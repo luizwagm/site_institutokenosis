@@ -18,7 +18,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.4.0";
 const UPLOAD_DIR = path.join(ROOT, "assets", "img", "uploads");
 fs.mkdirSync(path.join(ROOT, "data"), { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -185,9 +185,8 @@ setInterval(limparVisitasAntigas, 24 * 3600 * 1000).unref();
    edição feita pelo cliente no painel.
    -------------------------------------------------------------------------- */
 const IMG_TAG = {
-  img_hero:    { w: 620, h: 780, extra: 'fetchpriority="high" decoding="async"' },
-  img_clinica: { w: 620, h: 740, extra: 'loading="lazy" decoding="async"' },
-  img_online:  { w: 560, h: 640, extra: 'loading="lazy" decoding="async"' },
+  img_hero:        { w: 620, h: 775, extra: 'fetchpriority="high" decoding="async"' },   // 4/5 no CSS
+  img_instituicao: { w: 620, h: 744, extra: 'loading="lazy" decoding="async"' },         // 5/6 no CSS
 };
 
 function lerMarcador(html, chave) {
@@ -621,6 +620,18 @@ function setMarker(html, key, content) {
   return html.replace(re, (_m, open, close) => `${open}\n${content}\n${close}`);
 }
 
+/* O Google corta a <title> por volta de 60 caracteres. Com nomes longos ("Serviço
+   de Desenvolvimento Social e Produtivo") o sufixo da marca some no meio da
+   palavra e o resultado fica truncado feio. Aqui a marca encolhe antes disso, e
+   só sai de cena se nem assim couber. */
+function tituloSeo(base, limite = 60) {
+  const b = String(base).trim();
+  for (const sufixo of [" — Instituto Kenósis", " — Kenósis"]) {
+    if ((b + sufixo).length <= limite) return b + sufixo;
+  }
+  return b.length <= limite ? b : b.slice(0, limite - 1).trimEnd() + "…";
+}
+
 function publish() {
   const S = {}; for (const r of db.prepare("SELECT key,value FROM settings").all()) S[r.key] = r.value;
   const servicos = db.prepare("SELECT * FROM services ORDER BY sort,id").all();
@@ -635,14 +646,26 @@ function publish() {
   const paras = (txt) => String(txt || "").split(/\n{2,}/).map((p) => `<p>${esc(p.trim()).replace(/\n/g, "<br>")}</p>`).join("\n        ");
   const jsonldTag = (o) => `<script type="application/ld+json">\n  ${JSON.stringify(o, null, 2).replace(/\n/g, "\n  ")}\n  </script>`;
 
-  /* O conteúdo original vem com "## título" e "> citação" — converte para HTML
-     preservando a hierarquia da página do Google Sites. */
+  /* Conteúdo longo escrito no painel: "## título" vira h2, "> frase" vira
+     destaque e linha em branco separa parágrafo.
+
+     O texto NÃO é escapado — os campos do painel anunciam "aceita HTML", e
+     antes disto o publish escapava tudo, então um <strong> digitado pelo
+     cliente aparecia como texto na tela. Quem escreve aqui é o administrador
+     autenticado, a mesma pessoa que poderia editar os arquivos: não há elevação
+     de privilégio em confiar nesse conteúdo. Só o que vem de fora (formulário,
+     visitante) continua passando por esc().
+
+     Bloco que já começa com tag de bloco não é embrulhado em <p> — senão um
+     <ul> do cliente sairia dentro de um parágrafo, que é HTML inválido. */
+  const BLOCO_HTML = /^<(p|div|ul|ol|table|section|figure|h[1-6]|blockquote|pre|iframe|img)[\s>]/i;
   const marcado = (txt) => String(txt || "").split(/\n{2,}/).map((b) => {
     const t = b.trim();
     if (!t) return "";
-    if (t.startsWith("## ")) return `<h2>${esc(t.slice(3))}</h2>`;
-    if (t.startsWith("> ")) return `<blockquote class="cartao" style="margin:1.4rem 0"><p class="fala__texto">${esc(t.slice(2))}</p></blockquote>`;
-    return `<p>${esc(t).replace(/\n/g, "<br>")}</p>`;
+    if (t.startsWith("## ")) return `<h2>${t.slice(3)}</h2>`;
+    if (t.startsWith("> ")) return `<blockquote class="cartao" style="margin:1.4rem 0"><p class="fala__texto">${t.slice(2)}</p></blockquote>`;
+    if (BLOCO_HTML.test(t)) return t;
+    return `<p>${t.replace(/\n/g, "<br>")}</p>`;
   }).filter(Boolean).join("\n        ");
 
   /* ============================ blocos da home ============================ */
@@ -771,10 +794,31 @@ function publish() {
       description: "Organização da Sociedade Civil que atua na promoção da cidadania, na proteção social, no fortalecimento dos vínculos familiares e comunitários e na valorização da dignidade humana.",
       taxID: S.cnpj, email: S.contact_email, telephone: S.whatsapp ? "+" + S.whatsapp : undefined,
       sameAs: [`https://www.instagram.com/${S.instagram}/`],
-      areaServed: [{ "@type": "City", name: "Caruaru", containedInPlace: { "@type": "State", name: "Pernambuco" } }],
-      address: S.address ? { "@type": "PostalAddress", streetAddress: S.address, addressLocality: "Caruaru", addressRegion: "PE", addressCountry: "BR" } : undefined,
+      /* O Google usa areaServed para decidir em que buscas locais a instituição
+         entra. Caruaru é a sede; as vizinhas fazem parte da região de atuação
+         declarada e é nelas que a concorrência por "OSC", "assistência social"
+         e "voluntariado" é mais rala — logo, onde é mais viável ranquear. */
+      areaServed: [
+        { "@type": "City", name: "Caruaru", containedInPlace: { "@type": "State", name: "Pernambuco" } },
+        ...["Bezerros", "Riacho das Almas", "Toritama", "Santa Cruz do Capibaribe", "Gravatá",
+            "São Caetano", "Agrestina", "Brejo da Madre de Deus", "Bonito", "Belo Jardim"]
+          .map((c) => ({ "@type": "City", name: c, containedInPlace: { "@type": "State", name: "Pernambuco" } })),
+        { "@type": "AdministrativeArea", name: "Agreste Pernambucano" },
+      ],
+      address: S.address
+        ? { "@type": "PostalAddress", streetAddress: S.address, addressLocality: "Caruaru", addressRegion: "PE", addressCountry: "BR" }
+        // sem endereço cadastrado, ao menos a localidade — é o que ancora a
+        // instituição em Caruaru para o buscador
+        : { "@type": "PostalAddress", addressLocality: "Caruaru", addressRegion: "PE", addressCountry: "BR" },
+      nonprofitStatus: "NonprofitANBI",
       knowsAbout: servicos.map((s) => s.title),
       member: diretoria.map((m) => ({ "@type": "Person", name: m.name, jobTitle: m.role })),
+      /* Marca as ações como oferta gratuita: o Google distingue serviço
+         assistencial de serviço comercial, e isso muda o tipo de resultado. */
+      makesOffer: servicos.slice(0, 20).map((s) => ({
+        "@type": "Offer", price: "0", priceCurrency: "BRL",
+        itemOffered: { "@type": "Service", name: s.title, category: s.categoria || undefined },
+      })),
     },
     { "@type": "WebSite", "@id": `${SITE}/#site`, url: `${SITE}/`, name: "Instituto Kenósis", inLanguage: "pt-BR",
       publisher: { "@id": `${SITE}/#org` },
@@ -805,9 +849,48 @@ function publish() {
     fs.mkdirSync(path.join(ROOT, pasta), { recursive: true });
     fs.writeFileSync(path.join(ROOT, pasta, "index.html"), conteudo);
   };
+  /* --------------------------------------------------------------------
+     Navegação relacionada no pé de cada página interna.
+
+     Antes daqui, as páginas internas tinham 1 ou 2 links no corpo — só o menu
+     ligava uma à outra. Isso prende o visitante num beco e, para o buscador,
+     deixa páginas importantes a um único caminho de distância da home.
+     O bloco é montado a partir do canonical da própria página, então cada uma
+     nunca aponta para si mesma.
+     -------------------------------------------------------------------- */
+  const MAPA_PAGINAS = [
+    ["/institucional/", "A instituição", "Quem somos, governança, documentos constitutivos e parcerias."],
+    ["/servicos/", "Serviços", "O que o Instituto oferece em assistência social e saúde integrativa."],
+    ["/projetos/", "Projetos", "As iniciativas socioassistenciais em execução e em planejamento."],
+    ["/transparencia/", "Transparência", "Relatórios de atendimentos e documentos abertos à sociedade."],
+    ["/voluntariado/", "Voluntariado", "Como doar seu tempo e talento às ações do Instituto."],
+    ["/banco-de-talentos/", "Banco de talentos", "Envie seu currículo e participe de futuras oportunidades."],
+    ["/editais/", "Editais", "Chamamentos públicos e oportunidades de parceria."],
+    ["/memoria/", "Memória institucional", "O registro das nossas ações, encontros e conquistas."],
+  ];
+  const relacionados = (url) => {
+    const lista = MAPA_PAGINAS.filter(([u]) => u !== "/memoria/" || posts.length);
+    // começa na página SEGUINTE à atual e dá a volta: assim cada página sugere
+    // um trio diferente e, somadas, todas ficam a um clique de alguma outra.
+    // Sem isso, as três primeiras do mapa recebiam todos os links do site.
+    const i = lista.findIndex(([u]) => u === url);
+    const ordem = i < 0 ? lista : [...lista.slice(i + 1), ...lista.slice(0, i)];
+    return ordem.slice(0, 3)
+      .map(([u, titulo, texto], k) => `<a class="cartao proj-cartao" href="${u}" data-revela${k % 3 ? ` data-revela-atraso="${k % 3}"` : ""}>
+            <h3 class="cartao__titulo">${esc(titulo)}</h3>
+            <p class="cartao__texto">${esc(texto)}</p>
+          </a>`).join("\n          ");
+  };
+
   const base = (t, extras = {}) => {
     let h = aplicarTextos(tpl(t), S);
     for (const [k, v] of Object.entries(extras)) h = h.replaceAll(`{{${k}}}`, v);
+    if (h.includes("{{RELACIONADOS}}")) {
+      // o caminho vem depois do domínio — capturar a partir da primeira "/"
+      // pegaria a barra do "https://" e a página apontaria para si mesma
+      const canonical = /<link rel="canonical" href="https?:\/\/[^/"]+(\/[^"]*)"/.exec(h);
+      h = h.replaceAll("{{RELACIONADOS}}", "        " + relacionados(canonical ? canonical[1] : ""));
+    }
     return h.replace(/wa\.me\/\d+(?![?\d])/g, `wa.me/${S.whatsapp}`);
   };
   const migalha = (nome, url) => ({ "@type": "BreadcrumbList", itemListElement: [
@@ -837,8 +920,9 @@ function publish() {
   for (const p of projetos) {
     gravar(`projetos/${p.slug}`, base("projeto.html", {
       TITULO: esc(p.title), SLUG: esc(p.slug), SIGLA: esc(p.sigla || ""),
+      TITLE_TAG: esc(tituloSeo(p.title)),
       STATUS: esc(p.status || ""), CLASSE_STATUS: /execu/i.test(p.status || "") ? "ativo" : "planejado",
-      RESUMO: esc(p.resumo || ""), PUBLICO: esc(p.publico || ""), CONTEUDO: paras(p.content),
+      RESUMO: esc(p.resumo || ""), PUBLICO: esc(p.publico || ""), CONTEUDO: marcado(p.content),
       JSONLD: jsonldTag({ "@context": "https://schema.org", "@graph": [
         { "@type": "Project", name: p.title, alternateName: p.sigla, description: p.resumo,
           url: `${SITE}/projetos/${p.slug}/`, parentOrganization: { "@id": `${SITE}/#org` } },
@@ -884,16 +968,20 @@ function publish() {
       PG_CTA_LINK: destino,
       PG_CTA_ALVO: destino.startsWith("http") ? ' target="_blank" rel="noopener"' : "",
       PG_TITULO: S[`${chave}_titulo`] || "", PG_TEXTO: esc(S[`${chave}_texto`] || ""),
-      PG_CONTEUDO: paras(S[`${chave}_conteudo`] || ""), MIGALHA: esc(nome), URL: `/${pasta}/`,
-      TITLE_TAG: esc(`${nome} — Instituto Kenósis`),
+      PG_CONTEUDO: marcado(S[`${chave}_conteudo`] || ""), MIGALHA: esc(nome), URL: `/${pasta}/`,
+      TITLE_TAG: esc(tituloSeo(nome)),
       META_DESC: esc(String(S[`${chave}_texto`] || "").slice(0, 155)),
       JSONLD: jsonldTag({ "@context": "https://schema.org", "@graph": [migalha(nome, `/${pasta}/`)] }),
     }));
   }
 
   /* =============================== /memoria/ ============================== */
+  /* Página de listagem sem nenhum item é conteúdo raso: o Google indexa, avalia
+     como fraca e isso pesa contra o site inteiro. Enquanto não houver matéria,
+     ela fica fora do índice — e volta sozinha na primeira publicação. */
   gravar("memoria", base("memoria.html", {
     LISTA: "        " + memoriaTodas,
+    ROBOTS: posts.length ? "index, follow, max-image-preview:large, max-snippet:-1" : "noindex, follow",
     JSONLD: jsonldTag({ "@context": "https://schema.org", "@graph": [migalha("Memória institucional", "/memoria/"),
       { "@type": "Blog", name: "Memória institucional", url: `${SITE}/memoria/`, publisher: { "@id": `${SITE}/#org` } }] }),
   }));
@@ -903,7 +991,10 @@ function publish() {
   for (const p of posts) {
     gravar(`memoria/${p.slug}`, base("materia.html", {
       TITULO: esc(p.title), SLUG: esc(p.slug), RESUMO: esc(p.excerpt || ""), IMAGEM: esc(p.image || ""),
-      DATA_ISO: esc(p.date), DATA_BR: dataBR(p.date), CONTEUDO: paras(p.content),
+      DATA_ISO: esc(p.date), DATA_BR: dataBR(p.date), CONTEUDO: marcado(p.content),
+      FIGURA: p.image
+        ? `<figure class="materia-capa" data-revela><img src="${esc(p.image)}" alt="${esc(p.title)}" fetchpriority="high" decoding="async"></figure>`
+        : "",
       JSONLD: jsonldTag({ "@context": "https://schema.org", "@type": "Article",
         headline: p.title, description: p.excerpt, image: p.image, datePublished: p.date, inLanguage: "pt-BR",
         author: { "@id": `${SITE}/#org` }, publisher: { "@id": `${SITE}/#org` },
@@ -954,7 +1045,9 @@ function publish() {
     { loc: `${SITE}/voluntariado/`, pri: "0.8", freq: "monthly" },
     { loc: `${SITE}/banco-de-talentos/`, pri: "0.7", freq: "monthly" },
     { loc: `${SITE}/editais/`, pri: "0.7", freq: "weekly" },
-    { loc: `${SITE}/memoria/`, pri: "0.7", freq: "weekly" },
+    // vazia, ela está com noindex — anunciar no sitemap seria pedir para o
+    // buscador rastrear algo que mandamos ignorar
+    ...(posts.length ? [{ loc: `${SITE}/memoria/`, pri: "0.7", freq: "weekly" }] : []),
     ...posts.map((p) => ({ loc: `${SITE}/memoria/${p.slug}/`, pri: "0.6", freq: "yearly" })),
     { loc: `${SITE}/privacidade/`, pri: "0.3", freq: "yearly" },
   ];

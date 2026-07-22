@@ -290,6 +290,16 @@ h1, h2, h3, h4 {
   border: 8px solid #fff; box-shadow: var(--sombra);
 }
 
+/* --------------------- Seções sem foto cadastrada -------------------------
+   Enquanto o cliente não envia a imagem, a <figure> continua no HTML (é ali
+   que o marcador injeta a foto depois). Sem estas regras ela ocupa metade da
+   grade e a seção fica com um vão. Não dá para usar :empty — o marcador deixa
+   quebra de linha dentro, e espaço em branco já desqualifica o seletor.
+   -------------------------------------------------------------------------- */
+.hero__figura:not(:has(img)), .dividido__figura:not(:has(img)) { display: none; }
+.hero__grade:not(:has(.hero__figura img)),
+.dividido:not(:has(.dividido__figura img)) { grid-template-columns: 1fr; }
+
 /* ----------------------------- Missão/Visão ------------------------------- */
 .mvv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4rem; margin-top: 2.6rem; }
 .mvv__cartao { background: var(--papel); border-radius: var(--raio); padding: 1.8rem 1.6rem; border-top: 3px solid var(--celeste); box-shadow: var(--sombra-leve); }
@@ -483,6 +493,15 @@ h1, h2, h3, h4 {
 .materia__foto img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; transition: transform .6s ease; }
 .materia:hover .materia__foto img { transform: scale(1.05); }
 .materia__corpo { padding: 1.4rem 1.5rem; display: flex; flex-direction: column; flex: 1; }
+
+/* Capa da matéria aberta. Sobe sobre o topo azul para amarrar o cabeçalho ao
+   texto, em vez de ficar boiando no meio da página. */
+.materia-capa {
+  margin: -3.5rem 0 2.2rem; border-radius: var(--raio); overflow: hidden;
+  border: 1px solid var(--linha); box-shadow: var(--sombra); background: var(--papel);
+}
+.materia-capa img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block; }
+@media (max-width: 640px) { .materia-capa { margin-top: -2rem; } }
 .materia__data { font-size: .78rem; color: var(--terracota); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .materia__titulo { font-size: 1.12rem; margin: .4rem 0 .5rem; }
 .materia__titulo a { text-decoration: none; }

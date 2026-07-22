@@ -125,6 +125,32 @@ server {
         return 404;
     }
 
+    # ------------------------------------------------------------------
+    #  Compressão. O nginx comprime só text/html por padrão — CSS e JS
+    #  saíam inteiros pela rede (33 KB de CSS viram ~7 KB com gzip).
+    #  Peso de download é fator de ranqueamento via Core Web Vitals.
+    # ------------------------------------------------------------------
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 512;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css text/xml application/javascript application/json
+               application/xml application/rss+xml application/manifest+json image/svg+xml;
+
+    # ------------------------------------------------------------------
+    #  Cache dos estáticos. Sem isto o navegador revalida CSS, JS e imagem
+    #  a cada visita — retorno mais lento em toda navegação interna.
+    #  Ao trocar um asset, mude o nome do arquivo (o conteúdo fica 1 ano).
+    # ------------------------------------------------------------------
+    location ^~ /assets/ {
+        proxy_pass http://127.0.0.1:$PORTA;
+        proxy_set_header Host \$host;
+        expires 30d;
+        add_header Cache-Control "public, max-age=2592000" always;
+        access_log off;
+    }
+
 
     # ------------------------------------------------------------------
     #  Página de manutenção quando a APLICAÇÃO está fora do ar.

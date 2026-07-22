@@ -567,7 +567,12 @@ async function delRow(t, id) {
 }
 
 function pickImg(btn) {
-  const target = btn.parentElement.querySelector("input[data-f]");
+  /* Dois donos possíveis: linha de tabela (serviço, pessoa…) usa data-f e campo
+     de texto (Textos da Home) usa data-k. Procurando só por data-f, o botão nas
+     telas de texto achava null e a foto ia para o servidor sem nunca preencher
+     o campo — parecia que "não dava para inserir imagem". */
+  const target = btn.parentElement.querySelector("input[data-f], input[data-k]");
+  if (!target) return toast("Campo de imagem não encontrado nesta tela.", true);
   const fi = document.createElement("input");
   fi.type = "file"; fi.accept = "image/*";
   fi.onchange = () => {
