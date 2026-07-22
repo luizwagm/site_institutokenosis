@@ -14,7 +14,24 @@
 const fs = require("node:fs");
 const { DatabaseSync } = require("node:sqlite");
 
-const db = new DatabaseSync("data/site.db");
+/* Quem cria as tabelas é o primeiro boot do server.js. Rodar este script antes
+   disso não dá um erro compreensível: o DatabaseSync cria um site.db VAZIO sem
+   avisar e a primeira consulta estoura com "no such table". */
+const BANCO = "data/site.db";
+const existia = fs.existsSync(BANCO);
+const db = new DatabaseSync(BANCO);
+const tabelas = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map((t) => t.name));
+if (!tabelas.has("documentos") || !tabelas.has("settings")) {
+  db.close();
+  if (!existia) fs.unlinkSync(BANCO);   // não deixa para trás o arquivo vazio que acabei de criar
+  console.error("\n  O banco ainda não tem as tabelas — o site nunca subiu neste servidor.");
+  console.error("  Quem as cria é o primeiro boot do server.js. Faça nesta ordem:\n");
+  console.error("    sudo systemctl start kenosis.service");
+  console.error("    systemctl status kenosis.service      # precisa estar 'active (running)'");
+  console.error("    node aplicar-original.js\n");
+  console.error("  Se o serviço não sobe, veja o motivo em:  journalctl -u kenosis.service -n 50\n");
+  process.exit(1);
+}
 
 // documento cadastrado = conteúdo original já aplicado (o seed não cria nenhum)
 const jaAplicado = db.prepare("SELECT COUNT(*) c FROM documentos").get().c > 0;

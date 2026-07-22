@@ -41,8 +41,11 @@ sudo systemctl status kenosis.service
 #    então a pasta precisa ser gravável, não só o arquivo
 sudo chown -R deploy: data assets/img/uploads
 
-# 3. conteúdo original — RODE UMA VEZ SÓ, com o serviço já no ar
-sudo -u deploy node aplicar-original.js
+# 3. conteúdo original — RODE UMA VEZ SÓ, e só depois que o passo 1 subiu
+#    (é o boot do server.js que cria as tabelas; antes disso o script para
+#     com um aviso em vez de deixar um banco pela metade)
+systemctl is-active kenosis.service     # tem de responder: active
+node aplicar-original.js
 sudo systemctl restart kenosis.service
 
 # 4. vhost do nginx + certificado (o DNS já precisa apontar para cá)
