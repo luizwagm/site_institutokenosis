@@ -1,8 +1,8 @@
 /* ==========================================================================
    server.js — Gerenciador do site Instituto Kenósis
    Node puro + SQLite nativo (node:sqlite) — zero dependências.
-   · Site:   http://localhost:5185/
-   · Painel: http://localhost:5185/admin/   (senha inicial mostrada só no 1º boot)
+   · Site:   http://localhost:5189/
+   · Painel: http://localhost:5189/admin/   (senha inicial mostrada só no 1º boot)
    "Publicar" regenera o index.html (marcadores <!--#KEY-->) e o config.js.
    ========================================================================== */
 const http = require("node:http");
@@ -18,7 +18,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.0";
 const UPLOAD_DIR = path.join(ROOT, "assets", "img", "uploads");
 fs.mkdirSync(path.join(ROOT, "data"), { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -27,7 +27,7 @@ const db = new DatabaseSync(path.join(ROOT, "data", "site.db"));
 db.exec(`
   CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS services (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, text TEXT, sort INTEGER DEFAULT 0);
-  -- especialidades ganham página própria: slug (URL) + content (texto longo)
+  -- a coluna categoria agrupa os serviços na listagem; slug/content vêm do molde herdado
 
   -- portfolio guarda os PARCEIROS institucionais (nome, descrição da parceria, logo)
   CREATE TABLE IF NOT EXISTS portfolio (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, subtitle TEXT, image TEXT, sort INTEGER DEFAULT 0);
@@ -211,7 +211,6 @@ function migrarTextos() {
     for (const m of html.matchAll(/<!--#([A-Z0-9_]+)-->/g)) {
       const chave = m[1].toLowerCase();
       if (!KEYS.includes(chave)) continue;      // marcador de bloco gerado, não é texto editável
-      if (chave === "atendimento") continue;    // texto puro, tem valor próprio mais abaixo
       if (getS(chave) !== undefined) continue;  // já existe: respeita o que o cliente salvou
       let valor = lerMarcador(html, m[1]) || "";
       if (chave.startsWith("img_")) {
@@ -248,21 +247,6 @@ function migrarTextos() {
   if (getS("manutencao") === undefined) setS("manutencao", "0");
   if (getS("manutencao_titulo") === undefined) setS("manutencao_titulo", "Estamos atualizando o site");
   if (getS("manutencao_texto") === undefined) setS("manutencao_texto", "Volte em instantes.");
-  if (getS("atendimento") === undefined) setS("atendimento",
-    "Atendemos pacientes de toda a região!\n📍 Consultas presenciais: somente em Caruaru – PE.\n💻 Consultas online: para todo o Brasil e exterior.");
-
-  /* Reparo: a v1.6.0 gravou o HTML já renderizado do bloco em vez do texto puro,
-     e blocoAtendimento() escapa o conteúdo — resultado: as tags <p> apareciam na
-     tela. Converte de volta para uma linha por parágrafo. Roda uma vez só. */
-  const at = getS("atendimento") || "";
-  if (/<p[^>]*class="atendimento__/.test(at)) {
-    const linhas = [...at.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/g)]
-      .map((x) => x[1].replace(/<[^>]+>/g, "").trim()).filter(Boolean);
-    if (linhas.length) {
-      setS("atendimento", linhas.join("\n"));
-      console.log("  · bloco “Atendemos pacientes…” corrigido (tinha HTML no lugar do texto)");
-    }
-  }
   if (novos) console.log(`  · ${novos} texto(s) do site migrados para o painel`);
 }
 
@@ -284,6 +268,15 @@ const emManutencao = () => getS("manutencao") === "1";
 function gerarPaginaManutencao(S) {
   const titulo = S.manutencao_titulo || "Estamos atualizando o site";
   const texto = S.manutencao_texto || "Volte em instantes.";
+  // O símbolo entra inline: com o app fora do ar o nginx só serve este arquivo,
+  // então nada de /assets/ carrega — imagem referenciada apareceria quebrada.
+  let simbolo = "";
+  try {
+    simbolo = fs.readFileSync(path.join(ROOT, "assets", "img", "simbolo.svg"), "utf8")
+      .replace(/<\?xml[^>]*\?>/, "")
+      .replace("<svg", '<svg class="marca-svg" role="img" aria-label="Instituto Kenósis"');
+  } catch { /* sem o arquivo a página ainda se sustenta pelo texto */ }
+
   const html = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -294,56 +287,57 @@ function gerarPaginaManutencao(S) {
   <link rel="icon" type="image/svg+xml" href="/assets/img/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,600&family=Figtree:wght@300;400;600&family=Questrial&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,600&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
   <style>
     /* CSS embutido de propósito: se o app estiver fora do ar, o styles.css
        também não é servido — a página precisa se sustentar sozinha. */
     *{box-sizing:border-box;margin:0}
-    body{min-height:100vh;display:grid;place-items:center;padding:2rem;
-      font:400 16px/1.7 Figtree,system-ui,sans-serif;color:#2a2260;
-      background:radial-gradient(900px 500px at 80% -10%,rgba(255,255,255,.16),transparent 60%),
-                 radial-gradient(600px 400px at -5% 110%,rgba(185,138,70,.3),transparent 60%),
-                 linear-gradient(135deg,#3b2f9e,#5b4fd8)}
-    .caixa{width:min(560px,100%);background:#fff;border-radius:26px;padding:clamp(2rem,5vw,3rem);
-      text-align:center;box-shadow:0 30px 70px rgba(30,22,80,.3)}
-    .lotus{width:76px;height:76px;margin:0 auto 1.4rem;display:block}
-    h1{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;
-      font-size:clamp(1.7rem,4.6vw,2.4rem);line-height:1.2;color:#2a2260;margin-bottom:.8rem}
-    h1 em{font-style:italic;color:#b98a46}
-    p{color:#5f5a7a;font-weight:300;font-size:1.05rem}
-    .marca{margin-top:2rem;padding-top:1.4rem;border-top:1px solid #e7e4f5;
-      font-family:Questrial,sans-serif;letter-spacing:.04em;color:#5136d6;font-weight:600}
-    .zap{display:inline-flex;align-items:center;gap:.5rem;margin-top:1.4rem;padding:.8rem 1.5rem;
-      border-radius:999px;background:#5b4fd8;color:#fff;text-decoration:none;font-weight:600}
-    .zap:hover{background:#b98a46}
-    .pulso{animation:pulso 2.4s ease-in-out infinite}
-    @keyframes pulso{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.75;transform:scale(.95)}}
+    body{min-height:100vh;display:grid;place-items:center;padding:2rem;position:relative;overflow:hidden;
+      font:400 16px/1.7 Outfit,system-ui,sans-serif;color:#253282;background:#FAF7F2}
+    /* auréola: o mesmo motivo de arcos concêntricos que assina o site */
+    .aureola{position:absolute;inset:auto;left:50%;top:50%;translate:-50% -50%;
+      width:min(150vw,1100px);aspect-ratio:1;pointer-events:none}
+    .aureola span{position:absolute;inset:0;margin:auto;border-radius:50%;
+      border:1.5px solid rgba(30,161,228,.16)}
+    .aureola span:nth-child(1){width:34%;height:34%}
+    .aureola span:nth-child(2){width:52%;height:52%}
+    .aureola span:nth-child(3){width:70%;height:70%}
+    .aureola span:nth-child(4){width:88%;height:88%}
+    .aureola span:nth-child(5){width:100%;height:100%}
+    .caixa{position:relative;width:min(560px,100%);background:#fff;border-radius:24px;
+      padding:clamp(2rem,5vw,3.2rem);text-align:center;
+      border:1px solid rgba(37,50,130,.08);box-shadow:0 26px 60px rgba(37,50,130,.12)}
+    .marca-svg{width:96px;height:auto;margin:0 auto 1.6rem;display:block}
+    h1{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:clamp(1.7rem,4.6vw,2.4rem);
+      line-height:1.2;color:#253282;margin-bottom:.8rem}
+    h1 em{font-style:italic;color:#1EA1E4}
+    p{color:#5a6180;font-weight:300;font-size:1.05rem}
+    .zap{display:inline-flex;align-items:center;gap:.5rem;margin-top:1.6rem;padding:.85rem 1.6rem;
+      border-radius:999px;background:#1EA1E4;color:#fff;text-decoration:none;font-weight:600;
+      transition:background .2s ease}
+    .zap:hover{background:#253282}
+    .marca{margin-top:2rem;padding-top:1.4rem;border-top:1px solid #ece8e0;
+      font-family:Outfit,sans-serif;font-weight:600;letter-spacing:.02em;color:#253282}
+    .marca small{display:block;font-weight:400;font-size:.82rem;color:#8d92a8;letter-spacing:.06em;
+      text-transform:uppercase;margin-top:.25rem}
+    .pulso{animation:pulso 3s ease-in-out infinite}
+    @keyframes pulso{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.8;transform:scale(.97)}}
     @media(prefers-reduced-motion:reduce){.pulso{animation:none}}
   </style>
 </head>
 <body>
+  <div class="aureola" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
   <main class="caixa">
-    <svg class="lotus pulso" viewBox="180 840 300 300" role="img" aria-label="Instituto Kenósis">
-      <path fill="#5136d6" d="M457.37,933.57c-12.78-6.05-27.06-9.42-42.14-9.42-6.31,0-12.49.59-18.47,1.73-10.36-30.93-35.62-55.03-67.26-63.77-31.63,8.74-56.9,32.84-67.25,63.77-5.98-1.13-12.16-1.73-18.47-1.73-15.08,0-29.37,3.38-42.15,9.42-1.87,7.58-2.86,15.51-2.86,23.66,0,54.51,44.19,98.7,98.7,98.7,9.79,0,19.24-1.42,28.17-4.08-3.59-13.09-9.55-25.19-17.4-35.81-15.83-21.43-39.33-36.86-66.44-42.21,6.88-1.37,13.99-2.08,21.27-2.08,25.01,0,48.05,8.43,66.44,22.59,18.39-14.17,41.43-22.59,66.43-22.59,7.28,0,14.39.71,21.27,2.08-27.11,5.36-50.61,20.78-66.44,42.21-7.85,10.62-13.81,22.72-17.4,35.81,8.93,2.66,18.39,4.08,28.18,4.08,54.5,0,98.69-44.19,98.69-98.7,0-8.16-.99-16.08-2.86-23.66ZM329.5,976.94c-10.47,0-18.97-8.49-18.97-18.97s8.49-18.97,18.97-18.97,18.97,8.49,18.97,18.97-8.49,18.97-18.97,18.97Z"/>
-    </svg>
+    <div class="pulso">${simbolo}</div>
     <h1>${esc(titulo)}</h1>
     <p>${esc(texto)}</p>
     ${S.whatsapp ? `<a class="zap" href="https://wa.me/${esc(S.whatsapp)}" target="_blank" rel="noopener">Falar no WhatsApp</a>` : ""}
-    <p class="marca">Instituto Kenósis</p>
+    <p class="marca">Instituto Kenósis<small>Fonte das Graças Conceição &amp; Menezes</small></p>
   </main>
 </body>
 </html>`;
   fs.writeFileSync(path.join(ROOT, "manutencao.html"), html);
   return html;
-}
-
-/* HTML do bloco "Atendemos pacientes…" — 1ª linha vira destaque, o resto parágrafo */
-function blocoAtendimento(S) {
-  const linhas = String(S.atendimento || "").split("\n").map((l) => l.trim()).filter(Boolean);
-  if (!linhas.length) return "";
-  const [titulo, ...resto] = linhas;
-  return `<p class="atendimento__titulo">${esc(titulo)}</p>\n` +
-    resto.map((l) => `          <p class="atendimento__linha">${esc(l)}</p>`).join("\n");
 }
 
 /* Remonta a tag <img> a partir da URL e do alt guardados no painel */
@@ -1206,7 +1200,7 @@ try {
 
 /* Aplica em qualquer arquivo os textos simples guardados no painel.
    Chaves com formatação própria (listas, imagens) são tratadas à parte. */
-const ESPECIAIS = ["stats", "about_bullets", "online_list", "atendimento", "passos_itens", "empresas_cards", "ticker"];
+const ESPECIAIS = ["stats", "about_bullets", "online_list", "passos_itens", "empresas_cards", "ticker"];
 
 /* Faixa rolante: 4 grupos idênticos para o loop não ter emenda (ver styles.css) */
 function renderTicker(S) {
@@ -1448,7 +1442,7 @@ http.createServer(async (req, res) => {
     json(res, 500, { error: "Erro interno" });
   }
 // Escuta só no localhost: quem fala com o mundo é o nginx. Sem isto, o painel
-// ficaria acessível por http://IP:5185/admin/, sem HTTPS e sem cookie Secure.
+// ficaria acessível por http://IP:5189/admin/, sem HTTPS e sem cookie Secure.
 // Para expor direto (ambiente sem proxy), rode com HOST=0.0.0.0
 }).listen(PORT, process.env.HOST || "127.0.0.1", () => {
   console.log(`\n  Instituto Kenósis — site + gerenciador v${APP_VERSION}`);

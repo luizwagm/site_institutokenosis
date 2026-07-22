@@ -8,17 +8,17 @@
   <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap">
   <style>
-    :root{--bg:#f9f8fd;--surface:#fff;--line:#e7e4f5;--line2:#d2cdea;--text:#272144;--muted:#5f5a7a;--dim:#9a95b8;
+    :root{--bg:#FAF7F2;--surface:#fff;--line:#ece8e0;--line2:#d9d4ca;--text:#253282;--muted:#5a6180;--dim:#8d92a8;
       --violet:#253282;--violet2:#1EA1E4;--gold:#C8735B;--gold-d:#b3634d;--red:#e0426b;--r:14px}
     *{box-sizing:border-box;margin:0}
     [hidden]{display:none !important}
-    body{font:15px/1.6 Figtree,system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-    h1,h2,h3{font-family:Figtree,sans-serif;color:var(--violet)}
+    body{font:15px/1.6 Outfit,system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    h1,h2,h3{font-family:Outfit,sans-serif;color:var(--violet)}
     button{font:inherit;cursor:pointer;color:inherit}
     input,textarea,select{width:100%;padding:.65rem .8rem;font:inherit;color:var(--text);background:#fff;border:1.5px solid var(--line2);border-radius:9px}
-    input:focus,textarea:focus,select:focus{outline:none;border-color:var(--violet2);box-shadow:0 0 0 3px rgba(91,79,216,.13)}
+    input:focus,textarea:focus,select:focus{outline:none;border-color:var(--violet2);box-shadow:0 0 0 3px rgba(30,161,228,.18)}
     textarea{resize:vertical;min-height:80px}
     label{font-size:.8rem;font-weight:600;color:var(--muted);display:block;margin:.8rem 0 .3rem}
     .btn{display:inline-flex;align-items:center;gap:.5rem;padding:.6rem 1.15rem;border-radius:999px;border:2px solid transparent;font-weight:700}
@@ -28,18 +28,18 @@
     .btn-danger{background:#fdeef2;color:var(--red);border-color:#f6c6d4}
     .btn-sm{padding:.35rem .75rem;font-size:.8rem}
     .app{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
-    aside{background:var(--violet);color:#cfc9f6;padding:1.2rem;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+    aside{background:var(--violet);color:#b9d9ef;padding:1.2rem;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
     aside .logo{display:flex;align-items:center;gap:.6rem;margin-bottom:1.4rem;color:#fff;font-weight:700}
     aside .logo img{height:40px}
-    .navbtn{display:block;width:100%;text-align:left;padding:.6rem .8rem;border-radius:9px;border:0;background:none;color:#cfc9f6;font-weight:600;margin-bottom:.15rem}
+    .navbtn{display:block;width:100%;text-align:left;padding:.6rem .8rem;border-radius:9px;border:0;background:none;color:#b9d9ef;font-weight:600;margin-bottom:.15rem}
     .navbtn:hover{background:rgba(255,255,255,.08);color:#fff}
     .navbtn.on{background:var(--gold);color:#fff}
-    .versao{margin:.7rem 0 0;text-align:center;font-size:.7rem;letter-spacing:.08em;color:rgba(207,201,246,.55);font-variant-numeric:tabular-nums}
+    .versao{margin:.7rem 0 0;text-align:center;font-size:.7rem;letter-spacing:.08em;color:rgba(185,217,239,.55);font-variant-numeric:tabular-nums}
     /* na tela de login o fundo é claro — o tom da barra lateral sumiria */
     #login .versao{color:var(--dim)}
     main{padding:2rem 2.4rem;max-width:1000px}
     .panel{display:none}.panel.on{display:block}
-    .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1.2rem;margin-bottom:1rem;box-shadow:0 2px 8px rgba(68,56,184,.05)}
+    .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1.2rem;margin-bottom:1rem;box-shadow:0 2px 8px rgba(37,50,130,.06)}
     .row{display:grid;grid-template-columns:1fr 1fr;gap:0 1rem}
     .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.6rem;gap:1rem;flex-wrap:wrap}
     .hint{font-size:.75rem;color:var(--dim)}
@@ -60,13 +60,13 @@
     .pastilha-off{background:#fdeef2;color:var(--red)}
     /* --- Acessos --- */
     .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.8rem}
-    .stat-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1rem 1.1rem;box-shadow:0 2px 8px rgba(68,56,184,.05)}
+    .stat-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1rem 1.1rem;box-shadow:0 2px 8px rgba(37,50,130,.06)}
     .stat-card b{display:block;font-size:1.9rem;line-height:1.1;color:var(--violet)}
     .stat-card span{font-size:.76rem;color:var(--dim);font-weight:600}
     .stat-two{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
     @media(max-width:820px){.stat-two{grid-template-columns:1fr}}
     .spark{display:flex;align-items:flex-end;gap:2px;height:110px;margin-top:.8rem}
-    .spark-bar{flex:1;background:linear-gradient(180deg,var(--violet),#8f83e8);border-radius:3px 3px 0 0;min-height:3px}
+    .spark-bar{flex:1;background:linear-gradient(180deg,var(--violet),var(--violet2));border-radius:3px 3px 0 0;min-height:3px}
     .spark-bar:hover{background:var(--gold)}
     .st-table{width:100%;border-collapse:collapse;font-size:.85rem}
     .st-table td{padding:.4rem 0;border-bottom:1px solid var(--line)}
@@ -234,7 +234,7 @@
 
     <section class="panel" id="p-team">
       <div class="topbar"><h1>Diretoria e Conselho Fiscal</h1><button class="btn btn-ghost" onclick="addRow('team')">+ Nova pessoa</button></div>
-      <p class="hint mb">Cada pessoa aparece <b>uma única vez</b> na página <a href="/profissionais/" target="_blank">Guia de Profissionais</a>, mesmo atendendo várias especialidades — os grupos por especialidade abaixo da galeria mostram só o nome, sem repetir a foto.</p>
+      <p class="hint mb">Aparecem na seção <a href="/institucional/#diretoria" target="_blank">Diretoria e conselho fiscal</a> da página Institucional. Marque “aparece na home” para também sair na home. Sem foto, o card entra só com nome, cargo e titulação.</p>
       <datalist id="lista-categorias"></datalist>
       <div id="team-list"></div>
     </section>
@@ -453,6 +453,18 @@ async function saveTexts(painel) {
     renderTexts();
     toast("Salvo! Agora clique em Publicar.");
   } catch (e) { toast(e.message, true); }
+}
+
+/* Regenera os HTML estáticos a partir do banco. Enquanto isso não roda, o que
+   foi salvo no painel existe só no banco — o visitante continua vendo o antigo. */
+async function publishSite() {
+  $("#pub-log").textContent = "Publicando…";
+  try {
+    const r = await api("/api/publish", "POST");
+    $("#pub-log").textContent = `✓ Publicado — ${r.servicos} serviços, ${r.projetos} projetos, `
+      + `${r.documentos} documentos, ${r.diretoria} na diretoria, ${r.posts} memórias, ${r.parceiros} parceiros.`;
+    toast("Site publicado! 🚀");
+  } catch (e) { $("#pub-log").textContent = ""; toast(e.message, true); }
 }
 
 const TDEFS = {

@@ -354,16 +354,9 @@ h1, h2, h3, h4 {
   line-height: 1; margin-bottom: .6rem;
 }
 
-/* ------------------------------- Depoimentos ------------------------------ */
-.fala { display: flex; flex-direction: column; gap: .9rem; }
+/* --------------------------------- Citações -------------------------------
+   Uma linha iniciada por "> " no painel vira este destaque no meio do texto. */
 .fala__texto { font-family: var(--fonte-titulo); font-style: italic; font-size: 1.15rem; line-height: 1.5; color: var(--marinho); }
-.fala__autor { display: flex; align-items: center; gap: .8rem; font-size: .88rem; }
-.fala__inicial {
-  display: grid; place-items: center; width: 42px; height: 42px; flex: none;
-  border-radius: 50%; background: var(--celeste-luz); color: var(--marinho); font-weight: 700;
-}
-.fala__nome { font-weight: 700; color: var(--marinho); }
-.fala__papel { color: var(--tinta-suave); }
 
 /* -------------------------------- Contato --------------------------------- */
 .contato { display: grid; grid-template-columns: 1.1fr .9fr; gap: clamp(1.6rem, 4vw, 3rem); align-items: start; }
