@@ -1,0 +1,17 @@
+{
+  "name": "Instituto Kenósis",
+  "short_name": "Kenósis",
+  "description": "Organização da Sociedade Civil em Caruaru-PE: acolhimento, fortalecimento de vínculos familiares e projetos socioassistenciais.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FAF7F2",
+  "theme_color": "#253282",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "assets/img/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "assets/img/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/img/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/img/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

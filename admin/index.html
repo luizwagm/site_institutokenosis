@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Gerenciador — Instituto Kenósis</title>
+  <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
+  <style>
+    :root{--bg:#f9f8fd;--surface:#fff;--line:#e7e4f5;--line2:#d2cdea;--text:#272144;--muted:#5f5a7a;--dim:#9a95b8;
+      --violet:#253282;--violet2:#1EA1E4;--gold:#C8735B;--gold-d:#b3634d;--red:#e0426b;--r:14px}
+    *{box-sizing:border-box;margin:0}
+    [hidden]{display:none !important}
+    body{font:15px/1.6 Figtree,system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    h1,h2,h3{font-family:Figtree,sans-serif;color:var(--violet)}
+    button{font:inherit;cursor:pointer;color:inherit}
+    input,textarea,select{width:100%;padding:.65rem .8rem;font:inherit;color:var(--text);background:#fff;border:1.5px solid var(--line2);border-radius:9px}
+    input:focus,textarea:focus,select:focus{outline:none;border-color:var(--violet2);box-shadow:0 0 0 3px rgba(91,79,216,.13)}
+    textarea{resize:vertical;min-height:80px}
+    label{font-size:.8rem;font-weight:600;color:var(--muted);display:block;margin:.8rem 0 .3rem}
+    .btn{display:inline-flex;align-items:center;gap:.5rem;padding:.6rem 1.15rem;border-radius:999px;border:2px solid transparent;font-weight:700}
+    .btn-navy{background:var(--violet);color:#fff}
+    .btn-mint{background:var(--gold);color:#fff}
+    .btn-ghost{background:#fff;border-color:var(--line2);color:var(--violet)}
+    .btn-danger{background:#fdeef2;color:var(--red);border-color:#f6c6d4}
+    .btn-sm{padding:.35rem .75rem;font-size:.8rem}
+    .app{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+    aside{background:var(--violet);color:#cfc9f6;padding:1.2rem;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+    aside .logo{display:flex;align-items:center;gap:.6rem;margin-bottom:1.4rem;color:#fff;font-weight:700}
+    aside .logo img{height:40px}
+    .navbtn{display:block;width:100%;text-align:left;padding:.6rem .8rem;border-radius:9px;border:0;background:none;color:#cfc9f6;font-weight:600;margin-bottom:.15rem}
+    .navbtn:hover{background:rgba(255,255,255,.08);color:#fff}
+    .navbtn.on{background:var(--gold);color:#fff}
+    .versao{margin:.7rem 0 0;text-align:center;font-size:.7rem;letter-spacing:.08em;color:rgba(207,201,246,.55);font-variant-numeric:tabular-nums}
+    /* na tela de login o fundo é claro — o tom da barra lateral sumiria */
+    #login .versao{color:var(--dim)}
+    main{padding:2rem 2.4rem;max-width:1000px}
+    .panel{display:none}.panel.on{display:block}
+    .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1.2rem;margin-bottom:1rem;box-shadow:0 2px 8px rgba(68,56,184,.05)}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:0 1rem}
+    .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.6rem;gap:1rem;flex-wrap:wrap}
+    .hint{font-size:.75rem;color:var(--dim)}
+    .right{text-align:right}.mt{margin-top:1rem}.mb{margin-bottom:1rem}
+    .thumb{width:82px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+    .toast{position:fixed;bottom:1.2rem;left:50%;transform:translate(-50%,150%);background:var(--violet);color:#fff;
+      padding:.8rem 1.3rem;border-radius:999px;font-weight:600;transition:transform .3s;z-index:99}
+    .toast.on{transform:translate(-50%,0)}
+    .toast.err{background:var(--red)}
+    #login{position:fixed;inset:0;background:var(--violet);display:grid;place-items:center;z-index:50}
+    #login .card{width:min(360px,90vw);text-align:center;padding:2rem}
+    .imgrow{display:flex;gap:.6rem;align-items:center}
+    /* --- Manutenção --- */
+    #card-manutencao.manut-on{border-color:#f6c6d4;background:#fffafb;box-shadow:0 0 0 3px rgba(224,66,107,.09)}
+    .manut-estado{margin:.2rem 0 .6rem}
+    .pastilha{display:inline-block;padding:.35rem .9rem;border-radius:999px;font-size:.8rem;font-weight:700}
+    .pastilha-on{background:#e8f7ee;color:#1c7a45}
+    .pastilha-off{background:#fdeef2;color:var(--red)}
+    /* --- Acessos --- */
+    .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.8rem}
+    .stat-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1rem 1.1rem;box-shadow:0 2px 8px rgba(68,56,184,.05)}
+    .stat-card b{display:block;font-size:1.9rem;line-height:1.1;color:var(--violet)}
+    .stat-card span{font-size:.76rem;color:var(--dim);font-weight:600}
+    .stat-two{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    @media(max-width:820px){.stat-two{grid-template-columns:1fr}}
+    .spark{display:flex;align-items:flex-end;gap:2px;height:110px;margin-top:.8rem}
+    .spark-bar{flex:1;background:linear-gradient(180deg,var(--violet),#8f83e8);border-radius:3px 3px 0 0;min-height:3px}
+    .spark-bar:hover{background:var(--gold)}
+    .st-table{width:100%;border-collapse:collapse;font-size:.85rem}
+    .st-table td{padding:.4rem 0;border-bottom:1px solid var(--line)}
+    .st-table td:last-child{text-align:right;font-weight:700;color:var(--violet);width:70px}
+    .st-table tr:last-child td{border-bottom:0}
+    @media(max-width:820px){.app{grid-template-columns:1fr}aside{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:.3rem}main{padding:1.2rem}}
+  </style>
+</head>
+<body>
+
+<div id="login" hidden>
+  <div class="card">
+    <img src="/assets/img/favicon.svg" width="64" height="64" alt="Instituto Kenósis" style="margin:0 auto 1rem;border-radius:14px">
+    <h2 style="margin-bottom:.4rem">Gerenciador Instituto Kenósis</h2>
+    <p class="hint mb">Entre para editar o site.</p>
+    <input type="password" id="pw" placeholder="Senha" autocomplete="current-password">
+    <button class="btn btn-mint mt" style="width:100%;justify-content:center" onclick="login()">Entrar</button>
+    <p class="versao mt" title="Versão do gerenciador em execução no servidor">v{{APP_VERSION}}</p>
+  </div>
+</div>
+
+<div class="app" id="app" hidden>
+  <aside>
+    <span class="logo"><img src="/assets/img/favicon.svg" alt="" style="border-radius:10px"> Kenósis</span>
+    <button class="navbtn on" data-p="dash">▲ Publicar</button>
+    <button class="navbtn" data-p="acessos">📊 Acessos</button>
+    <button class="navbtn" data-p="home">Textos da Home</button>
+    <button class="navbtn" data-p="servicos">Serviços</button>
+    <button class="navbtn" data-p="projetos">Projetos</button>
+    <button class="navbtn" data-p="institucional">Institucional</button>
+    <button class="navbtn" data-p="transparencia">Transparência</button>
+    <button class="navbtn" data-p="team">Diretoria e Conselho</button>
+    <button class="navbtn" data-p="voluntariado">Voluntariado</button>
+    <button class="navbtn" data-p="talentos">Banco de Talentos</button>
+    <button class="navbtn" data-p="posts">Memórias</button>
+    <button class="navbtn" data-p="outras">Outras páginas</button>
+    <button class="navbtn" data-p="password">Senha</button>
+    <div style="margin-top:auto">
+      <a class="navbtn" href="/" target="_blank" style="text-decoration:none;display:block">↗ Ver o site</a>
+      <button class="navbtn" onclick="logout()">Sair</button>
+      <p class="versao" id="app-versao" title="Versão do gerenciador em execução no servidor">v—</p>
+    </div>
+  </aside>
+
+  <main>
+    <section class="panel on" id="p-dash">
+      <div class="topbar"><h1>Publicar</h1></div>
+      <div class="card">
+        <p style="color:var(--muted)">Suas edições ficam salvas no banco. Clique em <b>Publicar site</b> para atualizar as páginas com o novo conteúdo.</p>
+        <button class="btn btn-navy mt" onclick="publishSite()">🚀 Publicar site</button>
+        <p class="hint mt" id="pub-log"></p>
+      </div>
+
+      <div class="card" id="card-manutencao">
+        <h3 style="margin:0 0 .3rem">Modo manutenção</h3>
+        <p class="hint mb">Tira o site do ar e mostra um aviso com a identidade da clínica. Use antes de atualizar o servidor. Você, logado aqui, continua vendo o site normalmente.</p>
+        <div id="manut-estado" class="manut-estado"></div>
+        <label>Título do aviso</label><input id="manut_titulo">
+        <label>Mensagem</label><input id="manut_texto">
+        <div class="topbar mt" style="margin-bottom:0">
+          <button class="btn btn-ghost btn-sm" onclick="salvarTextoManutencao()">Salvar mensagem</button>
+          <button class="btn" id="btn-manut" onclick="alternarManutencao()"></button>
+        </div>
+        <p class="hint mt">Enquanto ligado, o site responde <b>503</b> — o Google entende que é temporário e não tira suas páginas do índice.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="p-acessos">
+      <div class="topbar"><h1>Acessos</h1><button class="btn btn-ghost" onclick="loadStats()">↻ Atualizar</button></div>
+      <div class="stat-grid" id="st-cards"></div>
+      <div class="card mt">
+        <h3 style="margin:0 0 .2rem">Últimos 30 dias</h3>
+        <p class="hint" id="st-janela"></p>
+        <div class="spark" id="st-spark"></div>
+      </div>
+      <div class="stat-two mt">
+        <div class="card">
+          <h3 style="margin:0 0 .6rem">Páginas mais acessadas</h3>
+          <table class="st-table" id="st-paginas"></table>
+        </div>
+        <div class="card">
+          <h3 style="margin:0 0 .6rem">De onde vieram</h3>
+          <table class="st-table" id="st-origens"></table>
+          <p class="hint mt" id="st-origens-vazio" hidden>Ainda sem origens externas registradas. Quando alguém chegar pelo Google ou pelo Instagram, aparece aqui.</p>
+        </div>
+      </div>
+      <p class="hint mt">O contador roda no próprio servidor, não usa cookie e não guarda o IP — só um código embaralhado dele. Robôs de busca e monitoramento são descartados. Nada disso aparece no site: só aqui.</p>
+    </section>
+
+    <section class="panel" id="p-home">
+      <div class="topbar"><h1>Textos da Home</h1><button class="btn btn-navy" onclick="saveTexts('home')">Salvar textos</button></div>
+      <p class="hint mb">Cada bloco corresponde a uma seção da página inicial. Depois de salvar, clique em <b>Publicar</b>.</p>
+      <div id="home-form"></div>
+      <div class="topbar" style="margin-top:1rem"><span></span><button class="btn btn-navy" onclick="saveTexts('home')">Salvar textos</button></div>
+    </section>
+
+    <section class="panel" id="p-servicos">
+      <div class="topbar"><h1>Serviços</h1><button class="btn btn-navy" onclick="saveTexts('servicos')">Salvar textos</button></div>
+      <p class="hint mb">Os serviços aparecem agrupados por categoria, na home e na página de Serviços. Cada linha é um serviço.</p>
+      <div class="topbar" style="margin-bottom:.8rem">
+        <h3 style="margin:0">Serviços cadastrados</h3>
+        <button class="btn btn-ghost btn-sm" onclick="addRow('services')">+ Novo serviço</button>
+      </div>
+      <div id="services-list" class="mb"></div>
+      <div id="servicos-form"></div>
+      <div class="topbar" style="margin-top:1rem"><span></span><button class="btn btn-navy" onclick="saveTexts('servicos')">Salvar textos</button></div>
+    </section>
+
+    <section class="panel" id="p-projetos">
+      <div class="topbar"><h1>Projetos</h1><button class="btn btn-navy" onclick="saveTexts('projetos')">Salvar textos</button></div>
+      <p class="hint mb">Cada projeto ganha uma página própria. Na home aparecem os 3 primeiros.</p>
+      <div class="topbar" style="margin-bottom:.8rem">
+        <h3 style="margin:0">Projetos cadastrados</h3>
+        <button class="btn btn-ghost btn-sm" onclick="addRow('projetos')">+ Novo projeto</button>
+      </div>
+      <div id="projetos-list" class="mb"></div>
+      <div id="projetos-form"></div>
+      <div class="topbar" style="margin-top:1rem"><span></span><button class="btn btn-navy" onclick="saveTexts('projetos')">Salvar textos</button></div>
+    </section>
+
+    <section class="panel" id="p-institucional">
+      <div class="topbar"><h1>Institucional</h1><button class="btn btn-navy" onclick="saveTexts('institucional')">Salvar textos</button></div>
+      <p class="hint mb">Todo o conteúdo da página Institucional. Os campos de conteúdo aceitam HTML.</p>
+      <div id="institucional-form"></div>
+      <div class="topbar" style="margin:1.6rem 0 .8rem">
+        <h3 style="margin:0">Parceiros institucionais</h3>
+        <button class="btn btn-ghost btn-sm" onclick="addRow('portfolio')">+ Novo parceiro</button>
+      </div>
+      <div id="portfolio-list" class="mb"></div>
+      <div class="topbar" style="margin-top:1rem"><span></span><button class="btn btn-navy" onclick="saveTexts('institucional')">Salvar textos</button></div>
+    </section>
+
+    <section class="panel" id="p-transparencia">
+      <div class="topbar"><h1>Transparência</h1><button class="btn btn-navy" onclick="saveTexts('transparencia')">Salvar textos</button></div>
+      <p class="hint mb">Textos da página e os documentos com link. Cada documento é um card.</p>
+      <div class="topbar" style="margin-bottom:.8rem">
+        <h3 style="margin:0">Documentos publicados</h3>
+        <button class="btn btn-ghost btn-sm" onclick="addRow('documentos')">+ Novo documento</button>
+      </div>
+      <div id="documentos-list" class="mb"></div>
+      <div id="transparencia-form"></div>
+      <div class="topbar" style="margin-top:1rem"><span></span><button class="btn btn-navy" onclick="saveTexts('transparencia')">Salvar textos</button></div>
+    </section>
+
+    <section class="panel" id="p-voluntariado">
+      <div class="topbar"><h1>Voluntariado</h1><button class="btn btn-navy" onclick="saveTexts('voluntariado')">Salvar textos</button></div>
+      <p class="hint mb">Conteúdo da página de voluntariado. Aceita HTML.</p>
+      <div id="voluntariado-form"></div>
+      <div class="topbar" style="margin-top:1rem"><span></span><button class="btn btn-navy" onclick="saveTexts('voluntariado')">Salvar textos</button></div>
+    </section>
+
+    <section class="panel" id="p-talentos">
+      <div class="topbar"><h1>Banco de Talentos</h1><button class="btn btn-navy" onclick="saveTexts('talentos')">Salvar textos</button></div>
+      <p class="hint mb">Conteúdo da página. O botão final leva para o WhatsApp.</p>
+      <div id="talentos-form"></div>
+      <div class="topbar" style="margin-top:1rem"><span></span><button class="btn btn-navy" onclick="saveTexts('talentos')">Salvar textos</button></div>
+    </section>
+
+    <section class="panel" id="p-outras">
+      <div class="topbar"><h1>Outras páginas</h1><button class="btn btn-navy" onclick="saveTexts('outras')">Salvar textos</button></div>
+      <p class="hint mb">Editais, Memória, Privacidade e o rodapé do site.</p>
+      <div id="outras-form"></div>
+      <div class="topbar" style="margin-top:1rem"><span></span><button class="btn btn-navy" onclick="saveTexts('outras')">Salvar textos</button></div>
+    </section>
+
+    <section class="panel" id="p-team">
+      <div class="topbar"><h1>Diretoria e Conselho Fiscal</h1><button class="btn btn-ghost" onclick="addRow('team')">+ Nova pessoa</button></div>
+      <p class="hint mb">Cada pessoa aparece <b>uma única vez</b> na página <a href="/profissionais/" target="_blank">Guia de Profissionais</a>, mesmo atendendo várias especialidades — os grupos por especialidade abaixo da galeria mostram só o nome, sem repetir a foto.</p>
+      <datalist id="lista-categorias"></datalist>
+      <div id="team-list"></div>
+    </section>
+
+    <section class="panel" id="p-posts">
+      <div class="topbar"><h1>Memórias</h1><button class="btn btn-ghost" onclick="addRow('posts')">+ Nova memória</button></div>
+      <p class="hint mb">A URL amigável (slug) sai do título. Parágrafos: linha em branco separa. Publique para gerar as páginas.</p>
+      <div id="posts-list"></div>
+    </section>
+
+
+
+
+
+
+    <section class="panel" id="p-password">
+      <div class="topbar"><h1>Trocar senha</h1></div>
+      <div class="card" style="max-width:420px">
+        <label>Senha atual</label><input type="password" id="pw_cur" autocomplete="current-password">
+        <label>Nova senha</label><input type="password" id="pw_new" autocomplete="new-password" minlength="8">
+        <p class="hint">Mínimo de 8 caracteres. Trocar a senha desconecta o painel em todos os outros dispositivos.</p>
+        <button class="btn btn-navy mt" onclick="changePw()">Salvar nova senha</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+let DATA = null;
+
+async function api(url, method = "GET", body) {
+  const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+let toastT;
+function toast(msg, err = false) {
+  const t = $("#toast"); t.textContent = msg; t.classList.toggle("err", err); t.classList.add("on");
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 3000);
+}
+const escA = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+
+async function boot() { try { await api("/api/me"); showApp(); } catch { $("#login").hidden = false; } }
+async function login() {
+  try { await api("/api/login", "POST", { password: $("#pw").value }); $("#login").hidden = true; showApp(); }
+  catch (e) { toast(e.message, true); }
+}
+async function logout() { await api("/api/logout", "POST"); location.reload(); }
+$("#pw")?.addEventListener("keydown", (e) => e.key === "Enter" && login());
+/* ------------------------------ Manutenção ------------------------------ */
+let MANUT = null;
+async function carregarManutencao() {
+  try { MANUT = await api("/api/manutencao"); } catch { return; }
+  $("#manut_titulo").value = MANUT.titulo || "";
+  $("#manut_texto").value = MANUT.texto || "";
+  pintarManutencao();
+}
+function pintarModo(ligado) {
+  $("#card-manutencao").classList.toggle("manut-on", ligado);
+  $("#manut-estado").innerHTML = ligado
+    ? '<span class="pastilha pastilha-off">● Site FORA DO AR para visitantes</span>'
+    : '<span class="pastilha pastilha-on">● Site no ar, normalmente</span>';
+  const b = $("#btn-manut");
+  b.textContent = ligado ? "✓ Colocar o site de volta no ar" : "⏻ Tirar o site do ar";
+  b.className = "btn " + (ligado ? "btn-mint" : "btn-danger");
+}
+function pintarManutencao() { pintarModo(!!MANUT?.ligado); }
+
+async function alternarManutencao() {
+  const ligando = !MANUT?.ligado;
+  if (ligando && !confirm("Tirar o site do ar agora?\n\nOs visitantes verão o aviso de manutenção. Você continuará vendo o site normalmente por estar logado.")) return;
+  try {
+    MANUT = await api("/api/manutencao", "POST", {
+      ligar: ligando, titulo: $("#manut_titulo").value, texto: $("#manut_texto").value,
+    });
+    pintarManutencao();
+    toast(ligando ? "Site fora do ar." : "Site de volta ao ar! 🪷");
+  } catch (e) { toast(e.message, true); }
+}
+async function salvarTextoManutencao() {
+  try {
+    MANUT = await api("/api/manutencao", "POST", {
+      ligar: !!MANUT?.ligado, titulo: $("#manut_titulo").value, texto: $("#manut_texto").value,
+    });
+    toast("Mensagem salva.");
+  } catch (e) { toast(e.message, true); }
+}
+
+async function showApp() {
+  $("#app").hidden = false;
+  carregarManutencao();
+  // vem do servidor (não do HTML) para não mostrar número velho vindo do cache
+  try { const me = await api("/api/me"); $("#app-versao").textContent = "v" + (me.version || "?"); } catch {}
+  await loadAll();
+}
+
+document.querySelectorAll(".navbtn[data-p]").forEach((b) =>
+  b.addEventListener("click", () => {
+    document.querySelectorAll(".navbtn[data-p]").forEach((x) => x.classList.remove("on"));
+    document.querySelectorAll(".panel").forEach((x) => x.classList.remove("on"));
+    b.classList.add("on");
+    $("#p-" + b.dataset.p).classList.add("on");
+    if (b.dataset.p === "acessos") loadStats();
+  })
+);
+
+/* ---------------------------- Acessos ---------------------------------- */
+const nf = new Intl.NumberFormat("pt-BR");
+async function loadStats() {
+  let s;
+  try { s = await api("/api/stats"); } catch (e) { return toast(e.message, true); }
+
+  $("#st-cards").innerHTML = [
+    ["Hoje", s.hoje], ["Últimos 7 dias", s.semana], ["Últimos 30 dias", s.mes],
+    ["Total de visitas", s.total], ["Visitantes únicos", s.visitantes], ["Únicos no mês", s.visitantesMes],
+  ].map(([r, v]) => `<div class="stat-card"><b>${nf.format(v)}</b><span>${r}</span></div>`).join("");
+
+  $("#st-janela").textContent =
+    `Uma visita = um visitante contado uma vez a cada ${s.janelaMin} minutos. Se a mesma pessoa voltar depois disso, conta de novo.`;
+
+  // gráfico de barras dos 30 dias, preenchendo os dias sem acesso com zero
+  const mapa = new Map(s.porDia.map((d) => [d.day, d.total]));
+  const dias = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    dias.push([d, mapa.get(d) || 0]);
+  }
+  const topo = Math.max(1, ...dias.map((d) => d[1]));
+  $("#st-spark").innerHTML = dias.map(([d, v]) => {
+    const [, m, dd] = d.split("-");
+    return `<span class="spark-bar" style="height:${Math.max(3, (v / topo) * 100)}%" title="${dd}/${m}: ${v} visita(s)"></span>`;
+  }).join("");
+
+  const linhas = (arr, campo, vazio) => arr.length
+    ? arr.map((r) => `<tr><td>${escA(r[campo] || "/")}</td><td>${nf.format(r.total)}</td></tr>`).join("")
+    : `<tr><td colspan="2" style="color:var(--muted)">${vazio}</td></tr>`;
+  $("#st-paginas").innerHTML = linhas(s.topPaginas, "path", "Nenhum acesso registrado ainda.");
+  $("#st-origens").innerHTML = linhas(s.origens, "referrer", "—");
+  $("#st-origens-vazio").hidden = s.origens.length > 0;
+}
+
+async function loadAll() {
+  DATA = await api("/api/content");
+  renderTexts();
+  const dl = $("#lista-categorias"); if (dl) dl.innerHTML = categoriasUsadas().map((c) => `<option value="${escA(c)}">`).join("");
+  renderTable("services"); renderTable("projetos"); renderTable("documentos");
+  renderTable("team"); renderTable("posts"); renderTable("portfolio");
+}
+
+/* ---------- Campos de texto, distribuídos pelos painéis via `painel` -------- */
+function valorParaCampo(chave, tipo) {
+  const v = DATA.settings[chave] ?? "";
+  if (tipo === "stats") {
+    try { return JSON.parse(v || "[]").map((x) => `${x.num} | ${x.label}`).join("\n"); } catch { return ""; }
+  }
+  if (tipo === "json_lista") {
+    try { return JSON.parse(v || "[]").join("\n"); } catch { return ""; }
+  }
+  return v;
+}
+
+function campoHTML(chave, rotulo, tipo) {
+  const val = valorParaCampo(chave, tipo);
+  const attrs = `data-k="${chave}" data-tipo="${tipo}"`;
+  if (tipo === "image") return `<label>${escA(rotulo)}</label>
+    <div class="imgrow">
+      <input ${attrs} value="${escA(val)}" style="flex:1">
+      <button class="btn btn-ghost btn-sm" onclick="pickImg(this)">Enviar foto</button>
+      ${val ? `<img class="thumb" src="${escA(val)}" alt="">` : ""}
+    </div>`;
+  if (tipo === "html") return `<label>${escA(rotulo)}</label>
+    <textarea ${attrs} style="min-height:280px;font-family:ui-monospace,Menlo,monospace;font-size:.85rem">${escA(val)}</textarea>
+    <p class="hint">Aceita HTML. Linha em branco separa parágrafos. <code>## Título</code> vira subtítulo e <code>&gt; frase</code> vira destaque.</p>`;
+  if (tipo === "bigtext") return `<label>${escA(rotulo)}</label><textarea ${attrs} style="min-height:170px">${escA(val)}</textarea>`;
+  if (["textarea", "lista", "stats", "json_lista"].includes(tipo))
+    return `<label>${escA(rotulo)}</label><textarea ${attrs}>${escA(val)}</textarea>`;
+  return `<label>${escA(rotulo)}</label><input ${attrs} value="${escA(val)}">`;
+}
+
+function renderTexts() {
+  const paineis = [...new Set((DATA.campos || []).map((g) => g.painel))];
+  for (const p of paineis) {
+    const alvo = $(`#${p}-form`);
+    if (!alvo) continue;
+    alvo.innerHTML = (DATA.campos || []).filter((g) => g.painel === p).map((g) => `
+      <div class="card">
+        <h3>${escA(g.grupo)}</h3>
+        ${g.campos.map(([c, r, t]) => campoHTML(c, r, t)).join("")}
+      </div>`).join("");
+  }
+}
+
+async function saveTexts(painel) {
+  const escopo = painel ? `#${painel}-form ` : "";
+  const body = {};
+  document.querySelectorAll(`${escopo}[data-k]`).forEach((el) => {
+    const { k, tipo } = el.dataset;
+    const v = el.value;
+    if (tipo === "stats") {
+      body[k] = JSON.stringify(v.split("\n").filter(Boolean).map((l) => {
+        const [num, ...r] = l.split("|"); return { num: num.trim(), label: r.join("|").trim() };
+      }));
+    } else if (tipo === "json_lista") {
+      body[k] = JSON.stringify(v.split("\n").map((x) => x.trim()).filter(Boolean));
+    } else {
+      body[k] = v;
+    }
+  });
+  try {
+    await api("/api/settings", "PUT", body);
+    DATA = await api("/api/content");
+    renderTexts();
+    toast("Salvo! Agora clique em Publicar.");
+  } catch (e) { toast(e.message, true); }
+}
+
+const TDEFS = {
+  portfolio: [
+    ["title", "Nome da instituição", "input"],
+    ["subtitle", "Descrição da parceria", "textarea"],
+    ["image", "Logo — sem logo, o card mostra só o nome", "image"],
+  ],
+  services: [
+    ["title", "Serviço", "input"],
+    ["categoria", "Categoria (agrupa na página)", "categoria"],
+  ],
+  projetos: [
+    ["title", "Nome do projeto", "input"],
+    ["sigla", "Sigla (aparece no círculo)", "input"],
+    ["status", "Situação (ex.: Em execução, Em planejamento institucional)", "input"],
+    ["resumo", "Resumo — aparece no card da home e da listagem", "textarea"],
+    ["publico", "Público-alvo", "textarea"],
+    ["content", "Conteúdo da página do projeto — aceita HTML", "bigtext"],
+    ["slug", "URL amigável (vazio = automática)", "input"],
+  ],
+  documentos: [
+    ["title", "Título do documento", "input"],
+    ["ano", "Ano", "input"],
+    ["tipo", "Descrição (aparece abaixo do título)", "textarea"],
+    ["url", "Link do arquivo (Google Drive, PDF…)", "input"],
+  ],
+  team: [
+    ["name", "Nome", "input"],
+    ["role", "Cargo (ex.: Presidente, Tesoureiro, Conselho Fiscal)", "input"],
+    ["photo", "Foto — sem foto, o card aparece sem imagem", "image"],
+    ["bio", "Titulação e formação", "textarea"],
+    ["na_home", "Aparece também na home?", "home"],
+  ],
+  posts: [
+    ["title", "Título", "input"],
+    ["slug", "URL amigável (vazio = automática)", "input"],
+    ["date", "Data (AAAA-MM-DD)", "input"],
+    ["excerpt", "Resumo", "textarea"],
+    ["image", "Imagem de capa", "image"],
+    ["content", "Conteúdo — aceita HTML", "bigtext"],
+  ],
+};
+/* categorias já usadas — para agrupar sem depender de digitação exata */
+const categoriasUsadas = () => [...new Set((DATA?.services || []).map((s) => s.categoria).filter(Boolean))];
+
+function renderTable(t) {
+  $("#" + t + "-list").innerHTML = DATA[t].map((r) => `
+    <div class="card">
+      ${TDEFS[t].map(([f, lab, kind]) => {
+        if (kind === "bigtext") return `<label>${lab}</label><textarea style="min-height:200px" data-t="${t}" data-id="${r.id}" data-f="${f}">${escA(r[f])}</textarea>`;
+        if (kind === "textarea") return `<label>${lab}</label><textarea data-t="${t}" data-id="${r.id}" data-f="${f}">${escA(r[f])}</textarea>`;
+        if (kind === "image") return `<label>${lab}</label>
+          <div class="imgrow">
+            <input data-t="${t}" data-id="${r.id}" data-f="${f}" value="${escA(r[f])}" style="flex:1">
+            <button class="btn btn-ghost btn-sm" onclick="pickImg(this)">Enviar foto</button>
+            ${r[f] ? `<img class="thumb" src="${escA(r[f])}" alt="">` : ""}
+          </div>`;
+        if (kind === "home") return `<label>${lab}</label>
+          <select data-t="${t}" data-id="${r.id}" data-f="${f}">
+            <option value="0"${Number(r[f]) ? "" : " selected"}>Não — só no guia de profissionais</option>
+            <option value="1"${Number(r[f]) ? " selected" : ""}>Sim — destacar na página inicial</option>
+          </select>`;
+        if (kind === "categoria") return `<label>${lab}</label>
+          <input data-t="${t}" data-id="${r.id}" data-f="${f}" value="${escA(r[f])}" list="lista-categorias">
+          <p class="hint">Serviços com a mesma categoria aparecem no mesmo bloco. Em uso: ${escA(categoriasUsadas().join(" · "))}</p>`;
+        return `<label>${lab}</label><input data-t="${t}" data-id="${r.id}" data-f="${f}" value="${escA(r[f])}">`;
+      }).join("")}
+      <div class="right mt">
+        ${t === "projetos" && r.slug ? `<a class="btn btn-ghost btn-sm" href="/projetos/${escA(r.slug)}/" target="_blank" style="text-decoration:none">Ver página</a>` : ""}
+        ${t === "posts" && r.slug ? `<a class="btn btn-ghost btn-sm" href="/memoria/${escA(r.slug)}/" target="_blank" style="text-decoration:none">Ver página</a>` : ""}
+        <button class="btn btn-danger btn-sm" onclick="delRow('${t}',${r.id})">Excluir</button>
+        <button class="btn btn-navy btn-sm" onclick="saveRow('${t}',${r.id})">Salvar</button>
+      </div>
+    </div>`).join("");
+}
+async function saveRow(t, id) {
+  const body = {};
+  document.querySelectorAll(`[data-t="${t}"][data-id="${id}"]`).forEach((el) => body[el.dataset.f] = el.value);
+  await api(`/api/${t}/${id}`, "PUT", body);
+  toast("Salvo! Lembre de publicar.");
+}
+async function addRow(t) {
+  const blank = {
+    services: { title: "Novo serviço", categoria: "", text: "", content: "", slug: "" },
+    team: { name: "Nova pessoa", role: "", bio: "", photo: "", whatsapp: "", especialidades: "", na_home: 0 },
+    projetos: { title: "Novo projeto", sigla: "", status: "Em planejamento institucional", resumo: "", publico: "", content: "" },
+    documentos: { title: "Novo documento", ano: "", tipo: "", url: "" },
+    posts: { title: "Nova memória", excerpt: "", content: "", image: "", date: new Date().toISOString().slice(0, 10) } }[t];
+  await api("/api/" + t, "POST", blank);
+  DATA = await api("/api/content");
+  renderTable(t);
+}
+async function delRow(t, id) {
+  if (!confirm("Excluir este item?")) return;
+  await api(`/api/${t}/${id}`, "DELETE");
+  DATA = await api("/api/content");
+  renderTable(t);
+  toast("Excluído. Lembre de publicar!");
+}
+
+function pickImg(btn) {
+  const target = btn.parentElement.querySelector("input[data-f]");
+  const fi = document.createElement("input");
+  fi.type = "file"; fi.accept = "image/*";
+  fi.onchange = () => {
+    const file = fi.files[0]; if (!file) return;
+    const fr = new FileReader();
+    fr.onload = async () => {
+      try {
+        const r = await api("/api/upload", "POST", { name: file.name, dataUrl: fr.result });
+        target.value = r.path;
+        toast("Foto enviada! Salve o item.");
+      } catch (e) { toast(e.message, true); }
+    };
+    fr.readAsDataURL(file);
+  };
+  fi.click();
+}
+
+async function changePw() {
+  try {
+    await api("/api/password", "POST", { current: $("#pw_cur").value, next: $("#pw_new").value });
+    $("#pw_cur").value = $("#pw_new").value = "";
+    toast("Senha alterada!");
+  } catch (e) { toast(e.message, true); }
+}
+
+boot();
+</script>
+</body>
+</html>

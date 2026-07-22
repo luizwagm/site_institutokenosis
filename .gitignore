@@ -1,0 +1,25 @@
+# --------------------------------------------------------------------------
+# Banco de dados — NUNCA versionar.
+# É o conteúdo vivo do site (textos, especialidades, profissionais, acessos) e
+# guarda dois segredos: o hash da senha do painel e o salt que anonimiza os IPs
+# do contador. Versionar significa (a) publicar esses segredos no repositório e
+# (b) o `git pull` em produção sobrescrever o banco do cliente com o do dev,
+# apagando tudo que ele editou pelo painel.
+# --------------------------------------------------------------------------
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Imagens enviadas pelo painel em produção — pertencem ao servidor, não ao repo.
+assets/img/uploads/
+
+# Sistema / editor
+Thumbs.db
+.DS_Store
+*.log
+node_modules/
+
+# Backups do banco gerados pelo deploy.sh
+backups/

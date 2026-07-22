@@ -1,0 +1,18 @@
+# Instituto Kenósis — https://institutokenosis.com
+# Regras válidas para Google, Bing/Yahoo, DuckDuckGo e demais buscadores.
+
+User-agent: *
+Allow: /
+
+# Painel administrativo: nunca deve ser rastreado nem indexado.
+Disallow: /admin/
+
+# Dados internos do site (índice de busca) — sem valor para o usuário na SERP.
+Disallow: /assets/data/
+
+# Observação: /busca/ NÃO é bloqueada aqui de propósito. Ela já envia
+# "noindex" no HTML; bloquear o rastreamento impediria o buscador de ler essa
+# diretiva e a página poderia acabar indexada sem descrição. Deixar rastrear é
+# o caminho certo para mantê-la fora do índice.
+
+Sitemap: https://institutokenosis.com/sitemap.xml

@@ -1,0 +1,657 @@
+/* ==========================================================================
+   Instituto Kenósis — Design System
+   --------------------------------------------------------------------------
+   CONCEITO: kénosis (κένωσις) é o esvaziamento de si para servir ao outro.
+   A tradução visual é o ESPAÇO e a LUZ: respiro generoso, traço fino e a
+   AURÉOLA do logotipo virando o motivo gráfico do site — arcos concêntricos
+   que abrem seções, contornam cards e assinam a marca. Nada de sombras
+   pesadas ou blocos cheios: a página respira como o conceito.
+
+   Paleta tirada do próprio logotipo (celeste do traço + marinho do wordmark),
+   com terracota como calor humano — a OSC acolhe, não é fria/corporativa.
+   ========================================================================== */
+
+:root {
+  /* --- cores do logotipo --- */
+  --celeste:      #1EA1E4;   /* extraído do logotipo — traço principal */
+  --celeste-claro:#7AC0E4;   /* extraído do logotipo — auréola */
+  --celeste-luz:  #EAF4FC;
+  --marinho:      #253282;   /* extraído do logotipo — wordmark */
+  --marinho-suave:#4A56A0;
+
+  /* --- calor humano: acolhimento, não instituição fria --- */
+  --terracota:    #C8735B;
+  --terracota-luz:#F5E3DD;
+
+  /* --- neutros quentes --- */
+  --areia:        #FAF7F2;
+  --papel:        #FFFFFF;
+  --tinta:        #22283D;
+  --tinta-suave:  #5C6479;
+  --linha:        #E6E2DA;
+
+  /* --- estrutura --- */
+  --raio:         20px;
+  --raio-p:       12px;
+  --sombra:       0 18px 44px rgba(37, 50, 130, .10);
+  --sombra-leve:  0 6px 18px rgba(37, 50, 130, .06);
+  --largura:      1200px;
+
+  /* --- tipografia: Fraunces (display caloroso) + Manrope (corpo) --- */
+  --fonte-titulo: "Fraunces", Georgia, serif;
+  --fonte-corpo:  "Outfit", system-ui, -apple-system, sans-serif;   /* mesma do logotipo */
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+
+html { scroll-behavior: smooth; }
+/* o cabeçalho é fixo: sem esta folga o link de âncora para embaixo dele e o
+   título da seção fica escondido */
+:target, section[id] { scroll-margin-top: 6.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+body {
+  font-family: var(--fonte-corpo);
+  font-size: clamp(1rem, .97rem + .15vw, 1.06rem);
+  line-height: 1.7;
+  color: var(--tinta);
+  background: var(--areia);
+  -webkit-font-smoothing: antialiased;
+}
+
+img, svg { display: block; max-width: 100%; }
+a { color: inherit; }
+button { font: inherit; color: inherit; cursor: pointer; }
+
+.container { width: min(var(--largura), 100% - 2.6rem); margin-inline: auto; }
+.container--estreito { max-width: 820px; }
+
+/* Foco visível — WCAG 2.2 AA */
+:focus-visible { outline: 3px solid var(--celeste); outline-offset: 3px; border-radius: 4px; }
+
+.pular-para {
+  position: absolute; left: -9999px; top: 0; z-index: 100;
+  background: var(--marinho); color: #fff; padding: .9rem 1.4rem; border-radius: 0 0 var(--raio-p) 0;
+}
+.pular-para:focus { left: 0; }
+
+/* ==========================================================================
+   AURÉOLA — o motivo da marca. Arcos concêntricos de luz, sempre em traço
+   fino, nunca preenchidos: é luz, não massa.
+   ========================================================================== */
+.aureola {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  border: 1px solid var(--celeste); opacity: .3;
+}
+.aureola--2 { opacity: .18; }
+.aureola--3 { opacity: .1; }
+
+/* --------------------------------- Tipografia ----------------------------- */
+h1, h2, h3, h4 {
+  font-family: var(--fonte-titulo);
+  font-weight: 600;
+  font-variation-settings: "SOFT" 40, "WONK" 1;   /* Fraunces: mais humana */
+  line-height: 1.15;
+  color: var(--marinho);
+  text-wrap: balance;
+}
+.titulo-secao { font-size: clamp(1.9rem, 1.2rem + 2.6vw, 2.9rem); margin-bottom: .7rem; }
+.titulo-secao em { font-style: italic; color: var(--celeste); }
+.titulo-p { font-size: clamp(1.35rem, 1.1rem + 1vw, 1.75rem); }
+
+.rotulo {
+  display: inline-flex; align-items: center; gap: .6rem;
+  font-family: var(--fonte-corpo); font-size: .76rem; font-weight: 700;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--terracota);
+  margin-bottom: .9rem;
+}
+.rotulo::before { content: ""; width: 28px; height: 1px; background: currentColor; }
+
+.sub-secao { color: var(--tinta-suave); font-size: 1.06rem; max-width: 60ch; }
+
+/* --------------------------------- Botões --------------------------------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .55rem;
+  padding: .85rem 1.7rem; border-radius: 999px; border: 1.5px solid transparent;
+  font-weight: 700; font-size: .95rem; text-decoration: none; letter-spacing: .01em;
+  transition: transform .25s ease, box-shadow .25s ease, background .25s ease, color .25s ease, border-color .25s ease;
+}
+.btn:hover { transform: translateY(-2px); }
+.btn--principal { background: var(--marinho); color: #fff; box-shadow: 0 8px 22px rgba(37, 50, 130, .22); }
+.btn--principal:hover { background: var(--celeste); box-shadow: 0 12px 28px rgba(30, 161, 228, .35); }
+.btn--contorno { border-color: var(--marinho); color: var(--marinho); }
+.btn--contorno:hover { background: var(--marinho); color: #fff; }
+.btn--claro { background: #fff; color: var(--marinho); }
+.btn--claro:hover { background: var(--celeste-luz); }
+.btn--calor { background: var(--terracota); color: #fff; box-shadow: 0 8px 22px rgba(200, 115, 91, .28); }
+.btn--calor:hover { background: #b3634d; }
+.btn--p { padding: .55rem 1.1rem; font-size: .85rem; }
+.btn--g { padding: 1rem 2rem; font-size: 1rem; }
+
+/* --------------------------------- Cabeçalho ------------------------------ */
+.cabecalho {
+  position: fixed; inset-inline: 0; top: 0; z-index: 60;
+  padding: 1.1rem 0; transition: background .3s ease, box-shadow .3s ease, padding .3s ease;
+}
+.cabecalho.rolou {
+  background: rgba(250, 247, 242, .93); backdrop-filter: blur(12px);
+  box-shadow: 0 1px 0 var(--linha); padding: .7rem 0;
+}
+.cabecalho__grade { display: flex; align-items: center; gap: 1.4rem; }
+/* Lockup da marca: o SÍMBOLO é SVG (vetor puro, sem texto) e o WORDMARK é
+   texto HTML de verdade. Motivo: SVG carregado como <img> não busca fonte
+   externa — o "Instituto Kenósis" do arquivo original sairia em Arial no lugar
+   da Outfit. Como texto, fica sempre correto, é selecionável, acessível, e
+   herda a cor do contexto (escuro no cabeçalho, branco no rodapé). */
+.marca { display: flex; align-items: center; gap: .75rem; text-decoration: none; flex: none; color: var(--marinho); }
+.marca__simbolo { height: 54px; width: auto; transition: height .3s ease; }
+.cabecalho.rolou .marca__simbolo { height: 44px; }
+.marca__nome { display: flex; flex-direction: column; line-height: 1.05; }
+.marca__linha1 {
+  font-family: var(--fonte-corpo); font-weight: 300; font-size: 1.42rem;
+  letter-spacing: -.01em; color: currentColor;
+}
+.marca__linha1 b { font-weight: 600; }
+.marca__linha2 {
+  font-family: var(--fonte-corpo); font-weight: 300; font-size: .62rem;
+  letter-spacing: .01em; color: var(--celeste); margin-top: .18rem;
+}
+.rodape .marca__linha2 { color: var(--celeste-claro); }
+.cabecalho.rolou .marca__linha1 { font-size: 1.24rem; }
+
+@media (max-width: 420px) {
+  .marca__linha1 { font-size: 1.15rem; }
+  .marca__linha2 { display: none; }   /* a assinatura longa não cabe no celular */
+  .marca__simbolo { height: 42px; }
+}
+
+.nav { display: flex; align-items: center; gap: clamp(.6rem, 1.3vw, 1.2rem); margin-left: auto; }
+.nav a:not(.btn) {
+  text-decoration: none; font-size: .93rem; font-weight: 600; color: var(--marinho);
+  white-space: nowrap; padding: .3rem 0; position: relative;
+}
+.nav a:not(.btn)::after {
+  content: ""; position: absolute; left: 0; bottom: 0; height: 2px; width: 0;
+  background: var(--celeste); transition: width .28s ease;
+}
+.nav a:not(.btn):hover::after, .nav a[aria-current="page"]::after { width: 100%; }
+
+.nav-botao { display: none; background: none; border: 0; padding: .5rem; }
+.nav-botao span { display: block; width: 24px; height: 2px; background: var(--marinho); border-radius: 2px; }
+.nav-botao span + span { margin-top: 5px; }
+
+/* ===================================== HERO =============================== */
+.hero { position: relative; padding: clamp(8rem, 16vh, 11rem) 0 clamp(4rem, 9vh, 6rem); overflow: hidden; }
+.hero::before {
+  content: ""; position: absolute; inset: 0; z-index: -2;
+  background:
+    radial-gradient(680px 480px at 78% 18%, var(--celeste-luz), transparent 62%),
+    radial-gradient(520px 420px at 8% 88%, var(--terracota-luz), transparent 60%);
+}
+/* as auréolas do hero: três arcos, do maior ao menor, atrás da foto */
+.hero__aureolas { position: absolute; right: -6%; top: 6%; width: min(46vw, 620px); aspect-ratio: 1; z-index: -1; }
+.hero__aureolas .aureola:nth-child(1) { inset: 0; }
+.hero__aureolas .aureola:nth-child(2) { inset: 9%; }
+.hero__aureolas .aureola:nth-child(3) { inset: 19%; }
+
+.hero__grade { display: grid; grid-template-columns: 1.05fr .95fr; gap: clamp(2rem, 5vw, 4rem); align-items: center; }
+.hero__titulo {
+  font-size: clamp(2.5rem, 1.5rem + 4.2vw, 4.2rem); line-height: 1.06;
+  letter-spacing: -.02em; margin-bottom: 1.2rem;
+}
+.hero__titulo em { font-style: italic; color: var(--celeste); }
+.hero__texto { font-size: clamp(1.05rem, 1rem + .3vw, 1.2rem); color: var(--tinta-suave); max-width: 52ch; margin-bottom: 2rem; }
+.hero__acoes { display: flex; flex-wrap: wrap; gap: .8rem; margin-bottom: 2.6rem; }
+
+.hero__figura { position: relative; }
+.hero__figura img {
+  width: 100%; aspect-ratio: 4 / 5; object-fit: cover;
+  border-radius: 300px 300px var(--raio) var(--raio);   /* arco no topo: a auréola */
+  border: 8px solid #fff; box-shadow: var(--sombra);
+}
+
+/* selo de credibilidade — OSC precisa provar existência formal */
+.selo-osc {
+  display: inline-flex; align-items: center; gap: .7rem; padding: .7rem 1.2rem;
+  background: #fff; border: 1px solid var(--linha); border-radius: 999px;
+  font-size: .84rem; color: var(--tinta-suave); box-shadow: var(--sombra-leve);
+}
+.selo-osc b { color: var(--marinho); }
+
+/* ------------------------------- Números ---------------------------------- */
+.numeros { display: flex; flex-wrap: wrap; gap: clamp(1.6rem, 4vw, 3.2rem); }
+.numero__valor {
+  font-family: var(--fonte-titulo); font-size: clamp(1.9rem, 1.4rem + 1.6vw, 2.6rem);
+  font-weight: 600; color: var(--celeste); line-height: 1;
+}
+.numero__rotulo { font-size: .82rem; color: var(--tinta-suave); max-width: 15ch; margin-top: .3rem; }
+
+/* -------------------------------- Seções ---------------------------------- */
+.secao { padding: clamp(3.8rem, 9vh, 6.4rem) 0; position: relative; }
+.secao--luz { background: var(--celeste-luz); }
+.secao--papel { background: var(--papel); }
+.secao__cabeca { max-width: 680px; margin-bottom: clamp(2.2rem, 5vh, 3.4rem); }
+.secao__cabeca--centro { margin-inline: auto; text-align: center; }
+.secao__cabeca--centro .rotulo::before { display: none; }
+.secao__cabeca--centro .sub-secao { margin-inline: auto; }
+
+/* divisor em arco: a auréola virando régua entre seções */
+.divisor-arco { display: block; width: 100%; height: 40px; color: var(--celeste); opacity: .35; }
+
+/* --------------------------------- Grades --------------------------------- */
+.grade { display: grid; gap: 1.5rem; }
+.grade--2 { grid-template-columns: repeat(2, 1fr); }
+.grade--3 { grid-template-columns: repeat(3, 1fr); }
+.grade--4 { grid-template-columns: repeat(4, 1fr); }
+
+.cartao {
+  background: var(--papel); border: 1px solid var(--linha); border-radius: var(--raio);
+  padding: 1.9rem 1.7rem; position: relative; overflow: hidden;
+  transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease;
+}
+/* cada cartão carrega um fragmento de auréola no canto */
+.cartao::before {
+  content: ""; position: absolute; top: -60px; right: -60px; width: 130px; height: 130px;
+  border: 1px solid var(--celeste); border-radius: 50%; opacity: .22;
+  transition: opacity .3s ease, transform .3s ease;
+}
+.cartao:hover { transform: translateY(-5px); box-shadow: var(--sombra); border-color: var(--celeste-claro); }
+.cartao:hover::before { opacity: .5; transform: scale(1.12); }
+
+.cartao__icone {
+  display: grid; place-items: center; width: 54px; height: 54px; margin-bottom: 1.1rem;
+  border-radius: 50%; background: var(--celeste-luz); color: var(--celeste);
+}
+.cartao__icone svg { width: 26px; height: 26px; }
+.cartao__titulo { font-size: 1.2rem; margin-bottom: .5rem; }
+.cartao__texto { font-size: .95rem; color: var(--tinta-suave); }
+.cartao__mais {
+  display: inline-flex; align-items: center; gap: .35rem; margin-top: 1rem;
+  font-size: .88rem; font-weight: 700; color: var(--celeste); text-decoration: none;
+  transition: gap .25s ease, color .25s ease;
+}
+.cartao__mais:hover { gap: .7rem; color: var(--terracota); }
+
+/* ------------------------- Lista de valores (checks) ---------------------- */
+.lista-valores { list-style: none; padding: 0; display: grid; gap: .7rem; }
+.lista-valores li { display: flex; gap: .7rem; align-items: flex-start; font-size: .97rem; }
+.lista-valores svg { flex: none; margin-top: .28rem; color: var(--celeste); }
+
+/* --------------------------- Bloco dividido ------------------------------- */
+.dividido { display: grid; grid-template-columns: .9fr 1.1fr; gap: clamp(2rem, 5vw, 4rem); align-items: center; }
+.dividido__figura { position: relative; }
+.dividido__figura img {
+  width: 100%; aspect-ratio: 5 / 6; object-fit: cover;
+  border-radius: var(--raio) 260px var(--raio) var(--raio);
+  border: 8px solid #fff; box-shadow: var(--sombra);
+}
+
+/* ----------------------------- Missão/Visão ------------------------------- */
+.mvv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4rem; margin-top: 2.6rem; }
+.mvv__cartao { background: var(--papel); border-radius: var(--raio); padding: 1.8rem 1.6rem; border-top: 3px solid var(--celeste); box-shadow: var(--sombra-leve); }
+.mvv__cartao:nth-child(2) { border-top-color: var(--terracota); }
+.mvv__cartao:nth-child(3) { border-top-color: var(--marinho); }
+.mvv__titulo { font-size: 1.15rem; margin-bottom: .6rem; }
+.mvv__texto { font-size: .93rem; color: var(--tinta-suave); }
+
+/* ------------------------------- Projetos --------------------------------- */
+.projeto {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 1.4rem; align-items: center;
+  background: var(--papel); border: 1px solid var(--linha); border-radius: var(--raio);
+  padding: 1.6rem 1.8rem; text-decoration: none;
+  transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease;
+}
+.projeto:hover { transform: translateX(6px); box-shadow: var(--sombra); border-color: var(--celeste-claro); }
+.projeto__sigla {
+  display: grid; place-items: center; width: 62px; height: 62px; flex: none;
+  border-radius: 50%; border: 1.5px solid var(--celeste); color: var(--marinho);
+  font-family: var(--fonte-titulo); font-weight: 600; font-size: .95rem;
+}
+.projeto__nome { font-size: 1.15rem; margin-bottom: .2rem; }
+.projeto__desc { font-size: .92rem; color: var(--tinta-suave); }
+.etiqueta {
+  display: inline-block; padding: .22rem .7rem; border-radius: 999px;
+  font-size: .72rem; font-weight: 700; letter-spacing: .04em;
+}
+.etiqueta--ativo { background: #e6f6ee; color: #1c7a45; }
+.etiqueta--planejado { background: var(--celeste-luz); color: var(--marinho); }
+
+/* ------------------------------ Transparência ----------------------------- */
+.transparencia { background: var(--marinho); color: #fff; }
+.transparencia .titulo-secao, .transparencia h3 { color: #fff; }
+.transparencia .titulo-secao em { color: var(--celeste-claro); }
+.transparencia .sub-secao { color: rgba(255, 255, 255, .8); }
+.transparencia .rotulo { color: var(--celeste-claro); }
+.doc {
+  display: flex; align-items: center; gap: 1rem; padding: 1.1rem 1.3rem;
+  background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: var(--raio-p); text-decoration: none; color: #fff;
+  transition: background .25s ease, transform .25s ease;
+}
+.doc:hover { background: rgba(255, 255, 255, .14); transform: translateY(-3px); }
+.doc__icone { flex: none; color: var(--celeste-claro); }
+.doc__nome { font-weight: 700; font-size: .95rem; }
+.doc__meta { font-size: .8rem; color: rgba(255, 255, 255, .65); }
+
+/* -------------------------------- Ajudar ---------------------------------- */
+.ajudar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+.ajudar__cartao {
+  background: var(--papel); border: 1px solid var(--linha); border-radius: var(--raio);
+  padding: 2rem 1.7rem; text-align: center; position: relative; overflow: hidden;
+}
+.ajudar__cartao::after {
+  content: ""; position: absolute; inset-inline: 0; bottom: 0; height: 3px;
+  background: linear-gradient(90deg, var(--celeste), var(--terracota));
+  transform: scaleX(0); transform-origin: left; transition: transform .35s ease;
+}
+.ajudar__cartao:hover::after { transform: scaleX(1); }
+.ajudar__num {
+  font-family: var(--fonte-titulo); font-size: 2.4rem; color: var(--celeste-claro);
+  line-height: 1; margin-bottom: .6rem;
+}
+
+/* ------------------------------- Depoimentos ------------------------------ */
+.fala { display: flex; flex-direction: column; gap: .9rem; }
+.fala__texto { font-family: var(--fonte-titulo); font-style: italic; font-size: 1.15rem; line-height: 1.5; color: var(--marinho); }
+.fala__autor { display: flex; align-items: center; gap: .8rem; font-size: .88rem; }
+.fala__inicial {
+  display: grid; place-items: center; width: 42px; height: 42px; flex: none;
+  border-radius: 50%; background: var(--celeste-luz); color: var(--marinho); font-weight: 700;
+}
+.fala__nome { font-weight: 700; color: var(--marinho); }
+.fala__papel { color: var(--tinta-suave); }
+
+/* -------------------------------- Contato --------------------------------- */
+.contato { display: grid; grid-template-columns: 1.1fr .9fr; gap: clamp(1.6rem, 4vw, 3rem); align-items: start; }
+.campo { margin-bottom: 1.1rem; }
+.campo label { display: block; font-size: .84rem; font-weight: 700; color: var(--marinho); margin-bottom: .35rem; }
+.campo input, .campo select, .campo textarea {
+  width: 100%; padding: .8rem 1rem; font: inherit; font-size: .95rem; color: var(--tinta);
+  background: #fff; border: 1.5px solid var(--linha); border-radius: var(--raio-p);
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.campo input:focus, .campo select:focus, .campo textarea:focus {
+  outline: none; border-color: var(--celeste); box-shadow: 0 0 0 3px rgba(30, 161, 228, .16);
+}
+.campo textarea { min-height: 110px; resize: vertical; }
+.campo-linha { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+
+.contato__canais { display: grid; gap: .8rem; }
+.canal {
+  display: flex; align-items: center; gap: .9rem; padding: 1rem 1.2rem;
+  background: var(--papel); border: 1px solid var(--linha); border-radius: var(--raio-p);
+  text-decoration: none; transition: border-color .25s ease, transform .25s ease;
+}
+.canal:hover { border-color: var(--celeste); transform: translateY(-2px); }
+.canal__icone { flex: none; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: var(--celeste-luz); color: var(--celeste); }
+.canal__rotulo { font-size: .76rem; color: var(--tinta-suave); }
+.canal__valor { font-weight: 700; color: var(--marinho); font-size: .95rem; }
+
+/* --------------------------------- Rodapé --------------------------------- */
+.rodape { background: var(--marinho); color: rgba(255, 255, 255, .75); padding: clamp(3rem, 7vh, 4.5rem) 0 1.8rem; }
+.rodape__grade { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1.2fr; gap: 2.4rem; }
+.rodape h4 { color: #fff; font-size: .8rem; font-family: var(--fonte-corpo); font-weight: 700; letter-spacing: .16em; text-transform: uppercase; margin-bottom: 1rem; }
+.rodape a { color: rgba(255, 255, 255, .75); text-decoration: none; transition: color .2s ease; }
+.rodape a:hover { color: var(--celeste-claro); }
+.rodape__nav { display: grid; gap: .5rem; font-size: .92rem; }
+.rodape__marca img { height: 62px; width: auto; margin-bottom: 1rem; }
+.rodape__frase { font-size: .92rem; max-width: 30ch; }
+.rodape__base {
+  margin-top: 2.6rem; padding-top: 1.6rem; border-top: 1px solid rgba(255, 255, 255, .14);
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;
+  font-size: .84rem;
+}
+
+/* assinatura LA Software House — obrigatória em todos os sites */
+.credito-dev { display: inline-flex; align-items: center; gap: .5rem; text-decoration: none; opacity: .78; transition: opacity .25s ease, color .25s ease; }
+.credito-dev:hover { opacity: 1; color: var(--celeste-claro); }
+.credito-dev b { font-weight: 700; }
+
+/* --------------------------- Botão flutuante ------------------------------ */
+.zap-flutua {
+  position: fixed; right: 1.4rem; bottom: 1.4rem; z-index: 70;
+  display: grid; place-items: center; width: 58px; height: 58px; border-radius: 50%;
+  background: #25d366; color: #fff; box-shadow: 0 10px 26px rgba(37, 211, 102, .4);
+  transition: transform .25s ease, bottom .4s ease;
+}
+.zap-flutua:hover { transform: scale(1.08); }
+.zap-flutua svg { width: 30px; height: 30px; }
+
+/* ==========================================================================
+   Revelação ao rolar — com melhoria progressiva.
+   O conteúdo é VISÍVEL por padrão. Só some para animar quando o JS confirma
+   que está no ar (a classe .js-anima no <html>). Se o JS falhar, o
+   IntersectionObserver não existir ou um bloqueador atrapalhar, o site
+   continua legível — em vez de virar uma página em branco.
+   ========================================================================== */
+[data-revela] { opacity: 1; }
+.js-anima [data-revela] {
+  opacity: 0; transform: translateY(22px);
+  transition: opacity .7s ease, transform .7s cubic-bezier(.2, .8, .3, 1);
+}
+.js-anima [data-revela].visivel { opacity: 1; transform: none; }
+[data-revela-atraso="1"] { transition-delay: .1s; }
+[data-revela-atraso="2"] { transition-delay: .2s; }
+[data-revela-atraso="3"] { transition-delay: .3s; }
+
+/* ------------------------------ Aviso/toast ------------------------------- */
+.aviso {
+  position: fixed; bottom: 1.4rem; left: 50%; transform: translate(-50%, 160%);
+  background: var(--marinho); color: #fff; padding: .85rem 1.4rem; border-radius: 999px;
+  font-weight: 600; font-size: .9rem; z-index: 90; transition: transform .35s ease;
+}
+.aviso.visivel { transform: translate(-50%, 0); }
+
+/* ============================ Páginas internas ============================= */
+.pagina-topo {
+  position: relative; overflow: hidden; color: #fff;
+  padding: clamp(8rem, 15vh, 10rem) 0 clamp(2.6rem, 6vh, 4rem);
+  background: linear-gradient(135deg, var(--marinho), #24377e);
+}
+.pagina-topo::before {
+  content: ""; position: absolute; right: -8%; top: -30%; width: 520px; height: 520px;
+  border: 1px solid rgba(255, 255, 255, .18); border-radius: 50%;
+}
+.pagina-topo::after {
+  content: ""; position: absolute; right: 2%; top: -12%; width: 340px; height: 340px;
+  border: 1px solid rgba(255, 255, 255, .12); border-radius: 50%;
+}
+.pagina-topo__titulo { color: #fff; font-size: clamp(2rem, 1.4rem + 2.6vw, 3rem); margin-bottom: .6rem; }
+.pagina-topo__titulo em { font-style: italic; color: var(--celeste-claro); }
+.pagina-topo__texto { color: rgba(255, 255, 255, .84); max-width: 56ch; }
+.migalhas { font-size: .84rem; margin-bottom: 1rem; color: rgba(255, 255, 255, .7); }
+.migalhas a { text-decoration: none; font-weight: 600; color: #fff; }
+.migalhas a:hover { text-decoration: underline; }
+.migalhas span { opacity: .5; margin-inline: .3rem; }
+
+.conteudo { font-size: 1.03rem; color: var(--tinta); }
+.conteudo p { margin-bottom: 1.1rem; }
+.conteudo h2 { font-size: clamp(1.4rem, 1.2rem + .8vw, 1.8rem); margin: 2.2rem 0 .8rem; }
+.conteudo h3 { font-size: 1.15rem; margin: 1.6rem 0 .6rem; }
+.conteudo ul { margin: 0 0 1.2rem; padding-left: 1.3rem; }
+.conteudo li { margin-bottom: .45rem; }
+.conteudo a { color: var(--celeste); font-weight: 600; text-underline-offset: 3px; }
+
+.cta-caixa {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1.2rem;
+  background: var(--celeste-luz); border-radius: var(--raio); padding: 1.6rem 1.8rem; margin: 2rem 0;
+}
+.cta-caixa p { margin: 0; max-width: 34rem; }
+.voltar { margin: 1.6rem 0 3rem; }
+.voltar a { color: var(--celeste); font-weight: 700; text-decoration: none; }
+.voltar a:hover { color: var(--terracota); }
+
+/* -------------------------------- Matérias -------------------------------- */
+.materia { background: var(--papel); border: 1px solid var(--linha); border-radius: var(--raio); overflow: hidden; display: flex; flex-direction: column; }
+.materia__foto img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; transition: transform .6s ease; }
+.materia:hover .materia__foto img { transform: scale(1.05); }
+.materia__corpo { padding: 1.4rem 1.5rem; display: flex; flex-direction: column; flex: 1; }
+.materia__data { font-size: .78rem; color: var(--terracota); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.materia__titulo { font-size: 1.12rem; margin: .4rem 0 .5rem; }
+.materia__titulo a { text-decoration: none; }
+.materia__titulo a:hover { color: var(--celeste); }
+.materia__resumo { font-size: .92rem; color: var(--tinta-suave); margin-bottom: 1rem; }
+.materia__mais { margin-top: auto; font-size: .88rem; font-weight: 700; color: var(--celeste); text-decoration: none; }
+
+/* ------------------------- Menu suspenso (Institucional) ------------------ */
+.nav-drop { position: relative; display: inline-flex; align-items: center; }
+.nav-drop > a { display: inline-flex; align-items: center; gap: .3rem; }
+.nav-drop__menu {
+  position: absolute; top: 100%; left: 50%; translate: -50% 0;
+  min-width: 250px; padding: .5rem; margin-top: .6rem;
+  display: grid; gap: .1rem; background: var(--papel);
+  border: 1px solid var(--linha); border-radius: var(--raio-p); box-shadow: var(--sombra);
+  opacity: 0; visibility: hidden; transform: translateY(-6px);
+  transition: opacity .22s ease, transform .22s ease, visibility .22s;
+}
+/* :focus-within mantém o menu aberto na navegação por teclado */
+.nav-drop:hover .nav-drop__menu, .nav-drop:focus-within .nav-drop__menu {
+  opacity: 1; visibility: visible; transform: none;
+}
+.nav-drop__menu a {
+  padding: .55rem .8rem !important; border-radius: 8px; font-size: .9rem;
+  color: var(--marinho) !important; white-space: nowrap;
+}
+.nav-drop__menu a::after { display: none; }
+.nav-drop__menu a:hover { background: var(--celeste-luz); }
+
+@media (max-width: 1080px) {
+  /* no painel mobile o submenu vira lista aberta, sem hover */
+  .nav-drop { display: block; }
+  .nav-drop__menu {
+    position: static; translate: none; opacity: 1; visibility: visible; transform: none;
+    transition: none;   /* aqui é lista fixa, não menu suspenso: nada a animar */
+    min-width: 0; border: 0; box-shadow: none; background: none;
+    margin: 0 0 .6rem; padding: 0 0 0 1rem; border-left: 2px solid var(--linha);
+  }
+  .nav-drop__menu a { padding: .55rem 0 !important; border-bottom: 0; }
+}
+
+/* --------------------- Cards de serviço: menor e expansível --------------- */
+.serv-cartao .lista-valores { display: grid; gap: .55rem; }
+.serv-cartao .lista-valores li { font-size: .92rem; }
+/* mostra 5 itens e esconde o resto até o clique — a categoria maior tem 16 */
+.serv-cartao .lista-valores li:nth-child(n + 6) { display: none; }
+.serv-cartao.aberto .lista-valores li:nth-child(n + 6) { display: flex; }
+.serv-cartao__botao {
+  margin-top: 1rem; padding: .45rem .95rem; border: 1.5px solid var(--linha);
+  border-radius: 999px; background: none; color: var(--celeste);
+  font-size: .84rem; font-weight: 700; cursor: pointer;
+  transition: background .2s ease, border-color .2s ease, color .2s ease;
+}
+.serv-cartao__botao:hover { background: var(--celeste-luz); border-color: var(--celeste-claro); }
+
+/* ------------------------- Foto na diretoria ------------------------------ */
+.pessoa__foto {
+  margin: 0 0 1rem; width: 96px; height: 96px; border-radius: 50%; overflow: hidden;
+  border: 3px solid #fff; box-shadow: var(--sombra-leve);
+}
+.pessoa__foto img { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
+
+/* --------------------- Card de projeto na home ---------------------------- */
+.proj-cartao { display: flex; flex-direction: column; text-decoration: none; }
+.proj-cartao .projeto__sigla { margin-bottom: .8rem; }
+.proj-cartao .cartao__mais { margin-top: auto; padding-top: 1rem; }
+
+/* ----------------------------- Lupa da busca ------------------------------ */
+.busca-lupa {
+  display: grid; place-items: center; width: 36px; height: 36px; flex: none;
+  border-radius: 50%; color: var(--marinho); text-decoration: none;
+  transition: background .25s ease, color .25s ease;
+}
+.busca-lupa:hover { background: var(--celeste-luz); color: var(--celeste); }
+
+/* ==========================================================================
+   Contraste do cabeçalho sobre o topo escuro das páginas internas.
+   O .pagina-topo é marinho e vai por baixo do cabeçalho fixo — sem isto os
+   links ficam marinho sobre marinho e somem, que foi o que aconteceu.
+   Ao rolar, o cabeçalho ganha fundo claro (.rolou) e tudo volta ao normal.
+   ========================================================================== */
+body:has(.pagina-topo) .cabecalho:not(.rolou) .marca,
+body:has(.pagina-topo) .cabecalho:not(.rolou) .nav a:not(.btn),
+body:has(.pagina-topo) .cabecalho:not(.rolou) .busca-lupa { color: #fff; }
+body:has(.pagina-topo) .cabecalho:not(.rolou) .marca__linha2 { color: var(--celeste-claro); }
+body:has(.pagina-topo) .cabecalho:not(.rolou) .nav a:not(.btn)::after { background: var(--celeste-claro); }
+body:has(.pagina-topo) .cabecalho:not(.rolou) .nav-botao span { background: #fff; }
+body:has(.pagina-topo) .cabecalho:not(.rolou) .btn--principal { background: #fff; color: var(--marinho); }
+body:has(.pagina-topo) .cabecalho:not(.rolou) .btn--principal:hover { background: var(--celeste-claro); }
+
+/* No celular o menu vira painel branco: os links precisam voltar ao escuro */
+@media (max-width: 1080px) {
+  body:has(.pagina-topo) .cabecalho:not(.rolou) .nav a:not(.btn) { color: var(--marinho); }
+  body:has(.pagina-topo) .cabecalho:not(.rolou) .nav .btn--principal { background: var(--marinho); color: #fff; }
+}
+
+/* --------------------------- Aviso de cookies (LGPD) ---------------------- */
+.cookie-barra {
+  position: fixed; z-index: 90; left: 1rem; right: 1rem; bottom: 1rem;
+  max-width: 720px; margin-inline: auto;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.4rem;
+  padding: 1.1rem 1.3rem; border-radius: var(--raio);
+  background: var(--papel); border: 1px solid var(--linha);
+  box-shadow: 0 18px 44px rgba(37, 50, 130, .22);
+  transform: translateY(140%); opacity: 0;
+  transition: transform .4s cubic-bezier(.2, .8, .3, 1), opacity .4s ease;
+}
+.cookie-barra.aberta { transform: translateY(0); opacity: 1; }
+.cookie-barra__texto { flex: 1 1 300px; }
+.cookie-barra__texto b { display: block; color: var(--marinho); margin-bottom: .25rem; }
+.cookie-barra__texto p { margin: 0; font-size: .84rem; line-height: 1.55; color: var(--tinta-suave); }
+.cookie-barra__texto a { color: var(--celeste); font-weight: 600; }
+/* os dois botões com o mesmo peso: recusar precisa ser tão fácil quanto
+   aceitar, senão o consentimento não é livre (ANPD/LGPD) */
+.cookie-barra__acoes { display: flex; flex-wrap: wrap; gap: .5rem; margin-left: auto; }
+
+.cookie-prefs {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; font-size: inherit; color: inherit; opacity: .85;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.cookie-prefs:hover { opacity: 1; color: var(--celeste-claro); }
+
+/* com o aviso aberto, o botão do WhatsApp sobe exatamente a altura dele */
+body.tem-cookie-barra .zap-flutua { bottom: calc(var(--cookie-barra-h, 0px) + 1.9rem); }
+
+@media (max-width: 620px) {
+  .cookie-barra { left: .7rem; right: .7rem; bottom: .7rem; padding: 1rem; gap: .9rem; }
+  .cookie-barra__acoes { margin-left: 0; width: 100%; }
+  .cookie-barra__acoes .btn { flex: 1; }
+  body.tem-cookie-barra .zap-flutua { bottom: calc(var(--cookie-barra-h, 0px) + 1.3rem); }
+}
+
+/* ------------------------------- Responsivo ------------------------------- */
+@media (max-width: 1080px) {
+  .nav {
+    position: fixed; inset: 0 0 auto; top: 0; padding: 5.5rem 1.6rem 2rem;
+    flex-direction: column; align-items: stretch; gap: .2rem;
+    background: var(--papel); box-shadow: var(--sombra);
+    transform: translateY(-102%); transition: transform .35s ease; margin-left: 0;
+  }
+  .nav.aberta { transform: none; }
+  .nav a:not(.btn) { padding: .8rem 0; border-bottom: 1px solid var(--linha); }
+  .nav .btn { margin-top: 1rem; justify-content: center; }
+  .nav-botao { display: block; margin-left: auto; }
+  .hero__grade, .dividido, .contato { grid-template-columns: 1fr; }
+  .hero__figura { max-width: 420px; margin-inline: auto; }
+  .grade--4 { grid-template-columns: repeat(2, 1fr); }
+  .rodape__grade { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 760px) {
+  .grade--3, .grade--2, .mvv, .ajudar { grid-template-columns: 1fr; }
+  .projeto { grid-template-columns: auto 1fr; }
+  .projeto > :last-child { grid-column: 1 / -1; }
+  .campo-linha { grid-template-columns: 1fr; }
+  .rodape__base { flex-direction: column; text-align: center; }
+}
+
+@media (max-width: 520px) {
+  .grade--4 { grid-template-columns: 1fr; }
+  .rodape__grade { grid-template-columns: 1fr; gap: 1.8rem; }
+  .hero__acoes .btn { width: 100%; }
+  .numeros { gap: 1.4rem 2rem; }
+}
