@@ -21,22 +21,25 @@ Description=Instituto Kenosis - site e gerenciador (Node + SQLite)
 Documentation=https://institutokenosis.com/
 After=network-online.target
 Wants=network-online.target
+; Estas duas SÓ funcionam aqui em [Unit]. Postas em [Service] são ignoradas, e
+; um erro de configuração vira reinício infinito (já rodou 145 vezes assim).
+StartLimitBurst=5
+StartLimitIntervalSec=120
 
 [Service]
 Type=simple
 User=deploy
 Group=deploy
 WorkingDirectory=/var/www/projetos/Instituto-Kenosis
-ExecStart=/usr/local/bin/node server.js
+; CONFIRA ESTE CAMINHO: `readlink -f $(which node)`. Errado, o systemd falha
+; com 203/EXEC — que não diz "não achei o node", só "não consegui executar".
+ExecStart=/usr/bin/node server.js
 Environment=NODE_ENV=production
 ; A porta tem de bater com a do vhost do nginx (nginx/criar-site.sh <dominio> 5189)
 Environment=PORT=5189
 
 Restart=always
 RestartSec=3
-; Aguenta reinícios seguidos sem o systemd desistir do serviço
-StartLimitBurst=10
-StartLimitIntervalSec=120
 
 StandardOutput=journal
 StandardError=journal
