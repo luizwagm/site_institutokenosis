@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Portal do Associado — Instituto Kenósis</title>
+  <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,600&family=Outfit:wght@400;500;600;700&display=swap">
+  <style>
+    :root{--marinho:#253282;--celeste:#1EA1E4;--areia:#FAF7F2;--linha:#e6e2da;--tinta:#22283d;--muted:#5c6479;--verde:#1c7a45;--red:#d63a5e}
+    *{box-sizing:border-box;margin:0}
+    [hidden]{display:none!important}
+    body{font:16px/1.6 Outfit,system-ui,sans-serif;color:var(--tinta);background:var(--areia);min-height:100vh}
+    h1,h2,h3{font-family:Fraunces,Georgia,serif;color:var(--marinho)}
+    input{width:100%;padding:.7rem .85rem;font:inherit;border:1.5px solid #cdd5e0;border-radius:10px}
+    input:focus{outline:none;border-color:var(--celeste);box-shadow:0 0 0 3px rgba(30,161,228,.16)}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;padding:.7rem 1.4rem;border-radius:999px;border:0;font:inherit;font-weight:700;cursor:pointer;background:var(--celeste);color:#fff}
+    .btn-ghost{background:#fff;border:1.5px solid #cdd5e0;color:var(--marinho)}
+    /* login */
+    #login{position:fixed;inset:0;display:grid;place-items:center;padding:1.5rem;background:linear-gradient(135deg,#253282,#1EA1E4)}
+    #login .card{width:min(380px,94vw);background:#fff;border-radius:20px;padding:2.2rem;text-align:center;box-shadow:0 30px 70px rgba(20,30,80,.3)}
+    #login img{width:60px;margin:0 auto 1rem;display:block}
+    #login label{display:block;text-align:left;font-size:.8rem;font-weight:600;color:var(--muted);margin:.9rem 0 .3rem}
+    /* portal */
+    header{background:var(--marinho);color:#fff;padding:1rem 0}
+    .wrap{width:min(880px,92%);margin-inline:auto}
+    header .wrap{display:flex;justify-content:space-between;align-items:center;gap:1rem}
+    header .marca{display:flex;align-items:center;gap:.6rem;font-weight:700}
+    header .marca img{height:34px}
+    main{padding:2rem 0 3rem}
+    .hero{display:flex;gap:1.4rem;align-items:center;margin-bottom:1.6rem}
+    .hero img{width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid #fff;box-shadow:0 8px 20px rgba(37,50,130,.16)}
+    .hero .semfoto{width:96px;height:96px;border-radius:50%;background:var(--celeste);color:#fff;display:grid;place-items:center;font:700 2rem Fraunces,serif}
+    .card{background:#fff;border:1px solid var(--linha);border-radius:16px;padding:1.4rem 1.6rem;margin-bottom:1.2rem;box-shadow:0 4px 14px rgba(37,50,130,.05)}
+    .rotulo{font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--celeste);margin-bottom:.9rem}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:.9rem 1.6rem}
+    .campo b{display:block;font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+    .campo span{font-size:1.05rem}
+    .tag{display:inline-block;padding:.2rem .7rem;border-radius:999px;font-size:.8rem;font-weight:700}
+    .tag-Ativo{background:#e7f6ee;color:var(--verde)}.tag-Inativo{background:#fdecef;color:var(--red)}
+    .nov{border-bottom:1px solid var(--linha);padding:.7rem 0}
+    .nov:last-child{border-bottom:0}
+    .nov b{color:var(--marinho)}.nov small{color:var(--muted)}
+    .erro{color:var(--red);font-size:.85rem;margin-top:.7rem;min-height:1.1em}
+    @media(max-width:560px){.grid{grid-template-columns:1fr}.hero{flex-direction:column;text-align:center}}
+  </style>
+</head>
+<body>
+
+<div id="login">
+  <div class="card">
+    <img src="/assets/img/favicon.svg" alt="">
+    <h2 style="margin-bottom:.2rem">Portal do Associado</h2>
+    <p style="color:var(--muted);font-size:.9rem">Instituto Kenósis</p>
+    <label>CPF</label>
+    <input id="lg-cpf" inputmode="numeric" placeholder="000.000.000-00" oninput="this.value=mCPF(this.value)">
+    <label>Senha (8 dígitos)</label>
+    <input id="lg-senha" type="password" inputmode="numeric" placeholder="Sua senha de acesso" onkeydown="if(event.key==='Enter')entrar()">
+    <button class="btn" style="width:100%;margin-top:1.1rem" onclick="entrar()">Entrar</button>
+    <p class="erro" id="lg-erro"></p>
+    <p style="font-size:.8rem;color:var(--muted);margin-top:1rem">Não tem senha? Fale com a secretaria do Instituto.</p>
+    <p style="font-size:.68rem;color:#aab;letter-spacing:.05em;margin-top:.8rem">Portal do Associado v{{VERSAO}}</p>
+  </div>
+</div>
+
+<div id="portal" hidden>
+  <header>
+    <div class="wrap">
+      <span class="marca"><img src="/assets/img/favicon.svg" alt=""> Instituto Kenósis</span>
+      <button class="btn btn-ghost" onclick="sair()" style="padding:.45rem 1rem">Sair</button>
+    </div>
+  </header>
+  <main>
+    <div class="wrap">
+      <div class="hero">
+        <img id="pf-foto" alt="" hidden>
+        <div id="pf-semfoto" class="semfoto"></div>
+        <div>
+          <p class="rotulo" style="margin:0">Associado</p>
+          <h1 id="pf-nome"></h1>
+          <span id="pf-status"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="rotulo">Minha ficha</p>
+        <div class="grid" id="pf-grid"></div>
+      </div>
+
+      <div class="card">
+        <p class="rotulo">Novidades e atualizações do Instituto</p>
+        <div id="pf-novidades"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const $=(s)=>document.querySelector(s);
+const escA=(s)=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+function mCPF(v){v=String(v).replace(/\D/g,"").slice(0,11);return v.replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d{1,2})$/,"$1-$2");}
+const dataBR=(iso)=>{if(!iso)return "—";const [a,m,d]=String(iso).split("-");return d?`${d}/${m}/${a}`:iso;};
+
+async function api(url,method="GET",body){
+  const r=await fetch("/externo/api/"+url,{method,headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error||r.statusText);
+  return j;
+}
+async function entrar(){
+  $("#lg-erro").textContent="";
+  try{ await api("login","POST",{cpf:$("#lg-cpf").value,senha:$("#lg-senha").value}); abrirPortal(); }
+  catch(e){ $("#lg-erro").textContent=e.message; }
+}
+async function sair(){ try{ await api("logout","POST"); }catch{} location.reload(); }
+
+async function abrirPortal(){
+  const d=await api("ficha");
+  $("#login").hidden=true; $("#portal").hidden=false;
+  const f=d.ficha;
+  $("#pf-nome").textContent=f.nome||"—";
+  $("#pf-status").innerHTML=f.status?`<span class="tag tag-${escA(f.status)}">${escA(f.status)}</span>`:"";
+  if(d.temFoto){ const img=$("#pf-foto"); img.src="/externo/foto?t="+Date.now(); img.hidden=false; $("#pf-semfoto").hidden=true; }
+  else { $("#pf-semfoto").textContent=(f.nome||"?").trim().charAt(0).toUpperCase(); }
+  const campo=(r,v)=>`<div class="campo"><b>${r}</b><span>${escA(v||"—")}</span></div>`;
+  $("#pf-grid").innerHTML=[
+    campo("Vínculo",f.vinculo), campo("Situação",f.status),
+    campo("Data de adesão",dataBR(f.adesao)), campo("Mensalidade",f.mensalidade),
+    campo("CPF",f.cpf), campo("Contato",f.contato),
+    campo("Endereço",f.endereco),
+  ].join("");
+  $("#pf-novidades").innerHTML = d.novidades.length
+    ? d.novidades.map((n)=>`<div class="nov"><b>${escA(n.titulo)}</b> — ${escA(n.tipo||"")}<br><small>${escA(n.tema||"")}${n.local?" · "+escA(n.local):""} · ${dataBR(n.data)}</small></div>`).join("")
+    : '<p style="color:var(--muted)">Nenhuma novidade no momento.</p>';
+}
+
+(async()=>{ try{ await api("ficha"); abrirPortal(); }catch{ $("#login").hidden=false; $("#lg-cpf").focus(); } })();
+</script>
+</body>
+</html>

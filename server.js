@@ -8,7 +8,7 @@
 const http = require("node:http");
 // Sistema de gestão da ONG — módulo independente, banco próprio (data/gestao.db).
 // Só compartilha o processo e a porta; ver restrito.js.
-const { handleRestrito } = require("./restrito");
+const { handleRestrito, handleExterno, listarProjetos, contarProjetos, importarProjetos } = require("./restrito");
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
@@ -21,7 +21,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "2.0.0";
 const UPLOAD_DIR = path.join(ROOT, "assets", "img", "uploads");
 fs.mkdirSync(path.join(ROOT, "data"), { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -642,7 +642,7 @@ function tituloSeo(base, limite = 60) {
 function publish() {
   const S = {}; for (const r of db.prepare("SELECT key,value FROM settings").all()) S[r.key] = r.value;
   const servicos = db.prepare("SELECT * FROM services ORDER BY sort,id").all();
-  const projetos = db.prepare("SELECT * FROM projetos ORDER BY sort,id").all();
+  const projetos = listarProjetos();   // fonte agora é o sistema de gestão (/restrito)
   const documentos = db.prepare("SELECT * FROM documentos ORDER BY sort,id").all();
   const parceiros = db.prepare("SELECT * FROM portfolio ORDER BY sort,id").all();
   const diretoria = db.prepare("SELECT * FROM team ORDER BY sort,id").all();
@@ -1292,6 +1292,16 @@ const KEYS = CAMPOS.flatMap((g) => g.campos.map(([k]) => k));
 // precisa vir depois de KEYS: a migração consulta a lista para saber o que é editável
 migrarTextos();
 
+/* Projetos passaram a ser cadastrados no /restrito. Se o banco de gestão ainda
+   não tem nenhum, leva os que já existiam aqui no site.db — migração única, para
+   não perder os projetos publicados. Depois disso o site.db.projetos fica ocioso. */
+try {
+  if (contarProjetos() === 0) {
+    const antigos = db.prepare("SELECT title,slug,sigla,status,resumo,publico,content,sort FROM projetos ORDER BY sort,id").all();
+    if (antigos.length) console.log(`  · projetos migrados para o sistema de gestão: ${importarProjetos(antigos)}`);
+  }
+} catch (e) { console.error("  ✖ migração de projetos:", e.message); }
+
 // garante que a página de manutenção exista em disco desde o primeiro boot —
 // o nginx a serve nas quedas, e nessa hora não há app para gerá-la
 try {
@@ -1369,8 +1379,8 @@ http.createServer(async (req, res) => {
 
   // Área restrita (sistema de gestão): atendida por módulo à parte, antes de
   // qualquer roteamento do site. Se ele tratou, encerra aqui.
-  try { if (handleRestrito(req, res, p)) return; }
-  catch (e) { console.error("  ✖ /restrito:", e.message); if (!res.headersSent) { res.writeHead(500); res.end("Erro interno"); } return; }
+  try { if (handleRestrito(req, res, p)) return; if (handleExterno(req, res, p)) return; }
+  catch (e) { console.error("  ✖ /restrito|externo:", e.message); if (!res.headersSent) { res.writeHead(500); res.end("Erro interno"); } return; }
 
   try {
     /* Modo manutenção: barra o visitante mas deixa passar o painel, a API e os
@@ -1451,7 +1461,7 @@ http.createServer(async (req, res) => {
           settings: S,
           campos: CAMPOS,   // o painel monta a tela "Textos do site" a partir daqui
           services: db.prepare("SELECT * FROM services ORDER BY sort,id").all(),
-          projetos: db.prepare("SELECT * FROM projetos ORDER BY sort,id").all(),
+          projetos: listarProjetos(),   // somente leitura no painel: cadastro é no /restrito
           documentos: db.prepare("SELECT * FROM documentos ORDER BY sort,id").all(),
           portfolio: db.prepare("SELECT * FROM portfolio ORDER BY sort,id").all(),
           team: db.prepare("SELECT * FROM team ORDER BY sort,id").all(),
@@ -1482,7 +1492,9 @@ http.createServer(async (req, res) => {
         for (const p of db.prepare("SELECT title, image FROM posts WHERE image<>''").all()) registrar(p.image, "Memórias");
         return json(res, 200, { galeria: daGaleria, emUso });
       }
-      const tm = p.match(/^\/api\/(services|portfolio|projetos|documentos|team|posts|galeria)(?:\/(\d+))?$/);
+      // projetos saíram do CRUD do painel: agora são cadastrados no /restrito e
+      // aqui o admin só lê (via /api/content) e publica.
+      const tm = p.match(/^\/api\/(services|portfolio|documentos|team|posts|galeria)(?:\/(\d+))?$/);
       if (tm) {
         const table = tm[1], id = tm[2], cols = TABLES[table];
         if (req.method === "POST" && !id) {

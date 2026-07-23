@@ -7,6 +7,7 @@ Allow: /
 # Painel administrativo: nunca deve ser rastreado nem indexado.
 Disallow: /admin/
 Disallow: /restrito/
+Disallow: /externo/
 
 # Dados internos do site (índice de busca) — sem valor para o usuário na SERP.
 Disallow: /assets/data/

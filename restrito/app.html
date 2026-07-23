@@ -40,6 +40,7 @@
     .navbtn{display:block;width:100%;text-align:left;padding:.52rem .75rem;border-radius:9px;border:0;background:none;color:#c5d6ea;font-weight:600;margin-bottom:.1rem}
     .navbtn:hover{background:rgba(255,255,255,.09);color:#fff}
     .navbtn.on{background:var(--celeste);color:#fff}
+    .nav-sep{border:0;border-top:1px solid rgba(255,255,255,.16);margin:.5rem 0}
     main{padding:1.6rem 2rem;max-width:1180px}
     .panel{display:none}.panel.on{display:block}
     .topbar{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.3rem}
@@ -59,6 +60,35 @@
     .tag-Atendido{background:#e7f6ee;color:var(--verde)}.tag-Faltou{background:#fdecef;color:var(--red)}
     .tag-Remarcado{background:#fdf4e6;color:var(--ambar)}.tag-Ativo{background:#e7f6ee;color:var(--verde)}.tag-Inativo{background:#eef1f6;color:var(--muted)}
     .vazio{color:var(--dim);padding:1.5rem;text-align:center}
+    /* seletor de vista da agenda */
+    .vista-toggle{display:inline-flex;gap:.25rem;background:#e3eaf3;border-radius:999px;padding:.25rem;margin-bottom:1rem}
+    .vbtn{border:0;background:none;padding:.4rem .95rem;border-radius:999px;font-weight:600;font-size:.85rem;color:var(--muted)}
+    .vbtn.on{background:#fff;color:var(--marinho);box-shadow:0 1px 4px rgba(37,50,130,.12)}
+    /* vista Agenda (calendário) */
+    .cal-cab{display:flex;align-items:center;justify-content:center;gap:1rem;margin-bottom:.9rem}
+    .cal-cab h3{min-width:190px;text-align:center;text-transform:capitalize}
+    .cal-cab button{width:34px;height:34px;border-radius:50%;border:1.5px solid var(--line2);background:#fff;color:var(--marinho);font-weight:700}
+    .cal-cab button:disabled{opacity:.35;cursor:not-allowed}
+    .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+    .cal .dow{text-align:center;font-size:.72rem;font-weight:700;color:var(--dim);text-transform:uppercase;padding:.3rem 0}
+    .cal .dia{min-height:92px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:.3rem;font-size:.8rem;cursor:pointer;overflow:hidden}
+    .cal .dia:hover{border-color:var(--celeste)}
+    .cal .dia.vazio-cel{background:transparent;border:0;cursor:default}
+    .cal .dia .num{font-weight:700;color:var(--muted);font-size:.75rem}
+    .cal .dia.hoje .num{background:var(--celeste);color:#fff;border-radius:50%;padding:0 .35rem}
+    .cal .ev{display:block;margin-top:2px;padding:1px 4px;border-radius:4px;font-size:.72rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:3px solid #999}
+    .ev-Agendado{background:#eaf1fb;border-color:#2a5bbd;color:#274f97}.ev-Confirmado,.ev-Atendido{background:#e7f6ee;border-color:var(--verde);color:#1c7a45}
+    .ev-Faltou{background:#fdecef;border-color:var(--red);color:#a3243f}.ev-Remarcado{background:#fdf4e6;border-color:var(--ambar);color:#8a5a15}
+    /* vista Kanban */
+    .kanban{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(220px,1fr);gap:.9rem;overflow-x:auto;padding-bottom:.5rem}
+    .kcol{background:#eef2f7;border-radius:12px;padding:.7rem;min-height:120px}
+    .kcol h4{font-size:.8rem;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:.6rem}
+    .kcol h4 span{background:#fff;border-radius:999px;padding:0 .5rem;color:var(--marinho)}
+    .kcol.drag{outline:2px dashed var(--celeste);outline-offset:-4px}
+    .kcard{background:#fff;border:1px solid var(--line);border-radius:9px;padding:.55rem .65rem;margin-bottom:.5rem;cursor:grab;box-shadow:0 1px 3px rgba(37,50,130,.06)}
+    .kcard b{display:block;font-size:.85rem;color:var(--marinho)}
+    .kcard small{color:var(--muted);font-size:.75rem}
+    .kvazio{color:var(--dim);font-size:.8rem;text-align:center;padding:.6rem 0}
     .modal-bg{position:fixed;inset:0;background:rgba(20,28,60,.45);display:grid;place-items:start center;padding:2rem 1rem;overflow:auto;z-index:40}
     .modal{width:min(760px,96vw);background:#fff;border-radius:16px;padding:1.4rem 1.5rem;box-shadow:0 30px 70px rgba(20,30,80,.3)}
     .modal h2{margin-bottom:1rem}
@@ -102,19 +132,23 @@
     <span class="marca"><img src="/assets/img/favicon.svg" alt=""> Gestão</span>
     <span class="sub" id="quem"></span>
     <button class="navbtn on" data-nav="painel">Painel</button>
-    <button class="navbtn" data-nav="pacientes">Pacientes</button>
+    <button class="navbtn" data-nav="pacientes">Usuários</button>
     <button class="navbtn" data-nav="associados">Associados</button>
     <button class="navbtn" data-nav="profissionais">Profissionais</button>
     <button class="navbtn" data-nav="atendimentos">Agenda</button>
     <button class="navbtn" data-nav="prontuario">Prontuário</button>
+    <button class="navbtn" data-nav="projetos">Projetos</button>
     <button class="navbtn" data-nav="beneficios">Benefícios</button>
     <button class="navbtn" data-nav="eventos">Eventos</button>
     <button class="navbtn" data-nav="documentos_gestao">Documentos</button>
     <button class="navbtn" data-nav="relatorios">Relatórios</button>
     <div style="margin-top:auto">
+      <hr class="nav-sep">
       <button class="navbtn" data-nav="conta">Minha conta</button>
+      <button class="navbtn" data-nav="usuarios">Usuários do Sistema</button>
       <a class="navbtn" href="/" target="_blank" style="text-decoration:none;display:block">↗ Ver o site</a>
       <button class="navbtn" onclick="sair()">Sair</button>
+      <p style="text-align:center;font-size:.68rem;letter-spacing:.06em;color:rgba(197,214,234,.5);margin-top:.5rem">Sistema de Gestão v{{VERSAO}}</p>
     </div>
   </aside>
 
@@ -134,22 +168,29 @@
         </div>
       </div>
       <input class="busca" id="mod-busca" placeholder="Buscar por nome ou CPF…" oninput="carregarLista()" style="margin-bottom:1rem" hidden>
-      <div class="card" style="padding:0;overflow:auto">
+      <div id="mod-vistas" class="vista-toggle" hidden>
+        <button class="vbtn on" data-v="tabela" onclick="trocarVista('tabela')">☰ Tabela</button>
+        <button class="vbtn" data-v="agenda" onclick="trocarVista('agenda')">▦ Agenda</button>
+        <button class="vbtn" data-v="kanban" onclick="trocarVista('kanban')">▤ Kanban</button>
+      </div>
+      <div class="card" id="mod-tabela" style="padding:0;overflow:auto">
         <table>
           <thead id="mod-thead"></thead>
           <tbody id="mod-tbody"><tr><td class="vazio">Carregando…</td></tr></tbody>
         </table>
       </div>
+      <div id="mod-agenda" hidden></div>
+      <div id="mod-kanban" hidden></div>
     </section>
 
     <section class="panel" id="pane-relatorios">
-      <div class="topbar"><h1>Relatórios</h1><button class="btn btn-ghost btn-sm" onclick="window.print()">Imprimir / PDF</button></div>
+      <div class="topbar"><h1>Relatórios</h1><button class="btn btn-ghost btn-sm" onclick="imprimirRelatorio()">Imprimir / PDF</button></div>
       <div class="stat-grid" id="rel-stats"></div>
       <div class="rel-cols">
-        <div class="card"><h3 style="margin-bottom:.6rem">Atendimentos por especialidade</h3><div id="rel-esp"></div></div>
-        <div class="card"><h3 style="margin-bottom:.6rem">Atendimentos por situação</h3><div id="rel-status"></div></div>
+        <div class="card"><h3 style="margin-bottom:.6rem">Serviços por especialidade</h3><div id="rel-esp"></div></div>
+        <div class="card"><h3 style="margin-bottom:.6rem">Serviços por situação</h3><div id="rel-status"></div></div>
       </div>
-      <div class="card"><h3 style="margin-bottom:.6rem">Atendimentos por mês</h3><div id="rel-mes"></div></div>
+      <div class="card"><h3 style="margin-bottom:.6rem">Serviços por mês</h3><div id="rel-mes"></div></div>
     </section>
 
     <section class="panel" id="pane-conta">
@@ -206,23 +247,27 @@ const ESCOLARIDADE = ["Não alfabetizado","Ensino Fundamental incompleto","Ensin
   "Ensino Médio incompleto","Ensino Médio completo","Ensino Superior incompleto","Ensino Superior completo","Pós-graduação"];
 const ESPECIALIDADES = ["Psicanálise (Individual)","Psicanálise (Casal)","Psicologia","Acupuntura","Nutrição",
   "Terapia Floral","Aromaterapia","Fitoterapia","Homeopatia","Ventosaterapia","Ozonioterapia","Detox Iônico","Assistência Social"];
-const CACHE = { pacientes: [], profissionais: [] };
+const CACHE = { pacientes: [], profissionais: [], projetos: [] };
 async function recarregarCache(){
   try { CACHE.pacientes = await api("pacientes"); } catch {}
   try { CACHE.profissionais = await api("profissionais"); } catch {}
+  try { CACHE.projetos = await api("projetos"); } catch {}
 }
-const nomePac = (id) => (CACHE.pacientes.find((p)=>String(p.id)===String(id))||{}).nome || "—";
-const nomeProf = (id) => (CACHE.profissionais.find((p)=>String(p.id)===String(id))||{}).nome || "—";
+const rotuloRef = (r) => r.nome ?? r.title ?? ("#"+r.id);
+const nomePac = (id) => { const r=CACHE.pacientes.find((p)=>String(p.id)===String(id)); return r?r.nome:"—"; };
+const nomeProf = (id) => { const r=CACHE.profissionais.find((p)=>String(p.id)===String(id)); return r?r.nome:"—"; };
 
 /* ========================= definição dos módulos ===================== */
 const MODULOS = {
-  pacientes: { titulo:"Pacientes", novo:"Novo paciente", busca:true,
+  pacientes: { titulo:"Usuários", novo:"Cadastrar Usuário", busca:true, imprimir:true,
     colunas:[["nome","Nome"],["nascimento","Nascimento","data"],["cpf","CPF"],["telefone","Telefone"],["vulneravel","Vulnerável","bool"]],
     campos:[
-      ["foto","Foto do paciente","foto",{full:1}],
+      ["foto","Foto do usuário","foto",{full:1}],
       ["nome","Nome completo","text",{req:1}],
       ["nascimento","Data de nascimento","date"],
       ["cpf","CPF","cpf"],["rg","RG","text"],
+      ["mae","Nome da mãe","text"],
+      ["pai","Nome do pai","text"],
       ["telefone","Telefone / WhatsApp","tel"],
       ["email","E-mail","email"],
       ["endereco","Endereço completo","text",{full:1}],
@@ -230,6 +275,7 @@ const MODULOS = {
       ["primeiro_atendimento","Data do 1º atendimento","date"],
       ["nis","NIS (opcional)","nis"],
       ["cartao_sus","Cartão SUS (opcional)","sus"],
+      ["projeto_id","Projeto vinculado","ref",{tabela:"projetos",full:1}],
       ["vulneravel","Situação de vulnerabilidade social","select",{bool:1}],
       ["vulnerabilidade","Descrição da vulnerabilidade","textarea",{full:1,dependeDe:"vulneravel"}],
       ["observacoes","Observações","textarea",{full:1}],
@@ -247,6 +293,7 @@ const MODULOS = {
       ["adesao","Data de adesão","date"],
       ["mensalidade","Valor da mensalidade","money"],
       ["status","Status","select",{opcoes:["Ativo","Inativo"]}],
+      ["senha_externo","Senha do portal do associado (/externo)","senha_externo",{full:1}],
     ]},
   profissionais: { titulo:"Profissionais", novo:"Novo profissional",
     colunas:[["nome","Nome"],["especialidade","Especialidade"],["registro","Registro"],["ativo","Ativo","bool"]],
@@ -257,11 +304,11 @@ const MODULOS = {
       ["contato","Contato","tel"],
       ["ativo","Ativo","select",{bool:1}],
     ]},
-  atendimentos: { titulo:"Agenda de atendimentos", novo:"Novo atendimento",
-    colunas:[["data","Data","data"],["hora","Hora"],["paciente_id","Paciente","pac"],["profissional_id","Profissional","prof"],["especialidade","Especialidade"],["status","Status","tag"]],
+  atendimentos: { titulo:"Agenda de serviços", novo:"Novo agendamento",
+    colunas:[["data","Data","data"],["hora","Hora"],["paciente_id","Usuário","pac"],["profissional_id","Profissional","prof"],["especialidade","Especialidade"],["status","Status","tag"]],
     campos:[
-      ["paciente_id","Paciente","ref",{tabela:"pacientes",req:1}],
-      ["profissional_id","Profissional","ref",{tabela:"profissionais"}],
+      ["paciente_id","Usuário","ref",{tabela:"pacientes",req:1}],
+      ["profissional_id","Profissional","ref",{tabela:"profissionais",ocultarPara:"profissional"}],
       ["especialidade","Especialidade","especialidade"],
       ["data","Data","date",{req:1}],
       ["hora","Horário","time"],
@@ -270,9 +317,9 @@ const MODULOS = {
       ["observacoes","Observações","textarea",{full:1}],
     ]},
   prontuario: { titulo:"Prontuário eletrônico", novo:"Novo registro",
-    colunas:[["data","Data","data"],["paciente_id","Paciente","pac"],["especialidade","Especialidade"],["profissional","Profissional"]],
+    colunas:[["data","Data","data"],["paciente_id","Usuário","pac"],["especialidade","Especialidade"],["profissional","Profissional"]],
     campos:[
-      ["paciente_id","Paciente","ref",{tabela:"pacientes",req:1}],
+      ["paciente_id","Usuário","ref",{tabela:"pacientes",req:1}],
       ["data","Data do atendimento","date",{req:1}],
       ["especialidade","Especialidade","especialidade"],
       ["profissional","Profissional responsável","text"],
@@ -310,17 +357,58 @@ const MODULOS = {
       ["fotos","Galeria de fotos","fotos",{full:1}],
     ]},
   documentos_gestao: { titulo:"Gestão de documentos", novo:"Novo documento",
-    colunas:[["data","Data","data"],["tipo","Tipo"],["titulo","Título"],["paciente_id","Paciente","pac"],["arquivo","Arquivo","arq"]],
+    colunas:[["data","Data","data"],["tipo","Tipo"],["titulo","Título"],["paciente_id","Usuário","pac"],["arquivo","Arquivo","arq"]],
     campos:[
       ["tipo","Tipo de documento","select",{opcoes:["Termo de consentimento","Receita/Prescrição","Certificado","Encaminhamento","Laudo","Outro"],placeholder:"Selecione…"}],
       ["titulo","Título/descrição","text",{req:1}],
-      ["paciente_id","Paciente (se aplicável)","ref",{tabela:"pacientes"}],
+      ["paciente_id","Usuário (se aplicável)","ref",{tabela:"pacientes"}],
       ["data","Data","date"],
       ["arquivo","Arquivo (foto/PDF)","arquivo",{full:1}],
     ]},
+  projetos: { titulo:"Projetos", novo:"Novo projeto",
+    colunas:[["title","Nome"],["sigla","Sigla"],["status","Situação"]],
+    campos:[
+      ["title","Nome do projeto","text",{req:1}],
+      ["sigla","Sigla (aparece no círculo)","text"],
+      ["status","Situação (ex.: Em execução, Em planejamento institucional)","text"],
+      ["resumo","Resumo — aparece no card da home e na listagem","textarea",{full:1}],
+      ["publico","Público-alvo","textarea",{full:1}],
+      ["content","Conteúdo da página do projeto (aceita parágrafos, ## título e > citação)","textarea",{full:1}],
+      ["sort","Ordem (menor aparece primeiro)","number"],
+    ]},
+  usuarios: { titulo:"Usuários do Sistema", novo:"Novo usuário",
+    colunas:[["nome","Nome"],["email","Login"],["perfil","Perfil","perfil"],["ativo","Ativo","bool"]],
+    campos:[
+      ["nome","Nome completo","text",{req:1}],
+      ["email","Usuário / login","text",{req:1}],
+      ["senha","Senha (mín. 8 — em branco mantém a atual)","password"],
+      ["perfil","Perfil de acesso","select",{opcoes:[["admin","Administrador Geral (acesso total)"],["secretaria","Secretaria / Atendente (cadastros, agenda, relatórios)"],["profissional","Profissional de Saúde/Terapias (sua agenda e prontuários)"]],padrao:"secretaria"}],
+      ["profissional_id","Profissional vinculado (só para o perfil Profissional — define de quem é a agenda)","ref",{tabela:"profissionais"}],
+      ["ativo","Situação","select",{bool:1,padrao:"1"}],
+    ]},
 };
+const PERFIL_ROTULO = { admin:"Administrador", secretaria:"Secretaria", profissional:"Profissional" };
 
-let MOD = null, LISTA = [];   // módulo atual e sua lista carregada
+/* Perfis: quais módulos cada um enxerga (o servidor faz a checagem de verdade;
+   aqui é só para esconder o que não interessa). admin vê tudo. */
+const PERM_CLIENTE = {
+  admin: null,
+  secretaria: new Set(["painel","pacientes","associados","profissionais","atendimentos","projetos","documentos_gestao","beneficios","eventos","relatorios","conta"]),
+  profissional: new Set(["atendimentos","prontuario","conta"]),   // SOMENTE a sua agenda e os seus prontuários
+};
+function aplicarPermissoes(perfil){
+  const allow = PERM_CLIENTE[perfil];
+  document.querySelectorAll(".navbtn[data-nav]").forEach((b)=>{
+    const nav=b.dataset.nav;
+    let vis;
+    if(perfil==="admin") vis=true;
+    else if(nav==="usuarios") vis=false;               // gestão de usuários é só do admin
+    else vis = !allow || nav==="conta" || allow.has(nav);
+    b.style.display = vis ? "" : "none";
+  });
+}
+
+let MOD = null, LISTA = [], FORM_ID = 0, ME = {};   // módulo, lista, id em edição e usuário logado
 
 /* ------------------------------ login ---------------------------------- */
 async function entrar(){ $("#lg-erro").textContent="";
@@ -329,11 +417,16 @@ async function entrar(){ $("#lg-erro").textContent="";
 async function sair(){ try{ await api("logout","POST"); }catch{} location.reload(); }
 
 async function iniciarApp(me){
+  ME=me;
   $("#login").hidden=true; $("#app").hidden=false;
-  $("#quem").textContent=me.nome+" · "+me.perfil;
+  $("#quem").textContent=me.nome+" · "+(PERFIL_ROTULO[me.perfil]||me.perfil);
+  aplicarPermissoes(me.perfil);
   $("#dl-esp").innerHTML=ESPECIALIDADES.map((e)=>`<option value="${escA(e)}">`).join("");
   await recarregarCache();
-  carregarPainel();
+  // abre o Painel se o perfil o vê; senão, vai ao primeiro módulo visível
+  const bp=document.querySelector('.navbtn[data-nav="painel"]');
+  if(bp && bp.style.display!=="none") carregarPainel();
+  else { const primeiro=[...document.querySelectorAll(".navbtn[data-nav]")].find((b)=>b.style.display!=="none" && b.dataset.nav!=="conta"); if(primeiro) primeiro.click(); }
 }
 
 /* ---------------------------- navegação -------------------------------- */
@@ -351,20 +444,35 @@ document.querySelectorAll(".navbtn[data-nav]").forEach((b)=>b.addEventListener("
 /* ------------------------------ painel --------------------------------- */
 async function carregarPainel(){
   try { const d=await api("painel");
-    $("#painel-stats").innerHTML=[["Pacientes",d.pacientes],["Associados",d.associados],
-      ["Atendimentos hoje",d.atendimentosHoje],["Eventos",d.eventos],["Benefícios entregues",d.beneficios]]
-      .map(([r,n])=>`<div class="stat"><b>${n}</b><span>${r}</span></div>`).join("");
+    const cards = d.profissional
+      ? [["Atendimentos hoje",d.agendaHoje],["Total na minha agenda",d.agendaTotal],["Meus prontuários",d.prontuarios]]
+      : [["Usuários",d.pacientes],["Associados",d.associados],["Atendimentos hoje",d.atendimentosHoje],["Eventos",d.eventos],["Benefícios entregues",d.beneficios]];
+    $("#painel-stats").innerHTML=cards.map(([r,n])=>`<div class="stat"><b>${n}</b><span>${r}</span></div>`).join("");
   } catch(e){ toast(e.message,true); }
 }
 
 /* ==================== lista genérica de um módulo ===================== */
+let vistaAgenda = "tabela", agendaYM = null;
 function mostrarModulo(){
   const m=MODULOS[MOD];
   $("#mod-titulo").textContent=m.titulo;
   $("#mod-novo").textContent="+ "+(m.novo||"Novo");
   $("#mod-busca").hidden=!m.busca; $("#mod-busca").value="";
   $("#mod-thead").innerHTML="<tr>"+m.colunas.map(([,lab])=>`<th>${lab}</th>`).join("")+"<th></th></tr>";
+  const ehAgenda = MOD==="atendimentos";
+  $("#mod-vistas").hidden=!ehAgenda;
+  if(ehAgenda){ agendaYM=null; document.querySelectorAll("#mod-vistas .vbtn").forEach((b)=>b.classList.toggle("on",b.dataset.v===vistaAgenda)); }
+  else { $("#mod-tabela").hidden=false; $("#mod-agenda").hidden=true; $("#mod-kanban").hidden=true; }
   carregarLista();
+}
+function trocarVista(v){ vistaAgenda=v; document.querySelectorAll("#mod-vistas .vbtn").forEach((b)=>b.classList.toggle("on",b.dataset.v===v)); pintarAtendimentos(); }
+function pintarAtendimentos(){
+  $("#mod-tabela").hidden = vistaAgenda!=="tabela";
+  $("#mod-agenda").hidden = vistaAgenda!=="agenda";
+  $("#mod-kanban").hidden = vistaAgenda!=="kanban";
+  if(vistaAgenda==="tabela") renderTabela();
+  else if(vistaAgenda==="agenda") renderAgenda();
+  else renderKanban();
 }
 function celula(row,[chave,,tipo]){
   const v=row[chave];
@@ -373,18 +481,97 @@ function celula(row,[chave,,tipo]){
   if(tipo==="tag"&&v) return `<span class="tag tag-${escA(v)}">${escA(v)}</span>`;
   if(tipo==="pac") return escA(nomePac(v));
   if(tipo==="prof") return escA(nomeProf(v));
+  if(tipo==="perfil") return escA(PERFIL_ROTULO[v]||v||"—");
   if(tipo==="arq") return v?`<a class="arq-link" href="${escA(v)}" target="_blank">abrir</a>`:"—";
   return escA(v||"—");
 }
 async function carregarLista(){
-  const m=MODULOS[MOD], tb=$("#mod-tbody"), nc=m.colunas.length+1;
+  const m=MODULOS[MOD];
   try {
     const q=m.busca?$("#mod-busca").value.trim():"";
     LISTA=await api(MOD+(q?"?q="+encodeURIComponent(q):""));
-    if(!LISTA.length){ tb.innerHTML=`<tr><td colspan="${nc}" class="vazio">Nenhum registro ${q?"encontrado":"cadastrado ainda"}.</td></tr>`; return; }
-    tb.innerHTML=LISTA.map((row)=>`<tr>${m.colunas.map((c)=>`<td>${celula(row,c)}</td>`).join("")}
-      <td style="text-align:right;white-space:nowrap"><button class="btn btn-ghost btn-sm" onclick="abrirForm(${row.id})">Abrir</button></td></tr>`).join("");
-  } catch(e){ tb.innerHTML=`<tr><td colspan="${nc}" class="vazio">${escA(e.message)}</td></tr>`; }
+  } catch(e){ $("#mod-tbody").innerHTML=`<tr><td colspan="${m.colunas.length+1}" class="vazio">${escA(e.message)}</td></tr>`; return; }
+  if(MOD==="atendimentos") pintarAtendimentos();
+  else renderTabela();
+}
+function renderTabela(){
+  const m=MODULOS[MOD], tb=$("#mod-tbody"), nc=m.colunas.length+1;
+  const q=m.busca?$("#mod-busca").value.trim():"";
+  if(!LISTA.length){ tb.innerHTML=`<tr><td colspan="${nc}" class="vazio">Nenhum registro ${q?"encontrado":"cadastrado ainda"}.</td></tr>`; return; }
+  tb.innerHTML=LISTA.map((row)=>`<tr>${m.colunas.map((c)=>`<td>${celula(row,c)}</td>`).join("")}
+    <td style="text-align:right;white-space:nowrap">${m.imprimir?`<button class="btn btn-ghost btn-sm" onclick="imprimirFicha(${row.id})">Imprimir</button> `:""}<button class="btn btn-ghost btn-sm" onclick="abrirForm(${row.id})">Abrir</button></td></tr>`).join("");
+}
+
+/* -------------------- vista Agenda (calendário do mês) ------------------ */
+const MESES_PT=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+const DOW_PT=["dom","seg","ter","qua","qui","sex","sáb"];
+const addMesYM=(ym,d)=>{ let [a,m]=ym.split("-").map(Number); m=m-1+d; a+=Math.floor(m/12); m=((m%12)+12)%12; return `${a}-${String(m+1).padStart(2,"0")}`; };
+const clampYM=(ym,lo,hi)=> ym<lo?lo:(ym>hi?hi:ym);
+function navAgenda(d){ agendaYM=addMesYM(agendaYM,d); renderAgenda(); }
+async function novoNaData(dstr){ await abrirForm(0); const el=$("#f-data"); if(el) el.value=dstr; }
+
+function renderAgenda(){
+  const cont=$("#mod-agenda");
+  const comData=LISTA.filter((a)=>a.data);
+  const meses=[...new Set(comData.map((a)=>a.data.slice(0,7)))].sort();
+  const hojeISO=new Date().toISOString().slice(0,10), hojeYM=hojeISO.slice(0,7);
+  const minYM=meses.length?meses[0]:hojeYM, maxYM=meses.length?meses[meses.length-1]:hojeYM;
+  if(!agendaYM) agendaYM=clampYM(hojeYM,minYM,maxYM); else agendaYM=clampYM(agendaYM,minYM,maxYM);
+  const [ano,mes]=agendaYM.split("-").map(Number);
+  const primeiroDow=new Date(ano,mes-1,1).getDay();
+  const diasNoMes=new Date(ano,mes,0).getDate();
+  const porDia={}; comData.filter((a)=>a.data.slice(0,7)===agendaYM).forEach((a)=>{ (porDia[a.data]=porDia[a.data]||[]).push(a); });
+  Object.values(porDia).forEach((l)=>l.sort((x,y)=>String(x.hora).localeCompare(String(y.hora))));
+
+  let cel="";
+  DOW_PT.forEach((d)=>cel+=`<div class="dow">${d}</div>`);
+  for(let i=0;i<primeiroDow;i++) cel+=`<div class="dia vazio-cel"></div>`;
+  for(let d=1;d<=diasNoMes;d++){
+    const iso=`${ano}-${String(mes).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const evs=(porDia[iso]||[]).map((a)=>`<span class="ev ev-${escA(a.status||"Agendado")}" title="${escA((a.hora||"")+" "+nomePac(a.paciente_id))}" onclick="event.stopPropagation();abrirForm(${a.id})">${escA(a.hora||"")} ${escA(nomePac(a.paciente_id))}</span>`).join("");
+    cel+=`<div class="dia${iso===hojeISO?" hoje":""}" onclick="novoNaData('${iso}')"><span class="num">${d}</span>${evs}</div>`;
+  }
+  cont.innerHTML=`
+    <div class="cal-cab">
+      <button onclick="navAgenda(-1)" ${agendaYM<=minYM?"disabled":""} title="Mês anterior">‹</button>
+      <h3>${MESES_PT[mes-1]} de ${ano}</h3>
+      <button onclick="navAgenda(1)" ${agendaYM>=maxYM?"disabled":""} title="Próximo mês">›</button>
+    </div>
+    <div class="card" style="padding:1rem"><div class="cal">${cel}</div>
+      <p class="hint" style="color:var(--dim);margin-top:.8rem;font-size:.8rem">Clique num dia para agendar · clique num serviço para abrir. Navegação limitada aos meses com agendamentos.</p>
+    </div>`;
+}
+
+/* --------------------------- vista Kanban ------------------------------- */
+const KAN_COLS=["Agendado","Confirmado","Atendido","Faltou","Remarcado"];
+function kcard(a){
+  return `<div class="kcard" draggable="true" data-id="${a.id}" onclick="abrirForm(${a.id})">
+    <b>${escA(nomePac(a.paciente_id))}</b>
+    <small>${dataBR(a.data)}${a.hora?" · "+escA(a.hora):""}${a.profissional_id?" · "+escA(nomeProf(a.profissional_id)):""}</small></div>`;
+}
+function renderKanban(){
+  const cont=$("#mod-kanban");
+  cont.innerHTML=`<div class="kanban">`+KAN_COLS.map((st)=>{
+    const cards=LISTA.filter((a)=>(a.status||"Agendado")===st);
+    return `<div class="kcol" data-status="${st}">
+      <h4>${st} <span>${cards.length}</span></h4>
+      <div class="kcards">${cards.map(kcard).join("")||'<p class="kvazio">—</p>'}</div></div>`;
+  }).join("")+`</div>`;
+  // arrastar para mudar a situação
+  let arrastando=null;
+  cont.querySelectorAll(".kcard").forEach((c)=>{
+    c.addEventListener("dragstart",(e)=>{ arrastando=c.dataset.id; e.dataTransfer.effectAllowed="move"; });
+  });
+  cont.querySelectorAll(".kcol").forEach((col)=>{
+    col.addEventListener("dragover",(e)=>{ e.preventDefault(); col.classList.add("drag"); });
+    col.addEventListener("dragleave",()=>col.classList.remove("drag"));
+    col.addEventListener("drop",async(e)=>{ e.preventDefault(); col.classList.remove("drag");
+      if(!arrastando) return;
+      try{ await api("atendimentos/"+arrastando,"PUT",{status:col.dataset.status}); await carregarLista(); }
+      catch(err){ toast(err.message,true); }
+      arrastando=null;
+    });
+  });
 }
 
 /* ======================= formulário genérico ========================= */
@@ -396,16 +583,24 @@ function campoHTML(campo, val){
     return wrap(`<label style="display:flex;gap:.5rem;align-items:center;margin-top:1.1rem;cursor:pointer;color:var(--text)"><input type="checkbox" id="${id}" style="width:auto" ${Number(val)?"checked":""}> ${lab}</label>`,op.full);
   let ctrl;
   if(tipo==="textarea") ctrl=`<textarea id="${id}">${escA(val||"")}</textarea>`;
+  else if(tipo==="password") ctrl=`<input id="${id}" type="password" autocomplete="new-password" value="">`;
   else if(tipo==="select"){
-    const opts=op.bool?[["0","Não"],["1","Sim"]]:(op.opcoes||[]).map((o)=>[o,o]);
+    const opts=op.bool?[["0","Não"],["1","Sim"]]:(op.opcoes||[]).map((o)=>Array.isArray(o)?o:[o,o]);
+    const atual=(val===undefined||val===null||val==="")?(op.padrao??(op.bool?"0":"")):val;
     ctrl=`<select id="${id}">${op.placeholder?`<option value="">${op.placeholder}</option>`:""}`+
-      opts.map(([v,l])=>`<option value="${escA(v)}"${String(val??(op.bool?0:""))===String(v)?" selected":""}>${escA(l)}</option>`).join("")+`</select>`;
+      opts.map(([v,l])=>`<option value="${escA(v)}"${String(atual)===String(v)?" selected":""}>${escA(l)}</option>`).join("")+`</select>`;
   }
   else if(tipo==="ref"){
     const lista=CACHE[op.tabela]||[];
     ctrl=`<select id="${id}"><option value="">—</option>`+
-      lista.map((r)=>`<option value="${r.id}"${String(val)===String(r.id)?" selected":""}>${escA(r.nome)}</option>`).join("")+`</select>`;
+      lista.map((r)=>`<option value="${r.id}"${String(val)===String(r.id)?" selected":""}>${escA(rotuloRef(r))}</option>`).join("")+`</select>`;
   }
+  else if(tipo==="senha_externo") ctrl = FORM_ID
+    ? `<div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+        <input id="${id}" value="${escA(val||"—")}" readonly style="max-width:170px;font-weight:700;letter-spacing:.14em">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="regenerarSenhaAssociado()">Gerar nova senha</button>
+        <span class="hint" style="color:var(--dim);font-size:.8rem">O associado entra em /externo com o CPF + esta senha.</span></div>`
+    : `<input id="${id}" value="Gerada automaticamente ao salvar" readonly disabled>`;
   else if(tipo==="especialidade") ctrl=`<input id="${id}" list="dl-esp" value="${escA(val||"")}">`;
   else if(tipo==="foto") ctrl=`<div style="display:flex;gap:1rem;align-items:center">
       <img class="foto-prev" id="${id}-prev" src="${val?escA(val):""}" alt="" style="${val?"":"display:none"}">
@@ -429,14 +624,17 @@ function campoHTML(campo, val){
 
 async function abrirForm(id){
   const m=MODULOS[MOD];
+  FORM_ID=id||0;
   let dados={};
   if(id){ try{ dados=await api(MOD+"/"+id); }catch(e){ return toast(e.message,true); } }
   const host=$("#modal-host");
+  const campos=camposDoPerfil(m);
   host.innerHTML=`<div class="modal-bg" onclick="if(event.target===this)fecharModal()"><div class="modal">
     <h2>${id?"Editar":m.novo||"Novo"}</h2>
-    <div class="formgrid">${m.campos.map((c)=>campoHTML(c,dados[c[0]])).join("")}</div>
+    <div class="formgrid">${campos.map((c)=>campoHTML(c,dados[c[0]])).join("")}</div>
     <div id="form-erros"></div>
     <div class="acoes">
+      ${m.imprimir&&id?`<button class="btn btn-ghost" onclick="imprimirFicha(${id})">Imprimir ficha</button>`:""}
       ${id?`<button class="btn btn-danger" onclick="excluirReg(${id})">Excluir</button>`:""}
       <button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button>
       <button class="btn btn-navy" onclick="salvarReg(${id||0})">Salvar</button>
@@ -454,10 +652,14 @@ async function abrirForm(id){
   for(const [k,,tipo] of m.campos) if(tipo==="fotos") desenharFotos("f-"+k);
 }
 function fecharModal(){ $("#modal-host").innerHTML=""; }
+// alguns campos não aparecem para certos perfis (ex.: o profissional não escolhe
+// "profissional" na agenda — é sempre ele). O servidor força isso de qualquer modo.
+function camposDoPerfil(m){ return m.campos.filter((c)=>!(c[3]&&c[3].ocultarPara===ME.perfil)); }
 
 function coletar(){
   const m=MODULOS[MOD], out={}, erros=[];
-  for(const [k,lab,tipo,op={}] of m.campos){
+  for(const [k,lab,tipo,op={}] of camposDoPerfil(m)){
+    if(tipo==="senha_externo") continue;   // gerida só pelo botão / servidor
     const el=$("#f-"+k); if(!el) continue;
     el.classList && el.classList.remove("erro");
     let v = tipo==="checkbox" ? (el.checked?1:0) : (el.value||"").trim();
@@ -482,15 +684,109 @@ async function salvarReg(id){
   box.innerHTML="";
   try{
     if(id) await api(MOD+"/"+id,"PUT",out); else await api(MOD,"POST",out);
-    if(MOD==="pacientes"||MOD==="profissionais") await recarregarCache();
+    if(["pacientes","profissionais","projetos"].includes(MOD)) await recarregarCache();
     fecharModal(); toast("Registro salvo."); carregarLista();
   }catch(e){ box.innerHTML=`<div class="erros">${escA(e.message)}</div>`; }
 }
 async function excluirReg(id){
   if(!confirm("Excluir este registro? Esta ação não pode ser desfeita.")) return;
   try{ await api(MOD+"/"+id,"DELETE");
-    if(MOD==="pacientes"||MOD==="profissionais") await recarregarCache();
+    if(["pacientes","profissionais","projetos"].includes(MOD)) await recarregarCache();
     fecharModal(); toast("Registro excluído."); carregarLista();
+  }catch(e){ toast(e.message,true); }
+}
+
+/* Documento impresso com o timbre do Instituto (cabeçalho + faixa + rodapé). */
+function timbreHTML(titulo, corpo){
+  const base=location.origin;
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escA(titulo)} — Instituto Kenósis</title>
+  <style>
+   @page{margin:1.6cm}
+   *{box-sizing:border-box}
+   body{font:13px/1.55 'Segoe UI',system-ui,Arial,sans-serif;color:#232733;margin:0}
+   .timbre{display:flex;align-items:center;gap:.9rem;border-bottom:3px solid #253282;padding-bottom:.7rem}
+   .timbre img{height:54px;width:auto}
+   .timbre .nome{font-weight:700;color:#253282;font-size:1.15rem;line-height:1.05}
+   .timbre .sub{color:#6b7280;font-size:.74rem}
+   .timbre .doc{margin-left:auto;text-align:right;color:#6b7280;font-size:.72rem;line-height:1.5}
+   .faixa{height:4px;background:linear-gradient(90deg,#253282,#1EA1E4);margin:0 0 1.3rem}
+   h1{color:#253282;font-size:1.2rem;margin:.2rem 0 1rem}
+   .sec{margin:1.5rem 0 .5rem;color:#1EA1E4;font-size:.72rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;border-bottom:1px solid #e7ecf4;padding-bottom:.25rem}
+   table{width:100%;border-collapse:collapse}
+   th{text-align:left;width:180px;color:#5a6172;font-weight:600;vertical-align:top;padding:.4rem .6rem;border-bottom:1px solid #eef1f6}
+   td{padding:.4rem .6rem;border-bottom:1px solid #eef1f6}
+   .foto{width:108px;height:108px;object-fit:cover;border-radius:10px;border:1px solid #dce2ec;float:right;margin:0 0 .6rem 1rem}
+   .cards{display:flex;flex-wrap:wrap;gap:.6rem;margin:.4rem 0}
+   .kpi{border:1px solid #e7ecf4;border-radius:10px;padding:.6rem .9rem;min-width:120px}
+   .kpi b{display:block;font-size:1.5rem;color:#253282;line-height:1}
+   .kpi span{font-size:.7rem;color:#8a90a0;text-transform:uppercase;letter-spacing:.04em}
+   .barra{display:flex;align-items:center;gap:.6rem;margin:.28rem 0;font-size:.82rem}
+   .barra .lb{width:200px}.barra .b{flex:1;height:9px;background:#eef2f8;border-radius:5px;overflow:hidden}
+   .barra .b i{display:block;height:100%;background:#1EA1E4}.barra .n{width:32px;text-align:right;font-weight:700;color:#253282}
+   .rod{margin-top:2.2rem;border-top:1px solid #eef1f6;padding-top:.6rem;color:#9aa0ad;font-size:.72rem;display:flex;justify-content:space-between}
+  </style></head><body>
+   <div class="timbre">
+     <img src="${base}/assets/img/simbolo.svg" alt="">
+     <div><div class="nome">Instituto Kenósis</div><div class="sub">Fonte das Graças Conceição &amp; Menezes</div></div>
+     <div class="doc">CNPJ 63.991.397/0001-40<br>Caruaru — PE<br>institutokenosis.com</div>
+   </div>
+   <div class="faixa"></div>
+   <h1>${escA(titulo)}</h1>
+   ${corpo}
+   <div class="rod"><span>Instituto Kenósis · documento de uso interno</span><span>Emitido em ${new Date().toLocaleString("pt-BR")}</span></div>
+   <scr`+`ipt>window.onload=function(){setTimeout(function(){window.print()},250)}</scr`+`ipt>
+  </body></html>`;
+}
+function abrirImpressao(titulo, corpo){
+  const w=window.open("","_blank","width=860,height=940");
+  if(!w) return toast("Permita pop-ups para imprimir.",true);
+  w.document.write(timbreHTML(titulo, corpo)); w.document.close();
+}
+
+/* Ficha imprimível do usuário, com o timbre do Instituto. */
+async function imprimirFicha(id){
+  let p; try{ p=await api("pacientes/"+id); }catch(e){ return toast(e.message,true); }
+  const proj=CACHE.projetos.find((x)=>String(x.id)===String(p.projeto_id));
+  const L=(r,v)=> v?`<tr><th>${escA(r)}</th><td>${escA(v)}</td></tr>`:"";
+  const vuln=Number(p.vulneravel)?("Sim"+(p.vulnerabilidade?" — "+p.vulnerabilidade:"")):"Não";
+  const corpo=`${p.foto?`<img class="foto" src="${escA(p.foto)}" alt="">`:""}
+    <div class="sec">Identificação</div>
+    <table>${L("Nome completo",p.nome)}${L("Data de nascimento",dataBR(p.nascimento))}${L("CPF",p.cpf)}${L("RG",p.rg)}
+      ${L("Nome da mãe",p.mae)}${L("Nome do pai",p.pai)}</table>
+    <div class="sec">Contato</div>
+    <table>${L("Telefone / WhatsApp",p.telefone)}${L("E-mail",p.email)}${L("Endereço",p.endereco)}</table>
+    <div class="sec">Dados sociais</div>
+    <table>${L("Escolaridade",p.escolaridade)}${L("NIS",p.nis)}${L("Cartão SUS",p.cartao_sus)}
+      ${L("Projeto vinculado",proj?proj.title:"")}${L("1º atendimento",dataBR(p.primeiro_atendimento))}
+      ${L("Vulnerabilidade social",vuln)}${L("Consentimento",Number(p.consentimento)?"Assinado / aceito":"")}</table>
+    ${p.observacoes?`<div class="sec">Observações</div><p>${escA(p.observacoes)}</p>`:""}`;
+  abrirImpressao("Ficha do usuário — "+p.nome, corpo);
+}
+
+/* Relatório impresso com o timbre e os mesmos indicadores da tela. */
+async function imprimirRelatorio(){
+  let d; try{ d=await api("relatorios"); }catch(e){ return toast(e.message,true); }
+  const kpi=(r,n)=>`<div class="kpi"><b>${n}</b><span>${escA(r)}</span></div>`;
+  const barras=(rows,fmt)=>{ if(!rows||!rows.length) return '<p style="color:#9aa">Sem serviços no período.</p>';
+    const max=Math.max(...rows.map((x)=>x.total),1);
+    return rows.map((x)=>`<div class="barra"><span class="lb">${escA(fmt?fmt(x.rotulo):x.rotulo)}</span><span class="b"><i style="width:${Math.round(x.total/max*100)}%"></i></span><span class="n">${x.total}</span></div>`).join(""); };
+  const corpo=`
+    <div class="cards">
+      ${kpi("Usuários",d.totais.pacientes)}${kpi("Associados",d.totais.associados)}${kpi("Serviços",d.totais.atendimentos)}
+      ${kpi("Faltas",d.totais.faltas)}${kpi("Eventos",d.totais.eventos)}${kpi("Benefícios",d.totais.beneficios)}
+    </div>
+    <div class="sec">Serviços por especialidade</div>${barras(d.porEspecialidade)}
+    <div class="sec">Serviços por situação</div>${barras(d.porStatus)}
+    <div class="sec">Serviços por mês</div>${barras(d.porMes,mesBR)}`;
+  abrirImpressao("Relatório de atividades", corpo);
+}
+
+async function regenerarSenhaAssociado(){
+  if(!FORM_ID) return;
+  if(!confirm("Gerar uma nova senha para este associado? A senha atual deixará de funcionar.")) return;
+  try{ const r=await api("associados/"+FORM_ID+"/senha","POST");
+    const el=$("#f-senha_externo"); if(el) el.value=r.senha;
+    toast("Nova senha: "+r.senha);
   }catch(e){ toast(e.message,true); }
 }
 
@@ -515,12 +811,12 @@ function removerFoto(id,i){ const inp=$("#"+id); const arr=JSON.parse(inp.value|
 /* ----------------------------- relatórios ------------------------------ */
 async function carregarRelatorios(){
   try{ const d=await api("relatorios");
-    $("#rel-stats").innerHTML=[["Pacientes",d.totais.pacientes],["Associados",d.totais.associados],
-      ["Atendimentos",d.totais.atendimentos],["Faltas",d.totais.faltas],["Eventos",d.totais.eventos],["Benefícios",d.totais.beneficios]]
+    $("#rel-stats").innerHTML=[["Usuários",d.totais.pacientes],["Associados",d.totais.associados],
+      ["Serviços",d.totais.atendimentos],["Faltas",d.totais.faltas],["Eventos",d.totais.eventos],["Benefícios",d.totais.beneficios]]
       .map(([r,n])=>`<div class="stat"><b>${n}</b><span>${r}</span></div>`).join("");
-    $("#rel-esp").innerHTML=barras(d.porEspecialidade)||'<p class="vazio">Sem atendimentos ainda.</p>';
-    $("#rel-status").innerHTML=barras(d.porStatus)||'<p class="vazio">Sem atendimentos ainda.</p>';
-    $("#rel-mes").innerHTML=barras(d.porMes.map((x)=>({rotulo:mesBR(x.rotulo),total:x.total})))||'<p class="vazio">Sem atendimentos ainda.</p>';
+    $("#rel-esp").innerHTML=barras(d.porEspecialidade)||'<p class="vazio">Sem serviços ainda.</p>';
+    $("#rel-status").innerHTML=barras(d.porStatus)||'<p class="vazio">Sem serviços ainda.</p>';
+    $("#rel-mes").innerHTML=barras(d.porMes.map((x)=>({rotulo:mesBR(x.rotulo),total:x.total})))||'<p class="vazio">Sem serviços ainda.</p>';
   }catch(e){ toast(e.message,true); }
 }
 function barras(rows){ if(!rows||!rows.length) return "";

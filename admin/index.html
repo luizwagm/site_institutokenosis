@@ -186,13 +186,13 @@
 
     <section class="panel" id="p-projetos">
       <div class="topbar"><h1>Projetos</h1><button class="btn btn-navy" onclick="saveTexts('projetos')">Salvar textos</button></div>
-      <p class="hint mb">Cada projeto ganha uma página própria. Na home aparecem os 3 primeiros.</p>
-      <div class="topbar" style="margin-bottom:.8rem">
-        <h3 style="margin:0">Projetos cadastrados</h3>
-        <button class="btn btn-ghost btn-sm" onclick="addRow('projetos')">+ Novo projeto</button>
+      <p class="hint mb">Os textos da seção (título, chamada) são editados aqui. <b>Os projetos em si são cadastrados no sistema de gestão</b> — aqui o painel apenas mostra o que foi cadastrado lá, para você publicar no site.</p>
+      <div id="projetos-form"></div>
+      <div class="topbar" style="margin:1.4rem 0 .8rem">
+        <h3 style="margin:0">Projetos cadastrados no sistema de gestão</h3>
+        <a class="btn btn-ghost btn-sm" href="/restrito/" target="_blank" style="text-decoration:none">Abrir sistema de gestão ↗</a>
       </div>
       <div id="projetos-list" class="mb"></div>
-      <div id="projetos-form"></div>
       <div class="topbar" style="margin-top:1rem"><span></span><button class="btn btn-navy" onclick="saveTexts('projetos')">Salvar textos</button></div>
     </section>
 
@@ -402,7 +402,7 @@ async function loadAll() {
   DATA = await api("/api/content");
   renderTexts();
   const dl = $("#lista-categorias"); if (dl) dl.innerHTML = categoriasUsadas().map((c) => `<option value="${escA(c)}">`).join("");
-  renderTable("services"); renderTable("projetos"); renderTable("documentos");
+  renderTable("services"); renderProjetosReadonly(); renderTable("documentos");
   renderTable("team"); renderTable("posts"); renderTable("portfolio");
   renderGaleria();
 }
@@ -602,6 +602,21 @@ const TDEFS = {
 };
 /* categorias já usadas — para agrupar sem depender de digitação exata */
 const categoriasUsadas = () => [...new Set((DATA?.services || []).map((s) => s.categoria).filter(Boolean))];
+
+/* Projetos são cadastrados no /restrito; aqui só se lê (sem editar/excluir). */
+function renderProjetosReadonly() {
+  const el = $("#projetos-list");
+  const lista = DATA.projetos || [];
+  if (!lista.length) { el.innerHTML = `<p class="hint">Nenhum projeto cadastrado no sistema de gestão ainda.</p>`; return; }
+  el.innerHTML = lista.map((p) => `
+    <div class="card" style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start">
+      <div>
+        <b>${escA(p.title)}</b> ${p.status ? `<span class="hint">· ${escA(p.status)}</span>` : ""}
+        <p class="hint" style="margin-top:.2rem">${escA(p.resumo || "")}</p>
+      </div>
+      ${p.slug ? `<a class="btn btn-ghost btn-sm" href="/projetos/${escA(p.slug)}/" target="_blank" style="text-decoration:none;white-space:nowrap">Ver página</a>` : ""}
+    </div>`).join("");
+}
 
 function renderTable(t) {
   $("#" + t + "-list").innerHTML = DATA[t].map((r) => `
