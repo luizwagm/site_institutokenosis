@@ -25,7 +25,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.5.0";
+const SISTEMA_VERSION = "1.7.1";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -63,6 +63,11 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS projetos (id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL, slug TEXT, sigla TEXT, status TEXT, resumo TEXT,
     publico TEXT, content TEXT, sort INTEGER DEFAULT 0, criado TEXT);
+
+  -- Serviços/especialidades oferecidos — também cadastrados AQUI; o site lê e
+  -- publica (agrupados por categoria). Alimentam também o seletor da agenda.
+  CREATE TABLE IF NOT EXISTS servicos (id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL, categoria TEXT, sort INTEGER DEFAULT 0, criado TEXT);
 
   -- 3.2 associados (não pacientes). senha_externo = código de 8 dígitos com que
   -- o associado entra no portal /externo para ver a própria ficha.
@@ -225,6 +230,7 @@ function json(res, code, obj) {
 const TAB = {
   pacientes:  ["nome", "foto", "nascimento", "cpf", "rg", "pai", "mae", "endereco", "telefone", "email", "nis", "cartao_sus", "escolaridade", "vulneravel", "vulnerabilidade", "primeiro_atendimento", "consentimento", "projeto_id", "observacoes"],
   projetos:   ["title", "slug", "sigla", "status", "resumo", "publico", "content", "sort"],
+  servicos:   ["title", "categoria", "sort"],
   associados: ["nome", "cpf", "contato", "endereco", "foto", "vinculo", "adesao", "mensalidade", "status", "senha_externo"],
   profissionais: ["nome", "especialidade", "registro", "contato", "ativo"],
   atendimentos: ["paciente_id", "profissional_id", "especialidade", "data", "hora", "local", "status", "observacoes"],
@@ -246,13 +252,13 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 const PERFIS = ["admin", "secretaria", "profissional"];
 const PERM = {
   admin: "*",
-  secretaria: new Set(["pacientes", "associados", "profissionais", "atendimentos", "documentos_gestao", "beneficios", "eventos", "projetos", "relatorios"]),
+  secretaria: new Set(["pacientes", "associados", "profissionais", "atendimentos", "documentos_gestao", "beneficios", "eventos", "projetos", "servicos", "relatorios"]),
   // profissional vê SOMENTE a sua agenda e os seus prontuários. Nada mais.
   // Lê pacientes/profissionais só como apoio (nomes nas telas e seletores),
   // sem menu próprio — ver PERM_LEITURA.
   profissional: new Set(["atendimentos", "prontuario"]),
 };
-const PERM_LEITURA = { profissional: new Set(["pacientes", "profissionais"]) };
+const PERM_LEITURA = { profissional: new Set(["pacientes", "profissionais", "servicos"]) };
 const pode = (perfil, modulo) => perfil === "admin" || (PERM[perfil] ? PERM[perfil].has(modulo) : false);
 const podeLer = (perfil, modulo) => pode(perfil, modulo) || (PERM_LEITURA[perfil] && PERM_LEITURA[perfil].has(modulo));
 const adminsAtivos = () => db.prepare("SELECT COUNT(*) c FROM g_usuarios WHERE perfil='admin' AND ativo=1").get().c;
@@ -378,7 +384,19 @@ async function rotaApi(req, res, p) {
         eventos: n("SELECT COUNT(*) c FROM eventos"),
         beneficios: n("SELECT COUNT(*) c FROM beneficios"),
       },
-      porEspecialidade: grupo("SELECT COALESCE(NULLIF(especialidade,''),'(sem especialidade)') rotulo, COUNT(*) total FROM atendimentos GROUP BY rotulo ORDER BY total DESC"),
+      // Um atendimento pode ter VÁRIOS serviços (guardados como lista JSON),
+      // então a contagem é feita aqui, quebrando cada lista em serviços.
+      porEspecialidade: (() => {
+        const conta = {};
+        for (const a of db.prepare("SELECT especialidade FROM atendimentos").all()) {
+          let itens = [];
+          try { itens = JSON.parse(a.especialidade || "[]"); if (!Array.isArray(itens)) itens = []; }
+          catch { itens = a.especialidade ? [a.especialidade] : []; }   // compat: valor antigo era texto
+          if (!itens.length) itens = ["(sem serviço)"];
+          for (const it of itens) conta[it] = (conta[it] || 0) + 1;
+        }
+        return Object.entries(conta).map(([rotulo, total]) => ({ rotulo, total })).sort((x, y) => y.total - x.total);
+      })(),
       porStatus: grupo("SELECT COALESCE(NULLIF(status,''),'(sem status)') rotulo, COUNT(*) total FROM atendimentos GROUP BY rotulo ORDER BY total DESC"),
       porMes: grupo("SELECT substr(data,1,7) rotulo, COUNT(*) total FROM atendimentos WHERE data<>'' GROUP BY rotulo ORDER BY rotulo DESC LIMIT 12"),
     });
@@ -623,4 +641,13 @@ function importarProjetos(rows) {
   return n;
 }
 
-module.exports = { handleRestrito, handleExterno, listarProjetos, contarProjetos, importarProjetos };
+const listarServicos = () => db.prepare("SELECT * FROM servicos ORDER BY sort, id").all();
+const contarServicos = () => db.prepare("SELECT COUNT(*) c FROM servicos").get().c;
+function importarServicos(rows) {
+  const ins = db.prepare("INSERT INTO servicos(title,categoria,sort,criado) VALUES(?,?,?,?)");
+  let n = 0;
+  for (const s of rows || []) { ins.run(s.title, s.categoria || "", s.sort || 0, agora()); n++; }
+  return n;
+}
+
+module.exports = { handleRestrito, handleExterno, listarProjetos, contarProjetos, importarProjetos, listarServicos, contarServicos, importarServicos };

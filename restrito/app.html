@@ -89,6 +89,15 @@
     .kcard b{display:block;font-size:.85rem;color:var(--marinho)}
     .kcard small{color:var(--muted);font-size:.75rem}
     .kvazio{color:var(--dim);font-size:.8rem;text-align:center;padding:.6rem 0}
+    /* checkboxes de serviços na agenda */
+    .chk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.35rem .8rem;border:1px solid var(--line2);border-radius:9px;padding:.7rem .8rem;max-height:200px;overflow:auto}
+    .chk{display:flex;align-items:center;gap:.45rem;font-weight:500;font-size:.88rem;color:var(--text);cursor:pointer}
+    .chk input{width:auto}
+    /* barra do relatório clicável */
+    .barra.clik{cursor:pointer;border-radius:6px;padding:.1rem .2rem}
+    .barra.clik:hover{background:#eef4fb}
+    .filtro-chip{display:inline-flex;align-items:center;gap:.5rem;background:#eaf1fb;color:#2a5bbd;font-weight:600;font-size:.85rem;padding:.35rem .8rem;border-radius:999px;margin-bottom:1rem}
+    .filtro-chip button{border:0;background:#2a5bbd;color:#fff;width:18px;height:18px;border-radius:50%;font-size:.7rem;line-height:1;cursor:pointer}
     .modal-bg{position:fixed;inset:0;background:rgba(20,28,60,.45);display:grid;place-items:start center;padding:2rem 1rem;overflow:auto;z-index:40}
     .modal{width:min(760px,96vw);background:#fff;border-radius:16px;padding:1.4rem 1.5rem;box-shadow:0 30px 70px rgba(20,30,80,.3)}
     .modal h2{margin-bottom:1rem}
@@ -137,6 +146,7 @@
     <button class="navbtn" data-nav="profissionais">Profissionais</button>
     <button class="navbtn" data-nav="atendimentos">Agenda</button>
     <button class="navbtn" data-nav="prontuario">Prontuário</button>
+    <button class="navbtn" data-nav="servicos">Serviços</button>
     <button class="navbtn" data-nav="projetos">Projetos</button>
     <button class="navbtn" data-nav="beneficios">Benefícios</button>
     <button class="navbtn" data-nav="eventos">Eventos</button>
@@ -173,6 +183,7 @@
         <button class="vbtn" data-v="agenda" onclick="trocarVista('agenda')">▦ Agenda</button>
         <button class="vbtn" data-v="kanban" onclick="trocarVista('kanban')">▤ Kanban</button>
       </div>
+      <div id="mod-filtro"></div>
       <div class="card" id="mod-tabela" style="padding:0;overflow:auto">
         <table>
           <thead id="mod-thead"></thead>
@@ -187,7 +198,7 @@
       <div class="topbar"><h1>Relatórios</h1><button class="btn btn-ghost btn-sm" onclick="imprimirRelatorio()">Imprimir / PDF</button></div>
       <div class="stat-grid" id="rel-stats"></div>
       <div class="rel-cols">
-        <div class="card"><h3 style="margin-bottom:.6rem">Serviços por especialidade</h3><div id="rel-esp"></div></div>
+        <div class="card"><h3 style="margin-bottom:.6rem">Atendimentos por serviço</h3><div id="rel-esp"></div></div>
         <div class="card"><h3 style="margin-bottom:.6rem">Serviços por situação</h3><div id="rel-status"></div></div>
       </div>
       <div class="card"><h3 style="margin-bottom:.6rem">Serviços por mês</h3><div id="rel-mes"></div></div>
@@ -247,11 +258,12 @@ const ESCOLARIDADE = ["Não alfabetizado","Ensino Fundamental incompleto","Ensin
   "Ensino Médio incompleto","Ensino Médio completo","Ensino Superior incompleto","Ensino Superior completo","Pós-graduação"];
 const ESPECIALIDADES = ["Psicanálise (Individual)","Psicanálise (Casal)","Psicologia","Acupuntura","Nutrição",
   "Terapia Floral","Aromaterapia","Fitoterapia","Homeopatia","Ventosaterapia","Ozonioterapia","Detox Iônico","Assistência Social"];
-const CACHE = { pacientes: [], profissionais: [], projetos: [] };
+const CACHE = { pacientes: [], profissionais: [], projetos: [], servicos: [] };
 async function recarregarCache(){
   try { CACHE.pacientes = await api("pacientes"); } catch {}
   try { CACHE.profissionais = await api("profissionais"); } catch {}
   try { CACHE.projetos = await api("projetos"); } catch {}
+  try { CACHE.servicos = await api("servicos"); } catch {}
 }
 const rotuloRef = (r) => r.nome ?? r.title ?? ("#"+r.id);
 const nomePac = (id) => { const r=CACHE.pacientes.find((p)=>String(p.id)===String(id)); return r?r.nome:"—"; };
@@ -296,20 +308,20 @@ const MODULOS = {
       ["senha_externo","Senha do portal do associado (/externo)","senha_externo",{full:1}],
     ]},
   profissionais: { titulo:"Profissionais", novo:"Novo profissional",
-    colunas:[["nome","Nome"],["especialidade","Especialidade"],["registro","Registro"],["ativo","Ativo","bool"]],
+    colunas:[["nome","Nome"],["especialidade","Serviços","servicos"],["registro","Registro"],["ativo","Ativo","bool"]],
     campos:[
       ["nome","Nome completo","text",{req:1}],
-      ["especialidade","Especialidade","especialidade"],
+      ["especialidade","Serviços","servicos_check",{full:1}],
       ["registro","Registro profissional","text"],
       ["contato","Contato","tel"],
       ["ativo","Ativo","select",{bool:1}],
     ]},
   atendimentos: { titulo:"Agenda de serviços", novo:"Novo agendamento",
-    colunas:[["data","Data","data"],["hora","Hora"],["paciente_id","Usuário","pac"],["profissional_id","Profissional","prof"],["especialidade","Especialidade"],["status","Status","tag"]],
+    colunas:[["data","Data","data"],["hora","Hora"],["paciente_id","Usuário","pac"],["profissional_id","Profissional","prof"],["especialidade","Serviços","servicos"],["status","Status","tag"]],
     campos:[
       ["paciente_id","Usuário","ref",{tabela:"pacientes",req:1}],
       ["profissional_id","Profissional","ref",{tabela:"profissionais",ocultarPara:"profissional"}],
-      ["especialidade","Especialidade","especialidade"],
+      ["especialidade","Serviços","servicos_check",{full:1}],
       ["data","Data","date",{req:1}],
       ["hora","Horário","time"],
       ["local","Local","select",{opcoes:["Presencial","Online","Domiciliar"]}],
@@ -317,11 +329,11 @@ const MODULOS = {
       ["observacoes","Observações","textarea",{full:1}],
     ]},
   prontuario: { titulo:"Prontuário eletrônico", novo:"Novo registro",
-    colunas:[["data","Data","data"],["paciente_id","Usuário","pac"],["especialidade","Especialidade"],["profissional","Profissional"]],
+    colunas:[["data","Data","data"],["paciente_id","Usuário","pac"],["especialidade","Serviço","servicos"],["profissional","Profissional"]],
     campos:[
       ["paciente_id","Usuário","ref",{tabela:"pacientes",req:1}],
       ["data","Data do atendimento","date",{req:1}],
-      ["especialidade","Especialidade","especialidade"],
+      ["especialidade","Serviço","servicos_check",{full:1}],
       ["profissional","Profissional responsável","text"],
       ["avaliacao","Avaliação inicial","textarea",{full:1}],
       ["evolucao","Evolução da sessão","textarea",{full:1}],
@@ -365,6 +377,13 @@ const MODULOS = {
       ["data","Data","date"],
       ["arquivo","Arquivo (foto/PDF)","arquivo",{full:1}],
     ]},
+  servicos: { titulo:"Serviços", novo:"Novo serviço",
+    colunas:[["title","Serviço"],["categoria","Categoria"]],
+    campos:[
+      ["title","Nome do serviço","text",{req:1}],
+      ["categoria","Categoria (agrupa na home e no site)","text"],
+      ["sort","Ordem (menor aparece primeiro)","number"],
+    ]},
   projetos: { titulo:"Projetos", novo:"Novo projeto",
     colunas:[["title","Nome"],["sigla","Sigla"],["status","Situação"]],
     campos:[
@@ -393,7 +412,7 @@ const PERFIL_ROTULO = { admin:"Administrador", secretaria:"Secretaria", profissi
    aqui é só para esconder o que não interessa). admin vê tudo. */
 const PERM_CLIENTE = {
   admin: null,
-  secretaria: new Set(["painel","pacientes","associados","profissionais","atendimentos","projetos","documentos_gestao","beneficios","eventos","relatorios","conta"]),
+  secretaria: new Set(["painel","pacientes","associados","profissionais","atendimentos","servicos","projetos","documentos_gestao","beneficios","eventos","relatorios","conta"]),
   profissional: new Set(["atendimentos","prontuario","conta"]),   // SOMENTE a sua agenda e os seus prontuários
 };
 function aplicarPermissoes(perfil){
@@ -461,12 +480,16 @@ function mostrarModulo(){
   $("#mod-thead").innerHTML="<tr>"+m.colunas.map(([,lab])=>`<th>${lab}</th>`).join("")+"<th></th></tr>";
   const ehAgenda = MOD==="atendimentos";
   $("#mod-vistas").hidden=!ehAgenda;
-  if(ehAgenda){ agendaYM=null; document.querySelectorAll("#mod-vistas .vbtn").forEach((b)=>b.classList.toggle("on",b.dataset.v===vistaAgenda)); }
+  if(ehAgenda){ agendaYM=null; if(!preservarFiltro) filtroAgenda=null; preservarFiltro=false; document.querySelectorAll("#mod-vistas .vbtn").forEach((b)=>b.classList.toggle("on",b.dataset.v===vistaAgenda)); }
   else { $("#mod-tabela").hidden=false; $("#mod-agenda").hidden=true; $("#mod-kanban").hidden=true; }
   carregarLista();
 }
 function trocarVista(v){ vistaAgenda=v; document.querySelectorAll("#mod-vistas .vbtn").forEach((b)=>b.classList.toggle("on",b.dataset.v===v)); pintarAtendimentos(); }
 function pintarAtendimentos(){
+  // chip do filtro ativo (vindo do relatório)
+  $("#mod-filtro").innerHTML = filtroAgenda
+    ? `<span class="filtro-chip">Filtrando por ${escA(rotuloFiltro())} <button onclick="limparFiltroAgenda()" title="Limpar filtro">✕</button></span>`
+    : "";
   $("#mod-tabela").hidden = vistaAgenda!=="tabela";
   $("#mod-agenda").hidden = vistaAgenda!=="agenda";
   $("#mod-kanban").hidden = vistaAgenda!=="kanban";
@@ -481,6 +504,7 @@ function celula(row,[chave,,tipo]){
   if(tipo==="tag"&&v) return `<span class="tag tag-${escA(v)}">${escA(v)}</span>`;
   if(tipo==="pac") return escA(nomePac(v));
   if(tipo==="prof") return escA(nomeProf(v));
+  if(tipo==="servicos"){ let a=[]; try{a=JSON.parse(v||"[]");}catch{a=v?[v]:[];} return a.length?a.map(escA).join(", "):"—"; }
   if(tipo==="perfil") return escA(PERFIL_ROTULO[v]||v||"—");
   if(tipo==="arq") return v?`<a class="arq-link" href="${escA(v)}" target="_blank">abrir</a>`:"—";
   return escA(v||"—");
@@ -494,11 +518,14 @@ async function carregarLista(){
   if(MOD==="atendimentos") pintarAtendimentos();
   else renderTabela();
 }
+// na agenda, aplica o filtro vindo do relatório (serviço/situação/mês)
+function dadosVisiveis(){ return MOD==="atendimentos" ? aplicarFiltroAgenda(LISTA) : LISTA; }
 function renderTabela(){
   const m=MODULOS[MOD], tb=$("#mod-tbody"), nc=m.colunas.length+1;
+  const dados=dadosVisiveis();
   const q=m.busca?$("#mod-busca").value.trim():"";
-  if(!LISTA.length){ tb.innerHTML=`<tr><td colspan="${nc}" class="vazio">Nenhum registro ${q?"encontrado":"cadastrado ainda"}.</td></tr>`; return; }
-  tb.innerHTML=LISTA.map((row)=>`<tr>${m.colunas.map((c)=>`<td>${celula(row,c)}</td>`).join("")}
+  if(!dados.length){ tb.innerHTML=`<tr><td colspan="${nc}" class="vazio">Nenhum registro ${q||filtroAgenda?"encontrado":"cadastrado ainda"}.</td></tr>`; return; }
+  tb.innerHTML=dados.map((row)=>`<tr>${m.colunas.map((c)=>`<td>${celula(row,c)}</td>`).join("")}
     <td style="text-align:right;white-space:nowrap">${m.imprimir?`<button class="btn btn-ghost btn-sm" onclick="imprimirFicha(${row.id})">Imprimir</button> `:""}<button class="btn btn-ghost btn-sm" onclick="abrirForm(${row.id})">Abrir</button></td></tr>`).join("");
 }
 
@@ -512,7 +539,7 @@ async function novoNaData(dstr){ await abrirForm(0); const el=$("#f-data"); if(e
 
 function renderAgenda(){
   const cont=$("#mod-agenda");
-  const comData=LISTA.filter((a)=>a.data);
+  const comData=dadosVisiveis().filter((a)=>a.data);
   const meses=[...new Set(comData.map((a)=>a.data.slice(0,7)))].sort();
   const hojeISO=new Date().toISOString().slice(0,10), hojeYM=hojeISO.slice(0,7);
   const minYM=meses.length?meses[0]:hojeYM, maxYM=meses.length?meses[meses.length-1]:hojeYM;
@@ -551,8 +578,9 @@ function kcard(a){
 }
 function renderKanban(){
   const cont=$("#mod-kanban");
+  const base=dadosVisiveis();
   cont.innerHTML=`<div class="kanban">`+KAN_COLS.map((st)=>{
-    const cards=LISTA.filter((a)=>(a.status||"Agendado")===st);
+    const cards=base.filter((a)=>(a.status||"Agendado")===st);
     return `<div class="kcol" data-status="${st}">
       <h4>${st} <span>${cards.length}</span></h4>
       <div class="kcards">${cards.map(kcard).join("")||'<p class="kvazio">—</p>'}</div></div>`;
@@ -601,6 +629,13 @@ function campoHTML(campo, val){
         <button type="button" class="btn btn-ghost btn-sm" onclick="regenerarSenhaAssociado()">Gerar nova senha</button>
         <span class="hint" style="color:var(--dim);font-size:.8rem">Por segurança a senha não é exibida. Gere uma nova para vê-la e repassar ao associado.</span></div>`
     : `<span class="hint" style="color:var(--dim)">Uma senha de acesso será gerada e exibida <b>uma única vez</b> ao salvar.</span>`;
+  else if(tipo==="servicos_check"){
+    let sel=[]; try{ sel=JSON.parse(val||"[]"); if(!Array.isArray(sel)) sel=[]; }catch{ sel=val?[val]:[]; }  // compat: texto antigo
+    const lista=CACHE.servicos||[];
+    ctrl = lista.length
+      ? `<div class="chk-grid" id="${id}-grid">`+lista.map((s)=>`<label class="chk"><input type="checkbox" value="${escA(s.title)}"${sel.includes(s.title)?" checked":""}> ${escA(s.title)}</label>`).join("")+`</div>`
+      : `<p class="hint" style="color:var(--dim)">Nenhum serviço cadastrado ainda. Cadastre no módulo <b>Serviços</b>.</p>`;
+  }
   else if(tipo==="especialidade") ctrl=`<input id="${id}" list="dl-esp" value="${escA(val||"")}">`;
   else if(tipo==="foto") ctrl=`<div style="display:flex;gap:1rem;align-items:center">
       <img class="foto-prev" id="${id}-prev" src="${val?escA(val):""}" alt="" style="${val?"":"display:none"}">
@@ -660,6 +695,7 @@ function coletar(){
   const m=MODULOS[MOD], out={}, erros=[];
   for(const [k,lab,tipo,op={}] of camposDoPerfil(m)){
     if(tipo==="senha_externo") continue;   // gerida só pelo botão / servidor
+    if(tipo==="servicos_check"){ const g=$("#f-"+k+"-grid"); out[k]=JSON.stringify(g?[...g.querySelectorAll("input:checked")].map((c)=>c.value):[]); continue; }
     const el=$("#f-"+k); if(!el) continue;
     el.classList && el.classList.remove("erro");
     let v = tipo==="checkbox" ? (el.checked?1:0) : (el.value||"").trim();
@@ -777,7 +813,7 @@ async function imprimirRelatorio(){
       ${kpi("Usuários",d.totais.pacientes)}${kpi("Associados",d.totais.associados)}${kpi("Serviços",d.totais.atendimentos)}
       ${kpi("Faltas",d.totais.faltas)}${kpi("Eventos",d.totais.eventos)}${kpi("Benefícios",d.totais.beneficios)}
     </div>
-    <div class="sec">Serviços por especialidade</div>${barras(d.porEspecialidade)}
+    <div class="sec">Atendimentos por serviço</div>${barras(d.porEspecialidade)}
     <div class="sec">Serviços por situação</div>${barras(d.porStatus)}
     <div class="sec">Serviços por mês</div>${barras(d.porMes,mesBR)}`;
   abrirImpressao("Relatório de atividades", corpo);
@@ -829,14 +865,39 @@ async function carregarRelatorios(){
     $("#rel-stats").innerHTML=[["Usuários",d.totais.pacientes],["Associados",d.totais.associados],
       ["Serviços",d.totais.atendimentos],["Faltas",d.totais.faltas],["Eventos",d.totais.eventos],["Benefícios",d.totais.beneficios]]
       .map(([r,n])=>`<div class="stat"><b>${n}</b><span>${r}</span></div>`).join("");
-    $("#rel-esp").innerHTML=barras(d.porEspecialidade)||'<p class="vazio">Sem serviços ainda.</p>';
-    $("#rel-status").innerHTML=barras(d.porStatus)||'<p class="vazio">Sem serviços ainda.</p>';
-    $("#rel-mes").innerHTML=barras(d.porMes.map((x)=>({rotulo:mesBR(x.rotulo),total:x.total})))||'<p class="vazio">Sem serviços ainda.</p>';
+    // as barras de "Atendimentos por serviço" e "por situação" levam à agenda filtrada
+    $("#rel-esp").innerHTML=barras(d.porEspecialidade,"servico")||'<p class="vazio">Sem serviços ainda.</p>';
+    $("#rel-status").innerHTML=barras(d.porStatus,"status")||'<p class="vazio">Sem serviços ainda.</p>';
+    $("#rel-mes").innerHTML=barras(d.porMes.map((x)=>({rotulo:mesBR(x.rotulo),total:x.total,bruto:x.rotulo})),"mes")||'<p class="vazio">Sem serviços ainda.</p>';
   }catch(e){ toast(e.message,true); }
 }
-function barras(rows){ if(!rows||!rows.length) return "";
+function barras(rows,filtro){ if(!rows||!rows.length) return "";
   const max=Math.max(...rows.map((r)=>r.total),1);
-  return rows.map((r)=>`<div class="barra"><span style="width:180px">${escA(r.rotulo)}</span><span class="b"><i style="width:${Math.round(r.total/max*100)}%"></i></span><span class="n">${r.total}</span></div>`).join(""); }
+  return rows.map((r)=>{
+    const clic=filtro?` class="barra clik" onclick="irParaAgenda('${filtro}',${JSON.stringify(r.bruto??r.rotulo).replace(/"/g,"&quot;")})"`:' class="barra"';
+    return `<div${clic}><span style="width:180px">${escA(r.rotulo)}</span><span class="b"><i style="width:${Math.round(r.total/max*100)}%"></i></span><span class="n">${r.total}</span></div>`;
+  }).join(""); }
+
+/* Clique numa barra do relatório → abre a Agenda, vista Tabela, já filtrada. */
+let filtroAgenda=null, preservarFiltro=false;
+function irParaAgenda(tipo,valor){
+  filtroAgenda={tipo,valor}; preservarFiltro=true;   // sobrevive ao mostrarModulo
+  vistaAgenda="tabela";
+  const btn=document.querySelector('.navbtn[data-nav="atendimentos"]');
+  if(btn) btn.click();
+}
+function limparFiltroAgenda(){ filtroAgenda=null; carregarLista(); }
+function aplicarFiltroAgenda(lista){
+  if(!filtroAgenda) return lista;
+  const {tipo,valor}=filtroAgenda;
+  return lista.filter((a)=>{
+    if(tipo==="status") return (a.status||"Agendado")===valor;
+    if(tipo==="mes") return String(a.data||"").slice(0,7)===valor;
+    if(tipo==="servico"){ let s=[]; try{s=JSON.parse(a.especialidade||"[]");}catch{s=a.especialidade?[a.especialidade]:[];} return s.includes(valor)||(valor==="(sem serviço)"&&!s.length); }
+    return true;
+  });
+}
+function rotuloFiltro(){ if(!filtroAgenda) return ""; const t={servico:"Serviço",status:"Situação",mes:"Mês"}[filtroAgenda.tipo]; const v=filtroAgenda.tipo==="mes"?mesBR(filtroAgenda.valor):filtroAgenda.valor; return `${t}: ${v}`; }
 
 /* ------------------------------- CSV ----------------------------------- */
 function exportarCSV(){

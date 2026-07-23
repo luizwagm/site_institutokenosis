@@ -8,7 +8,7 @@
 const http = require("node:http");
 // Sistema de gestão da ONG — módulo independente, banco próprio (data/gestao.db).
 // Só compartilha o processo e a porta; ver restrito.js.
-const { handleRestrito, handleExterno, listarProjetos, contarProjetos, importarProjetos } = require("./restrito");
+const { handleRestrito, handleExterno, listarProjetos, contarProjetos, importarProjetos, listarServicos, contarServicos, importarServicos } = require("./restrito");
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
@@ -646,7 +646,7 @@ function tituloSeo(base, limite = 60) {
 
 function publish() {
   const S = {}; for (const r of db.prepare("SELECT key,value FROM settings").all()) S[r.key] = r.value;
-  const servicos = db.prepare("SELECT * FROM services ORDER BY sort,id").all();
+  const servicos = listarServicos();   // fonte agora é o sistema de gestão (/restrito)
   const projetos = listarProjetos();   // fonte agora é o sistema de gestão (/restrito)
   const documentos = db.prepare("SELECT * FROM documentos ORDER BY sort,id").all();
   const parceiros = db.prepare("SELECT * FROM portfolio ORDER BY sort,id").all();
@@ -1306,6 +1306,13 @@ try {
     if (antigos.length) console.log(`  · projetos migrados para o sistema de gestão: ${importarProjetos(antigos)}`);
   }
 } catch (e) { console.error("  ✖ migração de projetos:", e.message); }
+// idem para os serviços — cadastro passou para o /restrito
+try {
+  if (contarServicos() === 0) {
+    const antigos = db.prepare("SELECT title,categoria,sort FROM services ORDER BY sort,id").all();
+    if (antigos.length) console.log(`  · serviços migrados para o sistema de gestão: ${importarServicos(antigos)}`);
+  }
+} catch (e) { console.error("  ✖ migração de serviços:", e.message); }
 
 // garante que a página de manutenção exista em disco desde o primeiro boot —
 // o nginx a serve nas quedas, e nessa hora não há app para gerá-la
@@ -1469,7 +1476,7 @@ http.createServer(async (req, res) => {
         return json(res, 200, {
           settings: S,
           campos: CAMPOS,   // o painel monta a tela "Textos do site" a partir daqui
-          services: db.prepare("SELECT * FROM services ORDER BY sort,id").all(),
+          services: listarServicos(),   // somente leitura no painel: cadastro é no /restrito
           projetos: listarProjetos(),   // somente leitura no painel: cadastro é no /restrito
           documentos: db.prepare("SELECT * FROM documentos ORDER BY sort,id").all(),
           portfolio: db.prepare("SELECT * FROM portfolio ORDER BY sort,id").all(),
@@ -1503,7 +1510,9 @@ http.createServer(async (req, res) => {
       }
       // projetos saíram do CRUD do painel: agora são cadastrados no /restrito e
       // aqui o admin só lê (via /api/content) e publica.
-      const tm = p.match(/^\/api\/(services|portfolio|documentos|team|posts|galeria)(?:\/(\d+))?$/);
+      // services e projetos saíram do CRUD do painel: cadastro é no /restrito;
+      // aqui o admin só lê (via /api/content) e publica.
+      const tm = p.match(/^\/api\/(portfolio|documentos|team|posts|galeria)(?:\/(\d+))?$/);
       if (tm) {
         const table = tm[1], id = tm[2], cols = TABLES[table];
         if (req.method === "POST" && !id) {

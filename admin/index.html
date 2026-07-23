@@ -174,13 +174,13 @@
 
     <section class="panel" id="p-servicos">
       <div class="topbar"><h1>Serviços</h1><button class="btn btn-navy" onclick="saveTexts('servicos')">Salvar textos</button></div>
-      <p class="hint mb">Os serviços aparecem agrupados por categoria, na home e na página de Serviços. Cada linha é um serviço.</p>
-      <div class="topbar" style="margin-bottom:.8rem">
-        <h3 style="margin:0">Serviços cadastrados</h3>
-        <button class="btn btn-ghost btn-sm" onclick="addRow('services')">+ Novo serviço</button>
+      <p class="hint mb">Os textos da seção (título, chamada) são editados aqui. <b>Os serviços em si são cadastrados no sistema de gestão</b> — aqui o painel apenas mostra o que foi cadastrado lá, agrupado por categoria, para você publicar no site.</p>
+      <div id="servicos-form"></div>
+      <div class="topbar" style="margin:1.4rem 0 .8rem">
+        <h3 style="margin:0">Serviços cadastrados no sistema de gestão</h3>
+        <a class="btn btn-ghost btn-sm" href="/restrito/" target="_blank" style="text-decoration:none">Abrir sistema de gestão ↗</a>
       </div>
       <div id="services-list" class="mb"></div>
-      <div id="servicos-form"></div>
       <div class="topbar" style="margin-top:1rem"><span></span><button class="btn btn-navy" onclick="saveTexts('servicos')">Salvar textos</button></div>
     </section>
 
@@ -402,7 +402,7 @@ async function loadAll() {
   DATA = await api("/api/content");
   renderTexts();
   const dl = $("#lista-categorias"); if (dl) dl.innerHTML = categoriasUsadas().map((c) => `<option value="${escA(c)}">`).join("");
-  renderTable("services"); renderProjetosReadonly(); renderTable("documentos");
+  renderServicosReadonly(); renderProjetosReadonly(); renderTable("documentos");
   renderTable("team"); renderTable("posts"); renderTable("portfolio");
   renderGaleria();
 }
@@ -602,6 +602,21 @@ const TDEFS = {
 };
 /* categorias já usadas — para agrupar sem depender de digitação exata */
 const categoriasUsadas = () => [...new Set((DATA?.services || []).map((s) => s.categoria).filter(Boolean))];
+
+/* Serviços cadastrados no /restrito; aqui só se lê, agrupados por categoria. */
+function renderServicosReadonly() {
+  const el = $("#services-list");
+  const lista = DATA.services || [];
+  if (!lista.length) { el.innerHTML = `<p class="hint">Nenhum serviço cadastrado no sistema de gestão ainda.</p>`; return; }
+  const cats = [...new Set(lista.map((s) => s.categoria || "Sem categoria"))];
+  el.innerHTML = cats.map((cat) => `
+    <div class="card">
+      <b>${escA(cat)}</b>
+      <ul style="margin:.5rem 0 0;padding-left:1.1rem;color:var(--muted)">
+        ${lista.filter((s) => (s.categoria || "Sem categoria") === cat).map((s) => `<li>${escA(s.title)}</li>`).join("")}
+      </ul>
+    </div>`).join("");
+}
 
 /* Projetos são cadastrados no /restrito; aqui só se lê (sem editar/excluir). */
 function renderProjetosReadonly() {
