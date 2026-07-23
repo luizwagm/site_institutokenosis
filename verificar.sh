@@ -65,6 +65,27 @@ else
 fi
 echo
 
+echo "--- Sistema de gestão (/restrito) ---"
+if [ -f data/gestao.db ]; then
+  node -e '
+    const { DatabaseSync } = require("node:sqlite");
+    const crypto = require("node:crypto");
+    try {
+      const db = new DatabaseSync("data/gestao.db");
+      const n = (t) => db.prepare(`SELECT COUNT(*) c FROM ${t}`).get().c;
+      console.log("  arquivo: " + require("fs").statSync("data/gestao.db").size + " bytes");
+      console.log(`  pacientes ${n("pacientes")} · associados ${n("associados")} · atendimentos ${n("atendimentos")} · eventos ${n("eventos")}`);
+      const u = db.prepare("SELECT senha_hash FROM g_usuarios WHERE email=?").get("admin");
+      if (u) { const [,N,r,p,salt,dk]=u.senha_hash.split("$");
+        const padrao = dk && crypto.scryptSync("kenosis-gestao", Buffer.from(salt,"hex"), dk.length/2, {N:+N,r:+r,p:+p}).toString("hex")===dk;
+        console.log("  senha admin: " + (padrao ? "AINDA E A PADRAO — troque em /restrito" : "trocada, ok")); }
+    } catch (e) { console.log("  ERRO ao ler: " + e.message); }
+  ' 2>/dev/null
+else
+  echo "  data/gestao.db ainda não existe (será criado no 1º boot)"
+fi
+echo
+
 echo "--- Backups guardados ---"
 # o || não pega o caso vazio porque quem define o código de saída é o sed
 LISTA=$(ls -1t backups/site.db.* 2>/dev/null | head -5)

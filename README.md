@@ -116,6 +116,28 @@ Depois de mexer no `server.js`, o Node **precisa** reiniciar — o `deploy.sh`
 faz isso. Um pull sem restart deixa o código novo em disco e o antigo na
 memória (foi assim que `{{APP_VERSION}}` apareceu cru em produção uma vez).
 
+## Sistema de gestão — /restrito
+
+Aplicação **independente** do painel do site, para a operação interna da ONG
+(pacientes, atendimentos, prontuário, associados, benefícios, eventos). Fica em
+`https://institutokenosis.com/restrito/`, com link discreto no rodapé do site.
+
+- **Código:** `restrito.js` + `restrito/app.html` — não se mistura com `server.js`/`admin`.
+- **Banco próprio:** `data/gestao.db` (nunca toca no `site.db`). Guarda dado
+  pessoal sensível (CPF, endereço, prontuário) — por isso é ignorado pelo git,
+  o `deploy.sh` o protege igual ao `site.db`, e os arquivos de pacientes ficam
+  em `restrito/arquivos/` (também fora do git).
+- **Login próprio:** cookie de sessão `rid`, separado do `sid` do admin. Uma
+  sessão não abre o outro sistema. Senha inicial: `admin` / `kenosis-gestao`
+  (troque em Minha conta; o `verificar.sh` avisa enquanto for a padrão).
+- Compartilha só o processo Node e a porta — nada a mexer no nginx.
+
+Módulos (todos ativos): **Pacientes, Associados, Profissionais, Agenda,
+Prontuário, Benefícios, Eventos, Documentos e Relatórios**. Os formulários
+têm máscara e validação de CPF (com dígito verificador), telefone, e-mail,
+NIS e Cartão SUS; a agenda e o prontuário referenciam paciente/profissional
+por seleção. Relatórios trazem indicadores, gráficos e exportação CSV.
+
 ## Tela de manutenção — duas camadas
 
 | Situação | Quem responde |

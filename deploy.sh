@@ -46,7 +46,8 @@ restaurar_e_sair() {
   vermelho "$1"
   if [ -f "$COFRE/site.db" ]; then
     mkdir -p data && cp "$COFRE/site.db" data/site.db
-    amarelo "Banco devolvido do cofre temporário."
+    [ -f "$COFRE/gestao.db" ] && cp "$COFRE/gestao.db" data/gestao.db
+    amarelo "Bancos devolvidos do cofre temporário."
   elif [ -f "${BACKUP:-}" ]; then
     mkdir -p data && cp "$BACKUP" data/site.db
     amarelo "Banco restaurado do backup: $BACKUP"
@@ -71,6 +72,13 @@ if [ -f data/site.db ]; then
 else
   amarelo "     ainda não existe banco (primeira instalação)"
 fi
+# backup do banco do sistema /restrito (pacientes) — se já existir
+if [ -f data/gestao.db ]; then
+  BKG="$BACKUP_DIR/gestao.db.$(date +%Y-%m-%d_%H%M%S)"
+  if command -v sqlite3 >/dev/null 2>&1; then sqlite3 data/gestao.db ".backup '$BKG'" || cp data/gestao.db "$BKG"; else cp data/gestao.db "$BKG"; fi
+  verde "     $BKG ($(du -h "$BKG" | cut -f1))"
+  ls -1t "$BACKUP_DIR"/gestao.db.* 2>/dev/null | tail -n +$((MANTER_BACKUPS + 1)) | xargs -r rm --
+fi
 
 # -------------------------------------------------------- 2. inventário
 azul "2/7  Conteúdo atual"
@@ -87,7 +95,14 @@ verde "     parado (o SQLite solta o arquivo antes de mexermos nele)"
 azul "4/7  Tirando banco e fotos do caminho do git"
 mkdir -p "$COFRE"
 [ -f data/site.db ] && mv data/site.db "$COFRE/site.db"
+# gestao.db é o banco do sistema /restrito — dado sensível de pacientes. Mesmo
+# tratamento do site.db: sai do caminho do git e volta depois.
+[ -f data/gestao.db ] && mv data/gestao.db "$COFRE/gestao.db"
+for wal in data/site.db-wal data/site.db-shm data/gestao.db-wal data/gestao.db-shm; do
+  [ -f "$wal" ] && mv "$wal" "$COFRE/$(basename "$wal")"
+done
 [ -d assets/img/uploads ] && cp -r assets/img/uploads "$COFRE/uploads"
+[ -d restrito/arquivos ] && cp -r restrito/arquivos "$COFRE/arquivos"   # fotos/docs de pacientes
 verde "     guardados em $COFRE"
 
 # ------------------------------------------------------------- 5. pull
@@ -106,9 +121,14 @@ fi
 
 # --------------------------------------------------------- 6. devolver
 azul "6/7  Devolvendo banco e fotos"
-mkdir -p data assets/img/uploads
+mkdir -p data assets/img/uploads restrito/arquivos
 [ -f "$COFRE/site.db" ] && mv "$COFRE/site.db" data/site.db
+[ -f "$COFRE/gestao.db" ] && mv "$COFRE/gestao.db" data/gestao.db
+for wal in site.db-wal site.db-shm gestao.db-wal gestao.db-shm; do
+  [ -f "$COFRE/$wal" ] && mv "$COFRE/$wal" "data/$wal"
+done
 [ -d "$COFRE/uploads" ] && cp -rn "$COFRE/uploads/." assets/img/uploads/ 2>/dev/null
+[ -d "$COFRE/arquivos" ] && cp -rn "$COFRE/arquivos/." restrito/arquivos/ 2>/dev/null
 
 # O dono precisa ser o usuário do serviço, não um palpite: com o dono errado o
 # SQLite responde "attempt to write a readonly database" e o painel não salva

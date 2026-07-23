@@ -23,3 +23,6 @@ node_modules/
 
 # Backups do banco gerados pelo deploy.sh
 backups/
+
+# Arquivos internos do sistema de gestão (fotos/documentos de pacientes — sensível)
+restrito/arquivos/

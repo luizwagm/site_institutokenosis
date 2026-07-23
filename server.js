@@ -6,6 +6,9 @@
    "Publicar" regenera o index.html (marcadores <!--#KEY-->) e o config.js.
    ========================================================================== */
 const http = require("node:http");
+// Sistema de gestão da ONG — módulo independente, banco próprio (data/gestao.db).
+// Só compartilha o processo e a porta; ver restrito.js.
+const { handleRestrito } = require("./restrito");
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
@@ -18,7 +21,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.6.0";
 const UPLOAD_DIR = path.join(ROOT, "assets", "img", "uploads");
 fs.mkdirSync(path.join(ROOT, "data"), { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -43,6 +46,10 @@ db.exec(`
   -- pública é o que converte doador, parceiro e órgão público.
   CREATE TABLE IF NOT EXISTS documentos (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
     tipo TEXT, ano TEXT, url TEXT, sort INTEGER DEFAULT 0);
+  -- Galeria/mídia: biblioteca de imagens do site. Envie aqui uma vez, copie o
+  -- link e reaproveite em qualquer campo de imagem das outras áreas.
+  CREATE TABLE IF NOT EXISTS galeria (id INTEGER PRIMARY KEY AUTOINCREMENT, path TEXT NOT NULL,
+    categoria TEXT, descricao TEXT, sort INTEGER DEFAULT 0);
   CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, slug TEXT NOT NULL UNIQUE,
     excerpt TEXT, content TEXT, image TEXT, date TEXT, sort INTEGER DEFAULT 0);
 
@@ -1085,6 +1092,7 @@ const TABLES = {
   portfolio:    ["title", "subtitle", "image", "sort"],          // parceiros
   team:         ["name", "role", "bio", "photo", "whatsapp", "especialidades", "na_home", "sort"],
   posts:        ["title", "slug", "excerpt", "content", "image", "date", "sort"],
+  galeria:      ["path", "categoria", "descricao", "sort"],
 };
 /* ==========================================================================
    CAMPOS — declaração única de tudo que é editável em "Textos do site".
@@ -1359,6 +1367,11 @@ http.createServer(async (req, res) => {
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), interest-cohort=()");
 
+  // Área restrita (sistema de gestão): atendida por módulo à parte, antes de
+  // qualquer roteamento do site. Se ele tratou, encerra aqui.
+  try { if (handleRestrito(req, res, p)) return; }
+  catch (e) { console.error("  ✖ /restrito:", e.message); if (!res.headersSent) { res.writeHead(500); res.end("Erro interno"); } return; }
+
   try {
     /* Modo manutenção: barra o visitante mas deixa passar o painel, a API e os
        assets (a própria página de aviso usa o favicon). Quem tem sessão de
@@ -1450,7 +1463,26 @@ http.createServer(async (req, res) => {
         for (const [k, v] of Object.entries(b)) if (KEYS.includes(k)) setS(k, v);
         return json(res, 200, { ok: true });
       }
-      const tm = p.match(/^\/api\/(services|portfolio|projetos|documentos|team|posts)(?:\/(\d+))?$/);
+      /* Galeria unificada: as fotos cadastradas aqui + as que já estão em uso
+         nas outras áreas (topo, instituição, diretoria, parceiros, matérias).
+         Assim o cliente vê tudo num lugar só e copia o link de qualquer uma. */
+      if (p === "/api/gallery") {
+        const daGaleria = db.prepare("SELECT id, path, categoria, descricao FROM galeria ORDER BY sort, id DESC").all();
+        const conhecidos = new Set(daGaleria.map((g) => g.path));
+        const emUso = [];
+        const registrar = (path, origem) => {
+          if (path && path.startsWith("/assets/") && !conhecidos.has(path)) {
+            conhecidos.add(path);
+            emUso.push({ id: null, path, categoria: origem, descricao: "", origem });
+          }
+        };
+        for (const k of ["img_hero", "img_instituicao", "img_og"]) registrar(getS(k), "Textos da Home");
+        for (const t of db.prepare("SELECT name, photo FROM team WHERE photo<>''").all()) registrar(t.photo, "Diretoria");
+        for (const p of db.prepare("SELECT title, image FROM portfolio WHERE image<>''").all()) registrar(p.image, "Parceiros");
+        for (const p of db.prepare("SELECT title, image FROM posts WHERE image<>''").all()) registrar(p.image, "Memórias");
+        return json(res, 200, { galeria: daGaleria, emUso });
+      }
+      const tm = p.match(/^\/api\/(services|portfolio|projetos|documentos|team|posts|galeria)(?:\/(\d+))?$/);
       if (tm) {
         const table = tm[1], id = tm[2], cols = TABLES[table];
         if (req.method === "POST" && !id) {

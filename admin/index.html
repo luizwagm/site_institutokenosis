@@ -52,6 +52,14 @@
     #login{position:fixed;inset:0;background:var(--violet);display:grid;place-items:center;z-index:50}
     #login .card{width:min(360px,90vw);text-align:center;padding:2rem}
     .imgrow{display:flex;gap:.6rem;align-items:center}
+    .galeria-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1rem}
+    .gal-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column}
+    .gal-card img{width:100%;height:150px;object-fit:cover;background:#f0eee9;display:block}
+    .gal-card__corpo{padding:.7rem .8rem;display:flex;flex-direction:column;gap:.45rem}
+    .gal-card input{font-size:.85rem;padding:.4rem .55rem}
+    .gal-card .gal-acoes{display:flex;gap:.4rem;margin-top:.2rem}
+    .gal-card .gal-acoes .btn{flex:1;justify-content:center}
+    .gal-origem{font-size:.7rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--violet2)}
     /* --- Manutenção --- */
     #card-manutencao.manut-on{border-color:#f6c6d4;background:#fffafb;box-shadow:0 0 0 3px rgba(224,66,107,.09)}
     .manut-estado{margin:.2rem 0 .6rem}
@@ -102,6 +110,7 @@
     <button class="navbtn" data-p="voluntariado">Voluntariado</button>
     <button class="navbtn" data-p="talentos">Banco de Talentos</button>
     <button class="navbtn" data-p="posts">Memórias</button>
+    <button class="navbtn" data-p="galeria">Galeria</button>
     <button class="navbtn" data-p="outras">Outras páginas</button>
     <button class="navbtn" data-p="password">Senha</button>
     <div style="margin-top:auto">
@@ -245,6 +254,15 @@
       <div id="posts-list"></div>
     </section>
 
+    <section class="panel" id="p-galeria">
+      <div class="topbar">
+        <h1>Galeria</h1>
+        <button class="btn btn-navy" onclick="enviarParaGaleria()">+ Enviar imagem</button>
+      </div>
+      <p class="hint mb">Envie uma imagem aqui, dê uma categoria e <b>copie o link</b> para usar em qualquer campo de foto das outras áreas. As imagens já usadas no site aparecem abaixo automaticamente.</p>
+      <div id="galeria-grid" class="galeria-grid"></div>
+    </section>
+
 
 
 
@@ -386,6 +404,80 @@ async function loadAll() {
   const dl = $("#lista-categorias"); if (dl) dl.innerHTML = categoriasUsadas().map((c) => `<option value="${escA(c)}">`).join("");
   renderTable("services"); renderTable("projetos"); renderTable("documentos");
   renderTable("team"); renderTable("posts"); renderTable("portfolio");
+  renderGaleria();
+}
+
+/* ------------------------------ Galeria -------------------------------- */
+async function renderGaleria() {
+  const grid = $("#galeria-grid");
+  if (!grid) return;
+  let dados;
+  try { dados = await api("/api/gallery"); }
+  catch (e) { grid.innerHTML = `<p class="hint">${escA(e.message)}</p>`; return; }
+
+  const cartao = (g, editavel) => `
+    <div class="gal-card">
+      <img src="${escA(g.path)}" alt="" loading="lazy">
+      <div class="gal-card__corpo">
+        ${g.origem ? `<span class="gal-origem">Em uso · ${escA(g.origem)}</span>` : ""}
+        ${editavel
+          ? `<input value="${escA(g.categoria || "")}" placeholder="Categoria" onchange="salvarGaleria(${g.id}, 'categoria', this.value)">
+             <input value="${escA(g.descricao || "")}" placeholder="Descrição" onchange="salvarGaleria(${g.id}, 'descricao', this.value)">`
+          : `<span class="hint">${escA(g.categoria || "")}</span>`}
+        <div class="gal-acoes">
+          <button class="btn btn-ghost btn-sm" onclick="copiarLink('${escA(g.path)}', this)">Copiar link</button>
+          ${editavel ? `<button class="btn btn-danger btn-sm" onclick="excluirGaleria(${g.id})">Excluir</button>` : ""}
+        </div>
+      </div>
+    </div>`;
+
+  const secoes = [];
+  secoes.push(dados.galeria.length
+    ? dados.galeria.map((g) => cartao(g, true)).join("")
+    : `<p class="hint" style="grid-column:1/-1">Nenhuma imagem enviada à galeria ainda. Clique em “Enviar imagem”.</p>`);
+  if (dados.emUso.length) {
+    secoes.push(`<h3 style="grid-column:1/-1;margin:.6rem 0 0">Já usadas no site</h3>`);
+    secoes.push(dados.emUso.map((g) => cartao(g, false)).join(""));
+  }
+  grid.innerHTML = secoes.join("");
+}
+
+function enviarParaGaleria() {
+  const fi = document.createElement("input");
+  fi.type = "file"; fi.accept = "image/*";
+  fi.onchange = () => {
+    const file = fi.files[0]; if (!file) return;
+    const fr = new FileReader();
+    fr.onload = async () => {
+      try {
+        const up = await api("/api/upload", "POST", { name: file.name, dataUrl: fr.result });
+        await api("/api/galeria", "POST", { path: up.path, categoria: "", descricao: "" });
+        toast("Imagem adicionada à galeria.");
+        renderGaleria();
+      } catch (e) { toast(e.message, true); }
+    };
+    fr.readAsDataURL(file);
+  };
+  fi.click();
+}
+
+async function salvarGaleria(id, campo, valor) {
+  try { await api("/api/galeria/" + id, "PUT", { [campo]: valor }); }
+  catch (e) { toast(e.message, true); }
+}
+
+async function excluirGaleria(id) {
+  if (!confirm("Remover esta imagem da galeria? (o arquivo continua no servidor se estiver em uso)")) return;
+  try { await api("/api/galeria/" + id, "DELETE"); toast("Removida da galeria."); renderGaleria(); }
+  catch (e) { toast(e.message, true); }
+}
+
+async function copiarLink(path, btn) {
+  const url = location.origin + path;
+  try { await navigator.clipboard.writeText(url); }
+  catch { const t = document.createElement("textarea"); t.value = url; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); }
+  const antes = btn.textContent; btn.textContent = "Copiado!";
+  setTimeout(() => (btn.textContent = antes), 1400);
 }
 
 /* ---------- Campos de texto, distribuídos pelos painéis via `painel` -------- */

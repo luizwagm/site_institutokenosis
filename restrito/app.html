@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Gestão — Instituto Kenósis</title>
+  <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap">
+  <style>
+    :root{--bg:#eef3f8;--surface:#fff;--line:#dde5ee;--line2:#c7d3e0;--text:#1c2540;--muted:#5a6480;--dim:#8a94ac;
+      --marinho:#253282;--celeste:#1EA1E4;--verde:#1c7a45;--ambar:#b3792a;--red:#d63a5e;--r:12px}
+    *{box-sizing:border-box;margin:0}
+    [hidden]{display:none!important}
+    body{font:15px/1.55 Outfit,system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    h1,h2,h3{color:var(--marinho)}
+    button{font:inherit;cursor:pointer;color:inherit}
+    input,select,textarea{width:100%;padding:.6rem .75rem;font:inherit;color:var(--text);background:#fff;border:1.5px solid var(--line2);border-radius:9px}
+    input:focus,select:focus,textarea:focus{outline:none;border-color:var(--celeste);box-shadow:0 0 0 3px rgba(30,161,228,.16)}
+    input:disabled,select:disabled,textarea:disabled{background:#f2f5f9;color:var(--dim);cursor:not-allowed}
+    input.erro,select.erro{border-color:var(--red);box-shadow:0 0 0 3px rgba(214,58,94,.14)}
+    textarea{resize:vertical;min-height:70px}
+    label{display:block;font-size:.78rem;font-weight:600;color:var(--muted);margin:.7rem 0 .25rem}
+    .btn{display:inline-flex;align-items:center;gap:.4rem;padding:.55rem 1.1rem;border-radius:999px;border:2px solid transparent;font-weight:700}
+    .btn-navy{background:var(--marinho);color:#fff}
+    .btn-cel{background:var(--celeste);color:#fff}
+    .btn-ghost{background:#fff;border-color:var(--line2);color:var(--marinho)}
+    .btn-danger{background:#fceef2;color:var(--red);border-color:#f4c9d5}
+    .btn-sm{padding:.35rem .7rem;font-size:.82rem}
+    #login{position:fixed;inset:0;display:grid;place-items:center;background:linear-gradient(135deg,#253282,#1EA1E4);padding:1.5rem;z-index:50}
+    #login .card{width:min(370px,92vw);background:#fff;border-radius:18px;padding:2rem;text-align:center;box-shadow:0 30px 70px rgba(20,30,80,.3)}
+    #login img{width:58px;margin:0 auto .8rem;display:block}
+    .app{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+    aside{background:var(--marinho);color:#c5d6ea;padding:1.1rem;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:auto}
+    aside .marca{display:flex;align-items:center;gap:.55rem;color:#fff;font-weight:700;margin-bottom:.3rem}
+    aside .marca img{height:34px}
+    aside .sub{font-size:.72rem;color:#8fa7c8;margin-bottom:1.2rem;letter-spacing:.04em}
+    .navbtn{display:block;width:100%;text-align:left;padding:.52rem .75rem;border-radius:9px;border:0;background:none;color:#c5d6ea;font-weight:600;margin-bottom:.1rem}
+    .navbtn:hover{background:rgba(255,255,255,.09);color:#fff}
+    .navbtn.on{background:var(--celeste);color:#fff}
+    main{padding:1.6rem 2rem;max-width:1180px}
+    .panel{display:none}.panel.on{display:block}
+    .topbar{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.3rem}
+    .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1.1rem 1.2rem;margin-bottom:1rem;box-shadow:0 2px 8px rgba(37,50,130,.05)}
+    .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.9rem;margin-bottom:1.5rem}
+    .stat{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:1rem 1.1rem}
+    .stat b{display:block;font-size:2rem;line-height:1.1;color:var(--marinho)}
+    .stat span{font-size:.76rem;color:var(--dim);font-weight:600}
+    table{width:100%;border-collapse:collapse;font-size:.9rem}
+    th{text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);padding:.5rem .6rem;border-bottom:2px solid var(--line)}
+    td{padding:.55rem .6rem;border-bottom:1px solid var(--line);vertical-align:middle}
+    tr:hover td{background:#f6f9fc}
+    .busca{max-width:320px}
+    .tag{display:inline-block;padding:.15rem .55rem;border-radius:999px;font-size:.72rem;font-weight:700}
+    .tag-sim{background:#fdecef;color:var(--red)}.tag-nao{background:#eef1f6;color:var(--muted)}
+    .tag-Agendado{background:#eaf1fb;color:#2a5bbd}.tag-Confirmado{background:#e7f6ee;color:var(--verde)}
+    .tag-Atendido{background:#e7f6ee;color:var(--verde)}.tag-Faltou{background:#fdecef;color:var(--red)}
+    .tag-Remarcado{background:#fdf4e6;color:var(--ambar)}.tag-Ativo{background:#e7f6ee;color:var(--verde)}.tag-Inativo{background:#eef1f6;color:var(--muted)}
+    .vazio{color:var(--dim);padding:1.5rem;text-align:center}
+    .modal-bg{position:fixed;inset:0;background:rgba(20,28,60,.45);display:grid;place-items:start center;padding:2rem 1rem;overflow:auto;z-index:40}
+    .modal{width:min(760px,96vw);background:#fff;border-radius:16px;padding:1.4rem 1.5rem;box-shadow:0 30px 70px rgba(20,30,80,.3)}
+    .modal h2{margin-bottom:1rem}
+    .formgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 1.1rem}
+    .formgrid .full{grid-column:1/-1}
+    .modal .acoes{display:flex;justify-content:flex-end;gap:.6rem;margin-top:1.2rem;flex-wrap:wrap}
+    .erros{background:#fdecef;color:#a3243f;border-radius:9px;padding:.6rem .8rem;font-size:.85rem;margin-top:.8rem}
+    .foto-prev{width:84px;height:84px;object-fit:cover;border-radius:12px;border:1px solid var(--line);background:#f0f3f8}
+    .fotos-lista{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.5rem}
+    .fotos-lista figure{position:relative}
+    .fotos-lista img{width:70px;height:70px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+    .fotos-lista button{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--red);color:#fff;border:0;font-size:.7rem;line-height:1}
+    .arq-link{display:inline-flex;align-items:center;gap:.4rem;font-size:.85rem;color:var(--celeste);font-weight:600}
+    .rel-cols{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    .barra{display:flex;align-items:center;gap:.6rem;margin:.35rem 0;font-size:.85rem}
+    .barra .b{flex:1;height:10px;background:#e9eef5;border-radius:6px;overflow:hidden}
+    .barra .b i{display:block;height:100%;background:var(--celeste)}
+    .barra .n{width:34px;text-align:right;font-weight:700;color:var(--marinho)}
+    .toast{position:fixed;bottom:1.2rem;left:50%;transform:translate(-50%,150%);background:var(--marinho);color:#fff;padding:.7rem 1.2rem;border-radius:999px;font-weight:600;transition:transform .3s;z-index:60}
+    .toast.on{transform:translate(-50%,0)}.toast.err{background:var(--red)}
+    @media(max-width:820px){.app{grid-template-columns:1fr}aside{position:static;height:auto;flex-direction:row;flex-wrap:wrap}main{padding:1.1rem}.formgrid,.rel-cols{grid-template-columns:1fr}}
+    @media print{aside,.topbar .btn,.navbtn{display:none}.app{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+
+<div id="login">
+  <div class="card">
+    <img src="/assets/img/favicon.svg" alt="">
+    <h2 style="margin-bottom:.2rem">Sistema de Gestão</h2>
+    <p style="color:var(--muted);font-size:.85rem;margin-bottom:1.2rem">Instituto Kenósis</p>
+    <input id="lg-user" placeholder="Usuário" autocomplete="username" style="margin-bottom:.6rem">
+    <input id="lg-pass" type="password" placeholder="Senha" autocomplete="current-password" onkeydown="if(event.key==='Enter')entrar()">
+    <button class="btn btn-cel" style="width:100%;justify-content:center;margin-top:.9rem" onclick="entrar()">Entrar</button>
+    <p id="lg-erro" style="color:var(--red);font-size:.82rem;margin-top:.7rem"></p>
+  </div>
+</div>
+
+<div class="app" id="app" hidden>
+  <aside>
+    <span class="marca"><img src="/assets/img/favicon.svg" alt=""> Gestão</span>
+    <span class="sub" id="quem"></span>
+    <button class="navbtn on" data-nav="painel">Painel</button>
+    <button class="navbtn" data-nav="pacientes">Pacientes</button>
+    <button class="navbtn" data-nav="associados">Associados</button>
+    <button class="navbtn" data-nav="profissionais">Profissionais</button>
+    <button class="navbtn" data-nav="atendimentos">Agenda</button>
+    <button class="navbtn" data-nav="prontuario">Prontuário</button>
+    <button class="navbtn" data-nav="beneficios">Benefícios</button>
+    <button class="navbtn" data-nav="eventos">Eventos</button>
+    <button class="navbtn" data-nav="documentos_gestao">Documentos</button>
+    <button class="navbtn" data-nav="relatorios">Relatórios</button>
+    <div style="margin-top:auto">
+      <button class="navbtn" data-nav="conta">Minha conta</button>
+      <a class="navbtn" href="/" target="_blank" style="text-decoration:none;display:block">↗ Ver o site</a>
+      <button class="navbtn" onclick="sair()">Sair</button>
+    </div>
+  </aside>
+
+  <main>
+    <section class="panel on" id="pane-painel">
+      <div class="topbar"><h1>Painel</h1></div>
+      <div class="stat-grid" id="painel-stats"></div>
+      <div class="card"><p style="color:var(--muted)">Bem-vindo ao sistema de gestão do Instituto Kenósis. Selecione um módulo no menu à esquerda.</p></div>
+    </section>
+
+    <section class="panel" id="pane-mod">
+      <div class="topbar">
+        <h1 id="mod-titulo"></h1>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-ghost btn-sm" onclick="exportarCSV()">Exportar CSV</button>
+          <button class="btn btn-navy" id="mod-novo" onclick="abrirForm()">+ Novo</button>
+        </div>
+      </div>
+      <input class="busca" id="mod-busca" placeholder="Buscar por nome ou CPF…" oninput="carregarLista()" style="margin-bottom:1rem" hidden>
+      <div class="card" style="padding:0;overflow:auto">
+        <table>
+          <thead id="mod-thead"></thead>
+          <tbody id="mod-tbody"><tr><td class="vazio">Carregando…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel" id="pane-relatorios">
+      <div class="topbar"><h1>Relatórios</h1><button class="btn btn-ghost btn-sm" onclick="window.print()">Imprimir / PDF</button></div>
+      <div class="stat-grid" id="rel-stats"></div>
+      <div class="rel-cols">
+        <div class="card"><h3 style="margin-bottom:.6rem">Atendimentos por especialidade</h3><div id="rel-esp"></div></div>
+        <div class="card"><h3 style="margin-bottom:.6rem">Atendimentos por situação</h3><div id="rel-status"></div></div>
+      </div>
+      <div class="card"><h3 style="margin-bottom:.6rem">Atendimentos por mês</h3><div id="rel-mes"></div></div>
+    </section>
+
+    <section class="panel" id="pane-conta">
+      <div class="topbar"><h1>Minha conta</h1></div>
+      <div class="card" style="max-width:420px">
+        <h3 style="margin-bottom:.6rem">Trocar senha</h3>
+        <label>Senha atual</label><input id="ct-atual" type="password">
+        <label>Nova senha (mín. 8 caracteres)</label><input id="ct-nova" type="password">
+        <div style="margin-top:1rem"><button class="btn btn-navy" onclick="trocarSenha()">Salvar</button></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<datalist id="dl-esp"></datalist>
+<div id="modal-host"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (s, c = document) => c.querySelector(s);
+const escA = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+const soDig = (s) => String(s ?? "").replace(/\D/g, "");
+let toastT;
+function toast(m, err) { const t = $("#toast"); t.textContent = m; t.classList.toggle("err", !!err); t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 3000); }
+
+async function api(url, method = "GET", body) {
+  const r = await fetch("/restrito/api/" + url, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+/* ===================== máscaras e validações ========================== */
+function mCPF(v){ v=soDig(v).slice(0,11); return v.replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d{1,2})$/,"$1-$2"); }
+function mTel(v){ v=soDig(v).slice(0,11);
+  if(v.length<=10) return v.replace(/(\d{2})(\d)/,"($1) $2").replace(/(\d{4})(\d)/,"$1-$2");
+  return v.replace(/(\d{2})(\d)/,"($1) $2").replace(/(\d{5})(\d)/,"$1-$2"); }        /* (00) 90000-0000 */
+function mNIS(v){ v=soDig(v).slice(0,11); return v.replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{5})(\d)/,"$1.$2").replace(/(\d{2})(\d)$/,"$1-$2"); } /* 000.00000.00-0 */
+function mSUS(v){ v=soDig(v).slice(0,15); return v.replace(/(\d{3})(\d)/,"$1 $2").replace(/(\d{4})(\d)/,"$1 $2").replace(/(\d{4})(\d)/,"$1 $2"); }   /* 000 0000 0000 0000 */
+function mMoney(v){ let n=soDig(v); if(!n) return ""; n=(parseInt(n,10)/100).toFixed(2); return "R$ "+n.replace(".",",").replace(/\B(?=(\d{3})+(?!\d))/g,"."); }
+const MASCARA = { cpf:mCPF, tel:mTel, nis:mNIS, sus:mSUS, money:mMoney };
+function aplicarMascara(tipo, v){ return MASCARA[tipo] ? MASCARA[tipo](v) : v; }
+
+function cpfValido(cpf){ cpf=soDig(cpf); if(cpf.length!==11||/^(\d)\1{10}$/.test(cpf)) return false;
+  let s=0; for(let i=0;i<9;i++) s+=+cpf[i]*(10-i); let d=(s*10)%11; if(d===10)d=0; if(d!==+cpf[9]) return false;
+  s=0; for(let i=0;i<10;i++) s+=+cpf[i]*(11-i); d=(s*10)%11; if(d===10)d=0; return d===+cpf[10]; }
+const emailValido = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
+
+const dataBR = (iso) => { if(!iso) return "—"; const [a,m,d]=String(iso).split("-"); return d?`${d}/${m}/${a}`:iso; };
+const mesBR = (ym) => { if(!ym) return "—"; const [a,m]=ym.split("-"); const nomes=["","jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"]; return `${nomes[+m]}/${a}`; };
+
+/* ============================ dados de apoio ========================== */
+const ESCOLARIDADE = ["Não alfabetizado","Ensino Fundamental incompleto","Ensino Fundamental completo",
+  "Ensino Médio incompleto","Ensino Médio completo","Ensino Superior incompleto","Ensino Superior completo","Pós-graduação"];
+const ESPECIALIDADES = ["Psicanálise (Individual)","Psicanálise (Casal)","Psicologia","Acupuntura","Nutrição",
+  "Terapia Floral","Aromaterapia","Fitoterapia","Homeopatia","Ventosaterapia","Ozonioterapia","Detox Iônico","Assistência Social"];
+const CACHE = { pacientes: [], profissionais: [] };
+async function recarregarCache(){
+  try { CACHE.pacientes = await api("pacientes"); } catch {}
+  try { CACHE.profissionais = await api("profissionais"); } catch {}
+}
+const nomePac = (id) => (CACHE.pacientes.find((p)=>String(p.id)===String(id))||{}).nome || "—";
+const nomeProf = (id) => (CACHE.profissionais.find((p)=>String(p.id)===String(id))||{}).nome || "—";
+
+/* ========================= definição dos módulos ===================== */
+const MODULOS = {
+  pacientes: { titulo:"Pacientes", novo:"Novo paciente", busca:true,
+    colunas:[["nome","Nome"],["nascimento","Nascimento","data"],["cpf","CPF"],["telefone","Telefone"],["vulneravel","Vulnerável","bool"]],
+    campos:[
+      ["foto","Foto do paciente","foto",{full:1}],
+      ["nome","Nome completo","text",{req:1}],
+      ["nascimento","Data de nascimento","date"],
+      ["cpf","CPF","cpf"],["rg","RG","text"],
+      ["telefone","Telefone / WhatsApp","tel"],
+      ["email","E-mail","email"],
+      ["endereco","Endereço completo","text",{full:1}],
+      ["escolaridade","Escolaridade","select",{opcoes:ESCOLARIDADE,placeholder:"Selecione…"}],
+      ["primeiro_atendimento","Data do 1º atendimento","date"],
+      ["nis","NIS (opcional)","nis"],
+      ["cartao_sus","Cartão SUS (opcional)","sus"],
+      ["vulneravel","Situação de vulnerabilidade social","select",{bool:1}],
+      ["vulnerabilidade","Descrição da vulnerabilidade","textarea",{full:1,dependeDe:"vulneravel"}],
+      ["observacoes","Observações","textarea",{full:1}],
+      ["consentimento","Termo de consentimento assinado / aceito","checkbox",{full:1}],
+    ]},
+  associados: { titulo:"Associados", novo:"Novo associado", busca:true,
+    colunas:[["nome","Nome"],["vinculo","Vínculo"],["adesao","Adesão","data"],["mensalidade","Mensalidade"],["status","Status","tag"]],
+    campos:[
+      ["foto","Foto","foto",{full:1}],
+      ["nome","Nome completo","text",{req:1}],
+      ["cpf","CPF","cpf"],
+      ["contato","Contato","tel"],
+      ["endereco","Endereço","text",{full:1}],
+      ["vinculo","Tipo de vínculo","select",{opcoes:["Contribuinte","Voluntário","Colaborador"],placeholder:"Selecione…"}],
+      ["adesao","Data de adesão","date"],
+      ["mensalidade","Valor da mensalidade","money"],
+      ["status","Status","select",{opcoes:["Ativo","Inativo"]}],
+    ]},
+  profissionais: { titulo:"Profissionais", novo:"Novo profissional",
+    colunas:[["nome","Nome"],["especialidade","Especialidade"],["registro","Registro"],["ativo","Ativo","bool"]],
+    campos:[
+      ["nome","Nome completo","text",{req:1}],
+      ["especialidade","Especialidade","especialidade"],
+      ["registro","Registro profissional","text"],
+      ["contato","Contato","tel"],
+      ["ativo","Ativo","select",{bool:1}],
+    ]},
+  atendimentos: { titulo:"Agenda de atendimentos", novo:"Novo atendimento",
+    colunas:[["data","Data","data"],["hora","Hora"],["paciente_id","Paciente","pac"],["profissional_id","Profissional","prof"],["especialidade","Especialidade"],["status","Status","tag"]],
+    campos:[
+      ["paciente_id","Paciente","ref",{tabela:"pacientes",req:1}],
+      ["profissional_id","Profissional","ref",{tabela:"profissionais"}],
+      ["especialidade","Especialidade","especialidade"],
+      ["data","Data","date",{req:1}],
+      ["hora","Horário","time"],
+      ["local","Local","select",{opcoes:["Presencial","Online","Domiciliar"]}],
+      ["status","Situação","select",{opcoes:["Agendado","Confirmado","Faltou","Remarcado","Atendido"]}],
+      ["observacoes","Observações","textarea",{full:1}],
+    ]},
+  prontuario: { titulo:"Prontuário eletrônico", novo:"Novo registro",
+    colunas:[["data","Data","data"],["paciente_id","Paciente","pac"],["especialidade","Especialidade"],["profissional","Profissional"]],
+    campos:[
+      ["paciente_id","Paciente","ref",{tabela:"pacientes",req:1}],
+      ["data","Data do atendimento","date",{req:1}],
+      ["especialidade","Especialidade","especialidade"],
+      ["profissional","Profissional responsável","text"],
+      ["avaliacao","Avaliação inicial","textarea",{full:1}],
+      ["evolucao","Evolução da sessão","textarea",{full:1}],
+      ["plano","Plano terapêutico","textarea",{full:1}],
+      ["encaminhamentos","Encaminhamentos","textarea",{full:1}],
+      ["anexos","Anexo (foto/PDF)","arquivo",{full:1}],
+      ["responsavel","Assinatura / responsável técnico","text"],
+    ]},
+  beneficios: { titulo:"Distribuição de benefícios", novo:"Nova entrega",
+    colunas:[["data","Data","data"],["nome","Beneficiado"],["item","Item"],["local","Local"],["responsavel","Responsável"]],
+    campos:[
+      ["nome","Nome do beneficiado","text",{req:1}],
+      ["cpf","CPF","cpf"],
+      ["item","Tipo de item entregue","text"],
+      ["data","Data da entrega","date"],
+      ["local","Local","text"],
+      ["responsavel","Responsável","text"],
+      ["foto","Foto da entrega (opcional)","foto",{full:1}],
+    ]},
+  eventos: { titulo:"Eventos comunitários", novo:"Novo evento",
+    colunas:[["data","Data","data"],["tipo","Tipo"],["titulo","Título"],["participantes","Participantes"],["responsavel","Responsável"]],
+    campos:[
+      ["tipo","Tipo de evento","select",{opcoes:["Palestra","Curso","Oficina","Roda de Conversa"],placeholder:"Selecione…"}],
+      ["titulo","Título","text",{req:1}],
+      ["tema","Tema","text"],
+      ["local","Local","text"],
+      ["data","Data","date"],
+      ["hora","Hora","time"],
+      ["publico_alvo","Público-alvo","text"],
+      ["participantes","Nº de participantes","number"],
+      ["responsavel","Responsável","text"],
+      ["avaliacao","Avaliação pós-evento","textarea",{full:1}],
+      ["fotos","Galeria de fotos","fotos",{full:1}],
+    ]},
+  documentos_gestao: { titulo:"Gestão de documentos", novo:"Novo documento",
+    colunas:[["data","Data","data"],["tipo","Tipo"],["titulo","Título"],["paciente_id","Paciente","pac"],["arquivo","Arquivo","arq"]],
+    campos:[
+      ["tipo","Tipo de documento","select",{opcoes:["Termo de consentimento","Receita/Prescrição","Certificado","Encaminhamento","Laudo","Outro"],placeholder:"Selecione…"}],
+      ["titulo","Título/descrição","text",{req:1}],
+      ["paciente_id","Paciente (se aplicável)","ref",{tabela:"pacientes"}],
+      ["data","Data","date"],
+      ["arquivo","Arquivo (foto/PDF)","arquivo",{full:1}],
+    ]},
+};
+
+let MOD = null, LISTA = [];   // módulo atual e sua lista carregada
+
+/* ------------------------------ login ---------------------------------- */
+async function entrar(){ $("#lg-erro").textContent="";
+  try { const j=await api("login","POST",{usuario:$("#lg-user").value,senha:$("#lg-pass").value}); iniciarApp(j); }
+  catch(e){ $("#lg-erro").textContent=e.message; } }
+async function sair(){ try{ await api("logout","POST"); }catch{} location.reload(); }
+
+async function iniciarApp(me){
+  $("#login").hidden=true; $("#app").hidden=false;
+  $("#quem").textContent=me.nome+" · "+me.perfil;
+  $("#dl-esp").innerHTML=ESPECIALIDADES.map((e)=>`<option value="${escA(e)}">`).join("");
+  await recarregarCache();
+  carregarPainel();
+}
+
+/* ---------------------------- navegação -------------------------------- */
+document.querySelectorAll(".navbtn[data-nav]").forEach((b)=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".navbtn[data-nav]").forEach((x)=>x.classList.remove("on"));
+  b.classList.add("on");
+  const nav=b.dataset.nav;
+  document.querySelectorAll(".panel").forEach((x)=>x.classList.remove("on"));
+  if(nav==="painel"){ $("#pane-painel").classList.add("on"); carregarPainel(); }
+  else if(nav==="conta"){ $("#pane-conta").classList.add("on"); }
+  else if(nav==="relatorios"){ $("#pane-relatorios").classList.add("on"); carregarRelatorios(); }
+  else { MOD=nav; $("#pane-mod").classList.add("on"); mostrarModulo(); }
+}));
+
+/* ------------------------------ painel --------------------------------- */
+async function carregarPainel(){
+  try { const d=await api("painel");
+    $("#painel-stats").innerHTML=[["Pacientes",d.pacientes],["Associados",d.associados],
+      ["Atendimentos hoje",d.atendimentosHoje],["Eventos",d.eventos],["Benefícios entregues",d.beneficios]]
+      .map(([r,n])=>`<div class="stat"><b>${n}</b><span>${r}</span></div>`).join("");
+  } catch(e){ toast(e.message,true); }
+}
+
+/* ==================== lista genérica de um módulo ===================== */
+function mostrarModulo(){
+  const m=MODULOS[MOD];
+  $("#mod-titulo").textContent=m.titulo;
+  $("#mod-novo").textContent="+ "+(m.novo||"Novo");
+  $("#mod-busca").hidden=!m.busca; $("#mod-busca").value="";
+  $("#mod-thead").innerHTML="<tr>"+m.colunas.map(([,lab])=>`<th>${lab}</th>`).join("")+"<th></th></tr>";
+  carregarLista();
+}
+function celula(row,[chave,,tipo]){
+  const v=row[chave];
+  if(tipo==="data") return dataBR(v);
+  if(tipo==="bool") return Number(v)?'<span class="tag tag-sim">Sim</span>':'<span class="tag tag-nao">Não</span>';
+  if(tipo==="tag"&&v) return `<span class="tag tag-${escA(v)}">${escA(v)}</span>`;
+  if(tipo==="pac") return escA(nomePac(v));
+  if(tipo==="prof") return escA(nomeProf(v));
+  if(tipo==="arq") return v?`<a class="arq-link" href="${escA(v)}" target="_blank">abrir</a>`:"—";
+  return escA(v||"—");
+}
+async function carregarLista(){
+  const m=MODULOS[MOD], tb=$("#mod-tbody"), nc=m.colunas.length+1;
+  try {
+    const q=m.busca?$("#mod-busca").value.trim():"";
+    LISTA=await api(MOD+(q?"?q="+encodeURIComponent(q):""));
+    if(!LISTA.length){ tb.innerHTML=`<tr><td colspan="${nc}" class="vazio">Nenhum registro ${q?"encontrado":"cadastrado ainda"}.</td></tr>`; return; }
+    tb.innerHTML=LISTA.map((row)=>`<tr>${m.colunas.map((c)=>`<td>${celula(row,c)}</td>`).join("")}
+      <td style="text-align:right;white-space:nowrap"><button class="btn btn-ghost btn-sm" onclick="abrirForm(${row.id})">Abrir</button></td></tr>`).join("");
+  } catch(e){ tb.innerHTML=`<tr><td colspan="${nc}" class="vazio">${escA(e.message)}</td></tr>`; }
+}
+
+/* ======================= formulário genérico ========================= */
+function campoHTML(campo, val){
+  const [k,lab,tipo,op={}]=campo, id="f-"+k;
+  const req=op.req?' <span style="color:var(--red)">*</span>':"";
+  const wrap=(inner,full)=>`<div class="${full?"full":""}">${inner}</div>`;
+  if(tipo==="checkbox")
+    return wrap(`<label style="display:flex;gap:.5rem;align-items:center;margin-top:1.1rem;cursor:pointer;color:var(--text)"><input type="checkbox" id="${id}" style="width:auto" ${Number(val)?"checked":""}> ${lab}</label>`,op.full);
+  let ctrl;
+  if(tipo==="textarea") ctrl=`<textarea id="${id}">${escA(val||"")}</textarea>`;
+  else if(tipo==="select"){
+    const opts=op.bool?[["0","Não"],["1","Sim"]]:(op.opcoes||[]).map((o)=>[o,o]);
+    ctrl=`<select id="${id}">${op.placeholder?`<option value="">${op.placeholder}</option>`:""}`+
+      opts.map(([v,l])=>`<option value="${escA(v)}"${String(val??(op.bool?0:""))===String(v)?" selected":""}>${escA(l)}</option>`).join("")+`</select>`;
+  }
+  else if(tipo==="ref"){
+    const lista=CACHE[op.tabela]||[];
+    ctrl=`<select id="${id}"><option value="">—</option>`+
+      lista.map((r)=>`<option value="${r.id}"${String(val)===String(r.id)?" selected":""}>${escA(r.nome)}</option>`).join("")+`</select>`;
+  }
+  else if(tipo==="especialidade") ctrl=`<input id="${id}" list="dl-esp" value="${escA(val||"")}">`;
+  else if(tipo==="foto") ctrl=`<div style="display:flex;gap:1rem;align-items:center">
+      <img class="foto-prev" id="${id}-prev" src="${val?escA(val):""}" alt="" style="${val?"":"display:none"}">
+      <button type="button" class="btn btn-ghost btn-sm" onclick="subirFoto('${id}')">Enviar foto</button>
+      <input type="hidden" id="${id}" value="${escA(val||"")}"></div>`;
+  else if(tipo==="arquivo") ctrl=`<div style="display:flex;gap:.8rem;align-items:center">
+      <button type="button" class="btn btn-ghost btn-sm" onclick="subirArquivo('${id}')">Enviar arquivo</button>
+      <span id="${id}-nome" class="arq-link">${val?`<a href="${escA(val)}" target="_blank">arquivo enviado</a>`:""}</span>
+      <input type="hidden" id="${id}" value="${escA(val||"")}"></div>`;
+  else if(tipo==="fotos"){
+    const arr=(()=>{ try{return JSON.parse(val||"[]");}catch{return [];} })();
+    ctrl=`<button type="button" class="btn btn-ghost btn-sm" onclick="subirFotos('${id}')">+ Adicionar foto</button>
+      <div class="fotos-lista" id="${id}-lista"></div><input type="hidden" id="${id}" value='${escA(JSON.stringify(arr))}'>`;
+  }
+  else { const t=tipo==="date"?"date":tipo==="time"?"time":tipo==="number"?"number":tipo==="email"?"email":"text";
+    const md=MASCARA[tipo]?` data-mask="${tipo}" inputmode="numeric"`:"";
+    const iv=MASCARA[tipo]?aplicarMascara(tipo,val||""):(val||"");
+    ctrl=`<input id="${id}" type="${t}"${md} value="${escA(iv)}">`; }
+  return wrap(`<label>${lab}${req}</label>${ctrl}`,op.full);
+}
+
+async function abrirForm(id){
+  const m=MODULOS[MOD];
+  let dados={};
+  if(id){ try{ dados=await api(MOD+"/"+id); }catch(e){ return toast(e.message,true); } }
+  const host=$("#modal-host");
+  host.innerHTML=`<div class="modal-bg" onclick="if(event.target===this)fecharModal()"><div class="modal">
+    <h2>${id?"Editar":m.novo||"Novo"}</h2>
+    <div class="formgrid">${m.campos.map((c)=>campoHTML(c,dados[c[0]])).join("")}</div>
+    <div id="form-erros"></div>
+    <div class="acoes">
+      ${id?`<button class="btn btn-danger" onclick="excluirReg(${id})">Excluir</button>`:""}
+      <button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-navy" onclick="salvarReg(${id||0})">Salvar</button>
+    </div></div></div>`;
+  // máscaras ao digitar
+  host.querySelector(".modal").addEventListener("input",(e)=>{ const mk=e.target.dataset.mask;
+    if(mk){ e.target.value=aplicarMascara(mk,e.target.value); } });
+  // campos que dependem de outro (habilita/desabilita)
+  for(const [k,,,op={}] of m.campos){ if(op.dependeDe){
+    const mestre=$("#f-"+op.dependeDe), dep=$("#f-"+k);
+    const sync=()=>{ const on=String(mestre.value)==="1"; dep.disabled=!on; if(!on) dep.value=""; };
+    mestre.addEventListener("change",sync); sync();
+  }}
+  // galerias de fotos já existentes
+  for(const [k,,tipo] of m.campos) if(tipo==="fotos") desenharFotos("f-"+k);
+}
+function fecharModal(){ $("#modal-host").innerHTML=""; }
+
+function coletar(){
+  const m=MODULOS[MOD], out={}, erros=[];
+  for(const [k,lab,tipo,op={}] of m.campos){
+    const el=$("#f-"+k); if(!el) continue;
+    el.classList && el.classList.remove("erro");
+    let v = tipo==="checkbox" ? (el.checked?1:0) : (el.value||"").trim();
+    if(op.bool) v=Number(v);
+    const vazio = v==="" || v===null || (op.bool && false);
+    if(op.req && (v===""||v===null||v===undefined)){ erros.push(`“${lab}” é obrigatório.`); el.classList.add("erro"); }
+    if(v!=="" && !vazio){
+      if(tipo==="cpf" && !cpfValido(v)){ erros.push("CPF inválido."); el.classList.add("erro"); }
+      if(tipo==="email" && !emailValido(v)){ erros.push("E-mail inválido."); el.classList.add("erro"); }
+      if(tipo==="tel" && soDig(v).length<10){ erros.push("Telefone incompleto."); el.classList.add("erro"); }
+      if(tipo==="nis" && soDig(v).length!==11){ erros.push("NIS deve ter 11 dígitos."); el.classList.add("erro"); }
+      if(tipo==="sus" && soDig(v).length!==15){ erros.push("Cartão SUS deve ter 15 dígitos."); el.classList.add("erro"); }
+    }
+    out[k]=v;
+  }
+  return {out,erros};
+}
+async function salvarReg(id){
+  const {out,erros}=coletar();
+  const box=$("#form-erros");
+  if(erros.length){ box.innerHTML=`<div class="erros">${erros.map(escA).join("<br>")}</div>`; return; }
+  box.innerHTML="";
+  try{
+    if(id) await api(MOD+"/"+id,"PUT",out); else await api(MOD,"POST",out);
+    if(MOD==="pacientes"||MOD==="profissionais") await recarregarCache();
+    fecharModal(); toast("Registro salvo."); carregarLista();
+  }catch(e){ box.innerHTML=`<div class="erros">${escA(e.message)}</div>`; }
+}
+async function excluirReg(id){
+  if(!confirm("Excluir este registro? Esta ação não pode ser desfeita.")) return;
+  try{ await api(MOD+"/"+id,"DELETE");
+    if(MOD==="pacientes"||MOD==="profissionais") await recarregarCache();
+    fecharModal(); toast("Registro excluído."); carregarLista();
+  }catch(e){ toast(e.message,true); }
+}
+
+/* ------------------------------ uploads -------------------------------- */
+function escolherArquivo(accept){ return new Promise((ok)=>{ const fi=document.createElement("input");
+  fi.type="file"; fi.accept=accept; fi.onchange=()=>ok(fi.files[0]||null); fi.click(); }); }
+function lerDataURL(f){ return new Promise((ok)=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.readAsDataURL(f); }); }
+async function enviar(f){ return api("upload","POST",{name:f.name,dataUrl:await lerDataURL(f)}); }
+async function subirFoto(id){ const f=await escolherArquivo("image/*"); if(!f) return;
+  try{ const up=await enviar(f); $("#"+id).value=up.path; const p=$("#"+id+"-prev"); p.src=up.path; p.style.display=""; toast("Foto enviada."); }
+  catch(e){ toast(e.message,true); } }
+async function subirArquivo(id){ const f=await escolherArquivo("image/*,application/pdf"); if(!f) return;
+  try{ const up=await enviar(f); $("#"+id).value=up.path; $("#"+id+"-nome").innerHTML=`<a href="${up.path}" target="_blank">${escA(f.name)}</a>`; toast("Arquivo enviado."); }
+  catch(e){ toast(e.message,true); } }
+async function subirFotos(id){ const f=await escolherArquivo("image/*"); if(!f) return;
+  try{ const up=await enviar(f); const inp=$("#"+id); const arr=JSON.parse(inp.value||"[]"); arr.push(up.path); inp.value=JSON.stringify(arr); desenharFotos(id); }
+  catch(e){ toast(e.message,true); } }
+function desenharFotos(id){ const inp=$("#"+id); let arr=[]; try{ arr=JSON.parse(inp.value||"[]"); }catch{}
+  $("#"+id+"-lista").innerHTML=arr.map((src,i)=>`<figure><img src="${escA(src)}" alt=""><button type="button" onclick="removerFoto('${id}',${i})">×</button></figure>`).join(""); }
+function removerFoto(id,i){ const inp=$("#"+id); const arr=JSON.parse(inp.value||"[]"); arr.splice(i,1); inp.value=JSON.stringify(arr); desenharFotos(id); }
+
+/* ----------------------------- relatórios ------------------------------ */
+async function carregarRelatorios(){
+  try{ const d=await api("relatorios");
+    $("#rel-stats").innerHTML=[["Pacientes",d.totais.pacientes],["Associados",d.totais.associados],
+      ["Atendimentos",d.totais.atendimentos],["Faltas",d.totais.faltas],["Eventos",d.totais.eventos],["Benefícios",d.totais.beneficios]]
+      .map(([r,n])=>`<div class="stat"><b>${n}</b><span>${r}</span></div>`).join("");
+    $("#rel-esp").innerHTML=barras(d.porEspecialidade)||'<p class="vazio">Sem atendimentos ainda.</p>';
+    $("#rel-status").innerHTML=barras(d.porStatus)||'<p class="vazio">Sem atendimentos ainda.</p>';
+    $("#rel-mes").innerHTML=barras(d.porMes.map((x)=>({rotulo:mesBR(x.rotulo),total:x.total})))||'<p class="vazio">Sem atendimentos ainda.</p>';
+  }catch(e){ toast(e.message,true); }
+}
+function barras(rows){ if(!rows||!rows.length) return "";
+  const max=Math.max(...rows.map((r)=>r.total),1);
+  return rows.map((r)=>`<div class="barra"><span style="width:180px">${escA(r.rotulo)}</span><span class="b"><i style="width:${Math.round(r.total/max*100)}%"></i></span><span class="n">${r.total}</span></div>`).join(""); }
+
+/* ------------------------------- CSV ----------------------------------- */
+function exportarCSV(){
+  const m=MODULOS[MOD]; if(!LISTA.length) return toast("Nada para exportar.",true);
+  const cols=m.colunas.map((c)=>c[0]);
+  const cab=m.colunas.map((c)=>c[1]);
+  const linha=(vals)=>vals.map((v)=>`"${String(v??"").replace(/"/g,'""')}"`).join(";");
+  const corpo=LISTA.map((row)=>linha(m.colunas.map((c)=>{
+    const v=row[c[0]]; const t=c[2];
+    if(t==="pac") return nomePac(v); if(t==="prof") return nomeProf(v);
+    if(t==="bool") return Number(v)?"Sim":"Não"; if(t==="data") return dataBR(v);
+    return v??""; })));
+  const csv="﻿"+[linha(cab),...corpo].join("\r\n");
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download=MOD+".csv"; a.click(); URL.revokeObjectURL(a.href);
+}
+
+/* ------------------------------- conta --------------------------------- */
+async function trocarSenha(){
+  try{ await api("senha","POST",{atual:$("#ct-atual").value,nova:$("#ct-nova").value});
+    $("#ct-atual").value=$("#ct-nova").value=""; toast("Senha alterada."); }
+  catch(e){ toast(e.message,true); }
+}
+
+/* -------------------------------- boot --------------------------------- */
+(async()=>{ try{ const me=await api("me"); iniciarApp(me); }
+  catch{ $("#login").hidden=false; $("#lg-user").focus(); } })();
+</script>
+</body>
+</html>
