@@ -596,11 +596,11 @@ function campoHTML(campo, val){
       lista.map((r)=>`<option value="${r.id}"${String(val)===String(r.id)?" selected":""}>${escA(rotuloRef(r))}</option>`).join("")+`</select>`;
   }
   else if(tipo==="senha_externo") ctrl = FORM_ID
-    ? `<div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
-        <input id="${id}" value="${escA(val||"—")}" readonly style="max-width:170px;font-weight:700;letter-spacing:.14em">
+    ? `<div style="display:flex;gap:.7rem;align-items:center;flex-wrap:wrap">
+        <span style="font-weight:700;color:var(--verde)">🔒 Senha definida</span>
         <button type="button" class="btn btn-ghost btn-sm" onclick="regenerarSenhaAssociado()">Gerar nova senha</button>
-        <span class="hint" style="color:var(--dim);font-size:.8rem">O associado entra em /externo com o CPF + esta senha.</span></div>`
-    : `<input id="${id}" value="Gerada automaticamente ao salvar" readonly disabled>`;
+        <span class="hint" style="color:var(--dim);font-size:.8rem">Por segurança a senha não é exibida. Gere uma nova para vê-la e repassar ao associado.</span></div>`
+    : `<span class="hint" style="color:var(--dim)">Uma senha de acesso será gerada e exibida <b>uma única vez</b> ao salvar.</span>`;
   else if(tipo==="especialidade") ctrl=`<input id="${id}" list="dl-esp" value="${escA(val||"")}">`;
   else if(tipo==="foto") ctrl=`<div style="display:flex;gap:1rem;align-items:center">
       <img class="foto-prev" id="${id}-prev" src="${val?escA(val):""}" alt="" style="${val?"":"display:none"}">
@@ -683,9 +683,11 @@ async function salvarReg(id){
   if(erros.length){ box.innerHTML=`<div class="erros">${erros.map(escA).join("<br>")}</div>`; return; }
   box.innerHTML="";
   try{
-    if(id) await api(MOD+"/"+id,"PUT",out); else await api(MOD,"POST",out);
+    let r;
+    if(id) r=await api(MOD+"/"+id,"PUT",out); else r=await api(MOD,"POST",out);
     if(["pacientes","profissionais","projetos"].includes(MOD)) await recarregarCache();
     fecharModal(); toast("Registro salvo."); carregarLista();
+    if(MOD==="associados" && r && r.senha) mostrarSenhaGerada(r.senha);   // senha do portal, exibida uma vez
   }catch(e){ box.innerHTML=`<div class="erros">${escA(e.message)}</div>`; }
 }
 async function excluirReg(id){
@@ -781,13 +783,26 @@ async function imprimirRelatorio(){
   abrirImpressao("Relatório de atividades", corpo);
 }
 
+/* Mostra a senha do portal UMA vez (não fica recuperável depois). */
+function mostrarSenhaGerada(senha){
+  const host=$("#modal-host2")||(()=>{const d=document.createElement("div");d.id="modal-host2";document.body.appendChild(d);return d;})();
+  host.innerHTML=`<div class="modal-bg" style="z-index:70" onclick="if(event.target===this)this.parentElement.innerHTML=''">
+    <div class="modal" style="max-width:420px;text-align:center">
+      <h2 style="margin-bottom:.4rem">Senha do portal do associado</h2>
+      <p class="hint" style="color:var(--dim)">Anote e repasse ao associado. Por segurança, ela <b>não será exibida novamente</b>.</p>
+      <div style="font-size:2rem;font-weight:800;letter-spacing:.3rem;color:var(--marinho);background:#eef3f8;border-radius:12px;padding:1rem;margin:1rem 0">${escA(senha)}</div>
+      <p class="hint" style="color:var(--dim)">O associado entra em <b>/externo</b> com o CPF + esta senha.</p>
+      <div style="display:flex;gap:.6rem;justify-content:center;margin-top:1rem">
+        <button class="btn btn-ghost" onclick="navigator.clipboard&&navigator.clipboard.writeText('${escA(senha)}');this.textContent='Copiado!'">Copiar</button>
+        <button class="btn btn-navy" onclick="$('#modal-host2').innerHTML=''">Fechar</button>
+      </div>
+    </div></div>`;
+}
 async function regenerarSenhaAssociado(){
   if(!FORM_ID) return;
   if(!confirm("Gerar uma nova senha para este associado? A senha atual deixará de funcionar.")) return;
-  try{ const r=await api("associados/"+FORM_ID+"/senha","POST");
-    const el=$("#f-senha_externo"); if(el) el.value=r.senha;
-    toast("Nova senha: "+r.senha);
-  }catch(e){ toast(e.message,true); }
+  try{ const r=await api("associados/"+FORM_ID+"/senha","POST"); mostrarSenhaGerada(r.senha); }
+  catch(e){ toast(e.message,true); }
 }
 
 /* ------------------------------ uploads -------------------------------- */

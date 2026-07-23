@@ -117,6 +117,10 @@ server {
     # o painel envia foto em base64 no JSON; o padrão de 1 MB devolveria 413
     client_max_body_size 25m;
 
+    # HSTS, CSP e demais cabeçalhos de segurança são emitidos pela aplicação Node
+    # (server.js/restrito.js) em toda resposta HTTPS — inclusive /assets, /admin,
+    # /restrito e /externo, todos proxiados para o app. Não repetir aqui.
+
     access_log /var/log/nginx/$DOMINIO.access.log;
     error_log  /var/log/nginx/$DOMINIO.error.log;
 

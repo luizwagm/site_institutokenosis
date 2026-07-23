@@ -22,6 +22,11 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
 const APP_VERSION = "2.0.0";
+// CSP das telas autenticadas (painel). Bloqueia script/estilo/objeto externos;
+// só libera as fontes do Google (CSS + arquivos) que o painel usa.
+const CSP_PAINEL = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; " +
+  "form-action 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+  "font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self'";
 const UPLOAD_DIR = path.join(ROOT, "assets", "img", "uploads");
 fs.mkdirSync(path.join(ROOT, "data"), { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -1376,6 +1381,10 @@ http.createServer(async (req, res) => {
   res.setHeader("X-Frame-Options", "SAMEORIGIN");            // impede clickjacking no painel
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), interest-cohort=()");
+  // HSTS: uma vez servido por HTTPS, o navegador nunca mais tenta HTTP (evita
+  // downgrade/MITM na 1ª visita). Só faz sentido — e só é honrado — sob HTTPS.
+  if (req.headers["x-forwarded-proto"] === "https")
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
 
   // Área restrita (sistema de gestão): atendida por módulo à parte, antes de
   // qualquer roteamento do site. Se ele tratou, encerra aqui.
@@ -1526,10 +1535,13 @@ http.createServer(async (req, res) => {
       }
       if (p === "/api/upload" && req.method === "POST") {
         const { name, dataUrl } = await readBody(req);
-        const m = /^data:(image\/(?:png|jpe?g|webp|svg\+xml|gif));base64,(.+)$/.exec(dataUrl || "");
-        if (!m) return json(res, 400, { error: "Envie uma imagem (png, jpg, webp, svg ou gif)" });
+        // SVG fica DE FORA de propósito: pode conter <script> e, servido como
+        // image/svg+xml, executaria na origem do site (XSS armazenado). As fotos
+        // do painel são todas raster; os SVGs do layout são arquivos do projeto.
+        const m = /^data:(image\/(?:png|jpe?g|webp|gif));base64,(.+)$/.exec(dataUrl || "");
+        if (!m) return json(res, 400, { error: "Envie uma imagem PNG, JPG, WEBP ou GIF." });
         const safe = slug(path.parse(name || "foto").name).slice(0, 40) || "foto";
-        const ext = m[1] === "image/svg+xml" ? ".svg" : "." + m[1].split("/")[1].replace("jpeg", "jpg");
+        const ext = "." + m[1].split("/")[1].replace("jpeg", "jpg");
         const file = `${Date.now().toString(36)}-${safe}${ext}`;
         fs.writeFileSync(path.join(UPLOAD_DIR, file), Buffer.from(m[2], "base64"));
         return json(res, 200, { ok: true, path: `/assets/img/uploads/${file}` });
@@ -1540,8 +1552,11 @@ http.createServer(async (req, res) => {
 
     if (p === "/admin" || p === "/admin/") {
       // no-store: painel autenticado não deve ficar em cache — e garante que a
-      // versão mostrada na tela de login seja sempre a que está rodando agora
-      res.writeHead(200, { "Content-Type": MIME[".html"], "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" });
+      // versão mostrada na tela de login seja sempre a que está rodando agora.
+      // CSP: mesmo que algo injete um <script src=...> externo, o navegador o
+      // bloqueia. 'unsafe-inline' é necessário porque o painel usa script/estilo
+      // inline; ainda assim, object/base/frame ficam trancados.
+      res.writeHead(200, { "Content-Type": MIME[".html"], "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Content-Security-Policy": CSP_PAINEL });
       const adminHtml = fs.readFileSync(path.join(ROOT, "admin", "index.html"), "utf8")
         .replaceAll("{{APP_VERSION}}", APP_VERSION);
       return res.end(adminHtml);

@@ -26,6 +26,14 @@ const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
 const SISTEMA_VERSION = "1.5.0";
+// CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
+// externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
+// telas usam script/estilo inline. A janela de impressão (about:blank via
+// document.write) herda esta política — por isso o print usa <script> inline
+// e imagem de mesma origem, ambos permitidos aqui.
+const CSP_GESTAO = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; " +
+  "form-action 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+  "font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self'";
 const db = new DatabaseSync(path.join(ROOT, "data", "gestao.db"));
 
 db.exec(`
@@ -288,7 +296,7 @@ function handleRestrito(req, res, pathname) {
   if (rota === "/" || rota === "/index.html") {
     const arq = path.join(APP_DIR, "app.html");
     const html = fs.readFileSync(arq, "utf8").replace(/\{\{VERSAO\}\}/g, SISTEMA_VERSION);
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" });
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Content-Security-Policy": CSP_GESTAO });
     res.end(html);
     return true;
   }
@@ -445,8 +453,8 @@ async function rotaApi(req, res, p) {
   if (sm && req.method === "POST") {
     if (!["admin", "secretaria"].includes(s.perfil)) return json(res, 403, { error: "Sem permissão." });
     const nova = String(crypto.randomInt(10000000, 100000000));   // 8 dígitos
-    db.prepare("UPDATE associados SET senha_externo=? WHERE id=?").run(nova, sm[1]);
-    return json(res, 200, { ok: true, senha: nova });
+    db.prepare("UPDATE associados SET senha_externo=? WHERE id=?").run(hashSenha(nova), sm[1]);   // guarda o hash
+    return json(res, 200, { ok: true, senha: nova });                                           // devolve o texto uma vez
   }
 
   // CRUD genérico: /api/<tabela>[/<id>]
@@ -488,7 +496,10 @@ async function rotaApi(req, res, p) {
       const b = await readBody(req);
       if (tabela === "prontuario") b.usuario_id = s.userId;                 // carimba o dono
       if (tabela === "atendimentos" && s.perfil === "profissional") b.profissional_id = s.profissionalId; // marca na própria agenda
-      if (tabela === "associados") b.senha_externo = String(crypto.randomInt(10000000, 100000000)); // gera a senha do portal
+      // senha do portal: guarda só o HASH (scrypt); o texto puro é devolvido
+      // UMA vez para a secretaria repassar, e nunca mais fica recuperável.
+      let senhaGerada = null;
+      if (tabela === "associados") { senhaGerada = String(crypto.randomInt(10000000, 100000000)); b.senha_externo = hashSenha(senhaGerada); }
       if (tabela === "atendimentos") { const e = validarAgenda(b.profissional_id, b.data, b.hora, null); if (e) return json(res, 400, { error: e }); }
       if (tabela === "projetos") { b.slug = slugify(b.slug || b.title); if (b.slug && db.prepare("SELECT id FROM projetos WHERE slug=?").get(b.slug)) b.slug = `${b.slug}-${Date.now().toString(36)}`; }
       const use = cols.filter((c) => c in b && COLS[tabela].has(c));
@@ -496,7 +507,7 @@ async function rotaApi(req, res, p) {
       const campos = temCriado ? use.concat("criado") : use;
       const valores = temCriado ? use.map((c) => b[c]).concat(agora()) : use.map((c) => b[c]);
       const info = db.prepare(`INSERT INTO ${tabela}(${campos.join(",")}) VALUES(${campos.map(() => "?").join(",")})`).run(...valores);
-      return json(res, 200, { ok: true, id: Number(info.lastInsertRowid) });
+      return json(res, 200, { ok: true, id: Number(info.lastInsertRowid), senha: senhaGerada || undefined });
     }
     if (req.method === "PUT" && id) {
       if (donoCol) { const dono = db.prepare(`SELECT ${donoCol} d FROM ${tabela} WHERE id=?`).get(id); if (dono && String(dono.d) !== String(donoVal)) return json(res, 403, { error: "Registro de outro profissional." }); }
@@ -568,7 +579,7 @@ function handleExterno(req, res, pathname) {
 
   if (rota === "/" || rota === "/index.html") {
     const html = fs.readFileSync(path.join(APP_DIR, "externo.html"), "utf8").replace(/\{\{VERSAO\}\}/g, SISTEMA_VERSION);
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" });
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Content-Security-Policy": CSP_GESTAO });
     res.end(html); return true;
   }
   res.writeHead(404, { "Content-Type": "text/plain" }); res.end("404"); return true;
@@ -580,8 +591,9 @@ async function rotaExt(req, res, p) {
     if (bloqueado(ip)) return json(res, 429, { error: "Muitas tentativas. Aguarde 15 minutos." });
     const { cpf, senha } = await readBody(req);
     const dig = String(cpf || "").replace(/\D/g, "");
-    const cand = db.prepare("SELECT * FROM associados WHERE senha_externo=?").all(String(senha || "").trim());
-    const a = dig && cand.find((x) => String(x.cpf || "").replace(/\D/g, "") === dig);
+    // acha o associado pelo CPF e confere o HASH da senha (nunca comparamos texto puro)
+    const cand = dig ? db.prepare("SELECT id,nome,cpf,senha_externo FROM associados WHERE senha_externo IS NOT NULL AND senha_externo<>''").all() : [];
+    const a = cand.find((x) => String(x.cpf || "").replace(/\D/g, "") === dig && confereSenha(String(senha || "").trim(), x.senha_externo));
     if (!a) { erroLogin(ip); return json(res, 401, { error: "CPF ou senha incorretos." }); }
     tentativas.delete(ip);
     const eid = crypto.randomBytes(24).toString("hex");
