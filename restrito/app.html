@@ -730,7 +730,8 @@ function campoHTML(campo, val){
     let sel=[]; try{ sel=JSON.parse(val||"[]"); if(!Array.isArray(sel)) sel=[]; }catch{ sel=val?[val]:[]; }  // compat: texto antigo
     const lista=CACHE.servicos||[];
     ctrl = lista.length
-      ? `<div class="chk-grid" id="${id}-grid">`+lista.map((s)=>`<label class="chk"><input type="checkbox" value="${escA(s.title)}"${sel.includes(s.title)?" checked":""}> ${escA(s.title)}</label>`).join("")+`</div>`
+      ? `<input type="text" id="${id}-busca" class="chk-busca" placeholder="Buscar serviço…" autocomplete="off" oninput="filtrarChkBusca('${id}')" style="margin-bottom:.5rem">
+         <div class="chk-grid" id="${id}-grid">`+lista.map((s)=>`<label class="chk"><input type="checkbox" value="${escA(s.title)}"${sel.includes(s.title)?" checked":""}> ${escA(s.title)}</label>`).join("")+`</div>`
       : `<p class="hint" style="color:var(--dim)">Nenhum serviço cadastrado ainda. Cadastre no módulo <b>Serviços</b>.</p>`;
   }
   else if(tipo==="especialidade") ctrl=`<input id="${id}" list="dl-esp" value="${escA(val||"")}">`;
@@ -858,21 +859,27 @@ function servicosDoProfissional(){
   let arr=[]; try{ arr=JSON.parse(prof.especialidade||"[]"); if(!Array.isArray(arr)) arr=[]; }catch{ arr=prof.especialidade?[prof.especialidade]:[]; }
   return new Set(arr);
 }
-function filtrarServicos(inicial){
-  const grid=$("#f-especialidade-grid"); if(!grid) return;
-  const allow=servicosDoProfissional();
-  let algum=false;
+// Visibilidade dos checkboxes de serviço = filtro do profissional (agenda/prontuário)
+// combinado com o campo de busca. Fonte única, chamada pelos dois gatilhos.
+function aplicarVisibilidadeServicos(id, inicial){
+  const grid=$("#"+id+"-grid"); if(!grid) return;
+  const allow=(MOD==="atendimentos"||MOD==="prontuario") ? servicosDoProfissional() : null;
+  const termo=(($("#"+id+"-busca")||{}).value||"").trim().toLowerCase();
   grid.querySelectorAll(".chk").forEach((lab)=>{
-    const cb=lab.querySelector("input"), ok=!allow||allow.has(cb.value);
-    lab.hidden=!ok; if(ok) algum=true;
-    if(!ok && !inicial) cb.checked=false;   // ao trocar de profissional, desmarca serviços não oferecidos
+    const cb=lab.querySelector("input");
+    const okProf=!allow||allow.has(cb.value);
+    const okBusca=!termo||lab.textContent.toLowerCase().includes(termo);
+    lab.hidden=!(okProf&&okBusca);
+    if(!okProf && !inicial) cb.checked=false;   // ao trocar de profissional, desmarca serviços não oferecidos
   });
   let aviso=grid.parentElement.querySelector(".chk-aviso");
-  if(allow && !algum){
+  if(allow && allow.size===0){   // profissional sem serviços vinculados (independe da busca)
     if(!aviso){ aviso=document.createElement("p"); aviso.className="chk-aviso"; aviso.style.cssText="color:var(--dim);margin-top:.45rem;font-size:.82rem"; grid.parentElement.appendChild(aviso); }
     aviso.textContent="Este profissional não tem serviços vinculados — cadastre os serviços dele em Profissionais."; aviso.hidden=false;
   } else if(aviso){ aviso.hidden=true; }
 }
+function filtrarServicos(inicial){ aplicarVisibilidadeServicos("f-especialidade", inicial); }   // gatilho: troca de profissional
+function filtrarChkBusca(id){ aplicarVisibilidadeServicos(id, true); }                            // gatilho: campo de busca
 // mostra/esconde os campos do responsável conforme a data de nascimento
 function sincMenor(){
   const nasc=$("#f-nascimento"); if(!nasc) return;
