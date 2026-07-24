@@ -25,7 +25,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.7.1";
+const SISTEMA_VERSION = "1.9.0";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -56,7 +56,8 @@ db.exec(`
     pai TEXT, mae TEXT, endereco TEXT, telefone TEXT, email TEXT, nis TEXT, cartao_sus TEXT,
     escolaridade TEXT, vulneravel INTEGER DEFAULT 0, vulnerabilidade TEXT,
     primeiro_atendimento TEXT, consentimento INTEGER DEFAULT 0,
-    projeto_id INTEGER, observacoes TEXT, criado TEXT);
+    projeto_id INTEGER, observacoes TEXT,
+    resp_nome TEXT, resp_cpf TEXT, resp_rg TEXT, resp_nascimento TEXT, criado TEXT);
 
   -- Projetos socioassistenciais — cadastrados AQUI (no sistema de gestão); o
   -- painel do site apenas lê e publica. Campos iguais aos que o site espera.
@@ -83,7 +84,7 @@ db.exec(`
   -- 3.3 agenda de atendimentos
   CREATE TABLE IF NOT EXISTS atendimentos (id INTEGER PRIMARY KEY AUTOINCREMENT,
     paciente_id INTEGER, profissional_id INTEGER, especialidade TEXT,
-    data TEXT, hora TEXT, local TEXT, status TEXT DEFAULT 'Agendado',
+    data TEXT, hora TEXT, local TEXT, sala TEXT, valor TEXT, status TEXT DEFAULT 'Agendado',
     observacoes TEXT, criado TEXT);
 
   -- 3.4 prontuário eletrônico (evolução por sessão). usuario_id = operador que
@@ -121,6 +122,12 @@ for (const alt of [
   "ALTER TABLE pacientes ADD COLUMN pai TEXT",
   "ALTER TABLE pacientes ADD COLUMN mae TEXT",
   "ALTER TABLE pacientes ADD COLUMN projeto_id INTEGER",
+  "ALTER TABLE pacientes ADD COLUMN resp_nome TEXT",
+  "ALTER TABLE pacientes ADD COLUMN resp_cpf TEXT",
+  "ALTER TABLE pacientes ADD COLUMN resp_rg TEXT",
+  "ALTER TABLE pacientes ADD COLUMN resp_nascimento TEXT",
+  "ALTER TABLE atendimentos ADD COLUMN sala TEXT",
+  "ALTER TABLE atendimentos ADD COLUMN valor TEXT",
 ]) { try { db.exec(alt); } catch { /* já existe */ } }
 
 /* ------------------------- senha (scrypt) e config ------------------------ */
@@ -228,12 +235,12 @@ function json(res, code, obj) {
 
 /* Tabelas expostas via CRUD genérico e suas colunas graváveis */
 const TAB = {
-  pacientes:  ["nome", "foto", "nascimento", "cpf", "rg", "pai", "mae", "endereco", "telefone", "email", "nis", "cartao_sus", "escolaridade", "vulneravel", "vulnerabilidade", "primeiro_atendimento", "consentimento", "projeto_id", "observacoes"],
+  pacientes:  ["nome", "foto", "nascimento", "cpf", "rg", "pai", "mae", "endereco", "telefone", "email", "nis", "cartao_sus", "escolaridade", "vulneravel", "vulnerabilidade", "primeiro_atendimento", "consentimento", "projeto_id", "observacoes", "resp_nome", "resp_cpf", "resp_rg", "resp_nascimento"],
   projetos:   ["title", "slug", "sigla", "status", "resumo", "publico", "content", "sort"],
   servicos:   ["title", "categoria", "sort"],
   associados: ["nome", "cpf", "contato", "endereco", "foto", "vinculo", "adesao", "mensalidade", "status", "senha_externo"],
   profissionais: ["nome", "especialidade", "registro", "contato", "ativo"],
-  atendimentos: ["paciente_id", "profissional_id", "especialidade", "data", "hora", "local", "status", "observacoes"],
+  atendimentos: ["paciente_id", "profissional_id", "especialidade", "data", "hora", "local", "sala", "valor", "status", "observacoes"],
   prontuario: ["paciente_id", "atendimento_id", "profissional", "especialidade", "data", "avaliacao", "evolucao", "plano", "encaminhamentos", "anexos", "responsavel", "usuario_id"],
   beneficios: ["nome", "cpf", "item", "data", "foto", "local", "responsavel"],
   eventos: ["tipo", "titulo", "tema", "local", "data", "hora", "publico_alvo", "participantes", "responsavel", "avaliacao", "fotos"],

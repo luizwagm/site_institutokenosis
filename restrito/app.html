@@ -32,16 +32,48 @@
     #login{position:fixed;inset:0;display:grid;place-items:center;background:linear-gradient(135deg,#253282,#1EA1E4);padding:1.5rem;z-index:50}
     #login .card{width:min(370px,92vw);background:#fff;border-radius:18px;padding:2rem;text-align:center;box-shadow:0 30px 70px rgba(20,30,80,.3)}
     #login img{width:58px;margin:0 auto .8rem;display:block}
-    .app{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
-    aside{background:var(--marinho);color:#c5d6ea;padding:1.1rem;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:auto}
-    aside .marca{display:flex;align-items:center;gap:.55rem;color:#fff;font-weight:700;margin-bottom:.3rem}
-    aside .marca img{height:34px}
-    aside .sub{font-size:.72rem;color:#8fa7c8;margin-bottom:1.2rem;letter-spacing:.04em}
-    .navbtn{display:block;width:100%;text-align:left;padding:.52rem .75rem;border-radius:9px;border:0;background:none;color:#c5d6ea;font-weight:600;margin-bottom:.1rem}
-    .navbtn:hover{background:rgba(255,255,255,.09);color:#fff}
+    .app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+    /* barra lateral vertical (menu principal, fonte branca) */
+    aside{background:var(--marinho);color:#eaf1fb;padding:1rem .8rem;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:auto}
+    aside .marca{display:flex;align-items:center;gap:.55rem;color:#fff;font-weight:700;margin:.1rem .1rem 1rem}
+    aside .marca img{height:32px}
+    .navbtn{display:block;width:100%;text-align:left;padding:.55rem .75rem;border-radius:9px;border:0;background:none;color:#eaf1fb;font-weight:600;margin-bottom:.12rem;text-decoration:none}
+    .navbtn:hover{background:rgba(255,255,255,.1);color:#fff}
     .navbtn.on{background:var(--celeste);color:#fff}
-    .nav-sep{border:0;border-top:1px solid rgba(255,255,255,.16);margin:.5rem 0}
-    main{padding:1.6rem 2rem;max-width:1180px}
+    /* seção Cadastros — accordion na lateral */
+    .side-sec{margin-bottom:.12rem}
+    .side-head{display:flex;align-items:center;justify-content:space-between;width:100%;padding:.55rem .75rem;border-radius:9px;border:0;background:none;color:#eaf1fb;font-weight:600}
+    .side-head:hover{background:rgba(255,255,255,.1);color:#fff}
+    .side-head.on{background:rgba(255,255,255,.14);color:#fff}
+    .side-head .tn-caret{transition:transform .2s}
+    .side-sec.open .side-head .tn-caret{transform:rotate(180deg)}
+    .side-sub{display:none;margin:.1rem 0 .3rem .35rem;padding-left:.5rem;border-left:1px solid rgba(255,255,255,.2)}
+    .side-sec.open .side-sub{display:block}
+    .side-sub .navbtn{font-size:.9rem;font-weight:500;padding:.44rem .7rem}
+    .side-credito{margin-top:auto;padding-top:.85rem;text-align:center;font-size:.72rem;font-weight:600;color:rgba(197,214,234,.7);border-top:1px solid rgba(255,255,255,.14)}
+    /* barra superior — só o menu da conta, no canto direito */
+    .conteudo{display:flex;flex-direction:column;min-height:100vh;min-width:0}
+    .appbar{display:flex;justify-content:flex-end;align-items:center;padding:.5rem 1.3rem;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:25}
+    .tn-drop{position:relative}
+    .tn-trigger{border:1.5px solid var(--line2);background:#fff;color:var(--marinho);font-weight:700;padding:.45rem .85rem;border-radius:999px;display:inline-flex;align-items:center;gap:.5rem}
+    .tn-trigger:hover{background:#f2f6fb}
+    .tn-caret{font-size:.6rem;opacity:.85}
+    .tn-panel{position:absolute;top:calc(100% + 6px);right:0;min-width:236px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 44px rgba(20,30,80,.24);padding:.4rem;display:none;z-index:40}
+    .tn-drop.open>.tn-panel,.tn-drop:hover>.tn-panel{display:block}
+    .tn-panel .navbtn{color:var(--text)}
+    .tn-panel .navbtn:hover{background:#eef4fb;color:var(--marinho)}
+    .tn-panel .navbtn.on{background:var(--celeste);color:#fff}
+    .tn-sep{border:0;border-top:1px solid var(--line);margin:.35rem .2rem}
+    .tn-versao{font-size:.7rem;color:var(--dim);text-align:center;margin:.45rem 0 .1rem}
+    .tn-quem{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px}
+    /* combobox com busca */
+    .cbx{position:relative}
+    .cbx-list{position:absolute;top:calc(100% + 2px);left:0;right:0;max-height:236px;overflow:auto;background:#fff;border:1.5px solid var(--line2);border-radius:9px;box-shadow:0 14px 32px rgba(20,30,80,.2);z-index:45}
+    .cbx-op{padding:.5rem .7rem;cursor:pointer;font-size:.9rem;border-bottom:1px solid #f0f4f9}
+    .cbx-op:last-child{border-bottom:0}
+    .cbx-op:hover,.cbx-op.hi{background:#eef4fb}
+    .cbx-vazio{padding:.6rem .7rem;color:var(--dim);font-size:.85rem}
+    main{padding:1.6rem 2rem;width:100%;max-width:100%;min-width:0}
     .panel{display:none}.panel.on{display:block}
     .topbar{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.3rem}
     .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1.1rem 1.2rem;margin-bottom:1rem;box-shadow:0 2px 8px rgba(37,50,130,.05)}
@@ -118,8 +150,8 @@
     .barra .n{width:34px;text-align:right;font-weight:700;color:var(--marinho)}
     .toast{position:fixed;bottom:1.2rem;left:50%;transform:translate(-50%,150%);background:var(--marinho);color:#fff;padding:.7rem 1.2rem;border-radius:999px;font-weight:600;transition:transform .3s;z-index:60}
     .toast.on{transform:translate(-50%,0)}.toast.err{background:var(--red)}
-    @media(max-width:820px){.app{grid-template-columns:1fr}aside{position:static;height:auto;flex-direction:row;flex-wrap:wrap}main{padding:1.1rem}.formgrid,.rel-cols{grid-template-columns:1fr}}
-    @media print{aside,.topbar .btn,.navbtn{display:none}.app{grid-template-columns:1fr}}
+    @media(max-width:820px){.app{grid-template-columns:1fr}aside{position:static;height:auto}main{padding:1.1rem}.formgrid,.rel-cols{grid-template-columns:1fr}}
+    @media print{aside,.appbar,.topbar .btn,.navbtn{display:none}.app{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -139,28 +171,41 @@
 <div class="app" id="app" hidden>
   <aside>
     <span class="marca"><img src="/assets/img/favicon.svg" alt=""> Gestão</span>
-    <span class="sub" id="quem"></span>
     <button class="navbtn on" data-nav="painel">Painel</button>
-    <button class="navbtn" data-nav="pacientes">Usuários</button>
-    <button class="navbtn" data-nav="associados">Associados</button>
-    <button class="navbtn" data-nav="profissionais">Profissionais</button>
-    <button class="navbtn" data-nav="atendimentos">Agenda</button>
-    <button class="navbtn" data-nav="prontuario">Prontuário</button>
-    <button class="navbtn" data-nav="servicos">Serviços</button>
-    <button class="navbtn" data-nav="projetos">Projetos</button>
-    <button class="navbtn" data-nav="beneficios">Benefícios</button>
-    <button class="navbtn" data-nav="eventos">Eventos</button>
+    <div class="side-sec">
+      <button class="side-head" type="button">Cadastros <span class="tn-caret">▼</span></button>
+      <div class="side-sub">
+        <button class="navbtn" data-nav="pacientes">Usuários</button>
+        <button class="navbtn" data-nav="associados">Associados</button>
+        <button class="navbtn" data-nav="profissionais">Profissionais</button>
+        <button class="navbtn" data-nav="servicos">Serviços</button>
+        <button class="navbtn" data-nav="projetos">Projetos</button>
+        <button class="navbtn" data-nav="prontuario">Prontuário</button>
+        <button class="navbtn" data-nav="beneficios">Benefícios</button>
+        <button class="navbtn" data-nav="eventos">Eventos</button>
+      </div>
+    </div>
+    <button class="navbtn" data-nav="atendimentos">Agendamento</button>
     <button class="navbtn" data-nav="documentos_gestao">Documentos</button>
     <button class="navbtn" data-nav="relatorios">Relatórios</button>
-    <div style="margin-top:auto">
-      <hr class="nav-sep">
-      <button class="navbtn" data-nav="conta">Minha conta</button>
-      <button class="navbtn" data-nav="usuarios">Usuários do Sistema</button>
-      <a class="navbtn" href="/" target="_blank" style="text-decoration:none;display:block">↗ Ver o site</a>
-      <button class="navbtn" onclick="sair()">Sair</button>
-      <p style="text-align:center;font-size:.68rem;letter-spacing:.06em;color:rgba(197,214,234,.5);margin-top:.5rem">Sistema de Gestão v{{VERSAO}}</p>
-    </div>
+    <div class="side-credito">Produzido por<br>LA Software House.</div>
   </aside>
+
+  <div class="conteudo">
+    <header class="appbar">
+      <div class="tn-drop">
+        <button class="tn-trigger" type="button"><span class="tn-quem" id="quem"></span> <span class="tn-caret">▼</span></button>
+        <div class="tn-panel">
+          <button class="navbtn" data-nav="conta">Minha conta</button>
+          <button class="navbtn" data-nav="usuarios">Usuários do Sistema</button>
+          <hr class="tn-sep">
+          <a class="navbtn" href="/" target="_blank">↗ Ver o site</a>
+          <hr class="tn-sep">
+          <button class="navbtn" onclick="sair()">Sair</button>
+          <p class="tn-versao">Versão do Sistema v{{VERSAO}}</p>
+        </div>
+      </div>
+    </header>
 
   <main>
     <section class="panel on" id="pane-painel">
@@ -173,6 +218,7 @@
       <div class="topbar">
         <h1 id="mod-titulo"></h1>
         <div style="display:flex;gap:.5rem">
+          <button class="btn btn-ghost btn-sm" id="mod-imprimir" onclick="imprimirAgenda()" hidden>🖨 Imprimir</button>
           <button class="btn btn-ghost btn-sm" onclick="exportarCSV()">Exportar CSV</button>
           <button class="btn btn-navy" id="mod-novo" onclick="abrirForm()">+ Novo</button>
         </div>
@@ -214,6 +260,7 @@
       </div>
     </section>
   </main>
+  </div>
 </div>
 
 <datalist id="dl-esp"></datalist>
@@ -251,6 +298,8 @@ function cpfValido(cpf){ cpf=soDig(cpf); if(cpf.length!==11||/^(\d)\1{10}$/.test
 const emailValido = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
 
 const dataBR = (iso) => { if(!iso) return "—"; const [a,m,d]=String(iso).split("-"); return d?`${d}/${m}/${a}`:iso; };
+const idadeAnos = (iso) => { if(!iso) return null; const [a,m,d]=String(iso).split("-").map(Number); if(!a||!m||!d) return null; const h=new Date(); let x=h.getFullYear()-a; if(h.getMonth()+1<m||(h.getMonth()+1===m&&h.getDate()<d)) x--; return x; };
+const ehMenor = (iso) => { const x=idadeAnos(iso); return x!==null && x<18; };
 const mesBR = (ym) => { if(!ym) return "—"; const [a,m]=ym.split("-"); const nomes=["","jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"]; return `${nomes[+m]}/${a}`; };
 
 /* ============================ dados de apoio ========================== */
@@ -280,6 +329,11 @@ const MODULOS = {
       ["cpf","CPF","cpf"],["rg","RG","text"],
       ["mae","Nome da mãe","text"],
       ["pai","Nome do pai","text"],
+      ["_resp","Responsável legal (usuário menor de 18 anos)","titulo",{full:1,menor:1}],
+      ["resp_nome","Nome do responsável","text",{menor:1}],
+      ["resp_cpf","CPF do responsável","cpf",{menor:1}],
+      ["resp_rg","RG do responsável","text",{menor:1}],
+      ["resp_nascimento","Data de nascimento do responsável","date",{menor:1}],
       ["telefone","Telefone / WhatsApp","tel"],
       ["email","E-mail","email"],
       ["endereco","Endereço completo","text",{full:1}],
@@ -319,22 +373,24 @@ const MODULOS = {
   atendimentos: { titulo:"Agenda de serviços", novo:"Novo agendamento",
     colunas:[["data","Data","data"],["hora","Hora"],["paciente_id","Usuário","pac"],["profissional_id","Profissional","prof"],["especialidade","Serviços","servicos"],["status","Status","tag"]],
     campos:[
-      ["paciente_id","Usuário","ref",{tabela:"pacientes",req:1}],
-      ["profissional_id","Profissional","ref",{tabela:"profissionais",ocultarPara:"profissional"}],
+      ["paciente_id","Usuário","busca",{tabela:"pacientes",req:1}],
+      ["profissional_id","Profissional","busca",{tabela:"profissionais",ocultarPara:"profissional",filtraServicos:1}],
       ["especialidade","Serviços","servicos_check",{full:1}],
       ["data","Data","date",{req:1}],
       ["hora","Horário","time"],
-      ["local","Local","select",{opcoes:["Presencial","Online","Domiciliar"]}],
+      ["local","Modalidade","select",{opcoes:["Presencial","Online","Domiciliar"]}],
+      ["sala","Sala / Consultório","text"],
+      ["valor","Valor (R$)","money"],
       ["status","Situação","select",{opcoes:["Agendado","Confirmado","Faltou","Remarcado","Atendido"]}],
       ["observacoes","Observações","textarea",{full:1}],
     ]},
   prontuario: { titulo:"Prontuário eletrônico", novo:"Novo registro",
     colunas:[["data","Data","data"],["paciente_id","Usuário","pac"],["especialidade","Serviço","servicos"],["profissional","Profissional"]],
     campos:[
-      ["paciente_id","Usuário","ref",{tabela:"pacientes",req:1}],
+      ["paciente_id","Usuário","busca",{tabela:"pacientes",req:1}],
+      ["profissional","Profissional responsável","busca",{tabela:"profissionais",valor:"nome",filtraServicos:1}],
       ["data","Data do atendimento","date",{req:1}],
       ["especialidade","Serviço","servicos_check",{full:1}],
-      ["profissional","Profissional responsável","text"],
       ["avaliacao","Avaliação inicial","textarea",{full:1}],
       ["evolucao","Evolução da sessão","textarea",{full:1}],
       ["plano","Plano terapêutico","textarea",{full:1}],
@@ -373,7 +429,7 @@ const MODULOS = {
     campos:[
       ["tipo","Tipo de documento","select",{opcoes:["Termo de consentimento","Receita/Prescrição","Certificado","Encaminhamento","Laudo","Outro"],placeholder:"Selecione…"}],
       ["titulo","Título/descrição","text",{req:1}],
-      ["paciente_id","Usuário (se aplicável)","ref",{tabela:"pacientes"}],
+      ["paciente_id","Usuário (se aplicável)","busca",{tabela:"pacientes"}],
       ["data","Data","date"],
       ["arquivo","Arquivo (foto/PDF)","arquivo",{full:1}],
     ]},
@@ -425,6 +481,12 @@ function aplicarPermissoes(perfil){
     else vis = !allow || nav==="conta" || allow.has(nav);
     b.style.display = vis ? "" : "none";
   });
+  // esconde a seção/dropdown inteiro se nenhum dos seus itens está visível
+  document.querySelectorAll(".tn-drop,.side-sec").forEach((d)=>{
+    const kids=[...d.querySelectorAll(".navbtn[data-nav]")];
+    if(!kids.length) return;
+    d.style.display = kids.some((k)=>k.style.display!=="none") ? "" : "none";
+  });
 }
 
 let MOD = null, LISTA = [], FORM_ID = 0, ME = {};   // módulo, lista, id em edição e usuário logado
@@ -458,7 +520,28 @@ document.querySelectorAll(".navbtn[data-nav]").forEach((b)=>b.addEventListener("
   else if(nav==="conta"){ $("#pane-conta").classList.add("on"); }
   else if(nav==="relatorios"){ $("#pane-relatorios").classList.add("on"); carregarRelatorios(); }
   else { MOD=nav; $("#pane-mod").classList.add("on"); mostrarModulo(); }
+  fecharDropdowns(); marcarTriggers();
 }));
+/* dropdown da conta (topo direito): abre no clique além do hover */
+function fecharDropdowns(){ document.querySelectorAll(".tn-drop.open").forEach((d)=>d.classList.remove("open")); }
+// marca a seção/aba ativa e mantém aberta a seção lateral do item selecionado
+function marcarTriggers(){
+  document.querySelectorAll(".tn-drop").forEach((d)=>{
+    const trig=d.querySelector(".tn-trigger"); if(trig) trig.classList.toggle("on",!!d.querySelector(".navbtn.on")); });
+  document.querySelectorAll(".side-sec").forEach((d)=>{
+    const ativo=!!d.querySelector(".navbtn.on");
+    d.querySelector(".side-head")?.classList.toggle("on",ativo);
+    if(ativo) d.classList.add("open");
+  });
+}
+document.querySelectorAll(".tn-trigger").forEach((t)=>t.addEventListener("click",(e)=>{
+  e.stopPropagation();
+  const d=t.closest(".tn-drop"), aberto=d.classList.contains("open");
+  fecharDropdowns(); if(!aberto) d.classList.add("open");
+}));
+document.addEventListener("click",()=>fecharDropdowns());
+// accordion da lateral (Cadastros)
+document.querySelectorAll(".side-head").forEach((h)=>h.addEventListener("click",()=>h.closest(".side-sec").classList.toggle("open")));
 
 /* ------------------------------ painel --------------------------------- */
 async function carregarPainel(){
@@ -480,6 +563,7 @@ function mostrarModulo(){
   $("#mod-thead").innerHTML="<tr>"+m.colunas.map(([,lab])=>`<th>${lab}</th>`).join("")+"<th></th></tr>";
   const ehAgenda = MOD==="atendimentos";
   $("#mod-vistas").hidden=!ehAgenda;
+  $("#mod-imprimir").hidden=!ehAgenda;
   if(ehAgenda){ agendaYM=null; if(!preservarFiltro) filtroAgenda=null; preservarFiltro=false; document.querySelectorAll("#mod-vistas .vbtn").forEach((b)=>b.classList.toggle("on",b.dataset.v===vistaAgenda)); }
   else { $("#mod-tabela").hidden=false; $("#mod-agenda").hidden=true; $("#mod-kanban").hidden=true; }
   carregarLista();
@@ -606,7 +690,9 @@ function renderKanban(){
 function campoHTML(campo, val){
   const [k,lab,tipo,op={}]=campo, id="f-"+k;
   const req=op.req?' <span style="color:var(--red)">*</span>':"";
-  const wrap=(inner,full)=>`<div class="${full?"full":""}">${inner}</div>`;
+  const wrap=(inner,full)=>`<div class="${full?"full":""}"${op.menor?' data-menor="1"':""}>${inner}</div>`;
+  if(tipo==="titulo")
+    return wrap(`<h3 style="margin:.7rem 0 -.2rem;color:var(--marinho);font-size:.78rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-top:1px solid #e7ecf4;padding-top:.9rem">${escA(lab)}</h3>`,true);
   if(tipo==="checkbox")
     return wrap(`<label style="display:flex;gap:.5rem;align-items:center;margin-top:1.1rem;cursor:pointer;color:var(--text)"><input type="checkbox" id="${id}" style="width:auto" ${Number(val)?"checked":""}> ${lab}</label>`,op.full);
   let ctrl;
@@ -622,6 +708,17 @@ function campoHTML(campo, val){
     const lista=CACHE[op.tabela]||[];
     ctrl=`<select id="${id}"><option value="">—</option>`+
       lista.map((r)=>`<option value="${r.id}"${String(val)===String(r.id)?" selected":""}>${escA(rotuloRef(r))}</option>`).join("")+`</select>`;
+  }
+  else if(tipo==="busca"){   // combobox com campo de busca; guarda id (padrão) ou o nome (op.valor==="nome")
+    const lista=CACHE[op.tabela]||[], usaNome=op.valor==="nome", atualVal=val??"";
+    let atualLab="";
+    if(atualVal!==""){ const achado=lista.find((r)=>String(usaNome?rotuloRef(r):r.id)===String(atualVal)); atualLab=achado?rotuloRef(achado):String(atualVal); }
+    ctrl=`<div class="cbx" data-cbx data-tab="${escA(op.tabela)}" data-valor="${usaNome?"nome":"id"}" data-id="${id}">
+        <input type="text" id="${id}-txt" class="cbx-inp" autocomplete="off" placeholder="Digite para buscar…" value="${escA(atualLab)}"
+          oninput="cbxFiltrar('${id}')" onfocus="cbxFiltrar('${id}')" onkeydown="cbxTecla(event,'${id}')" onblur="cbxBlur('${id}')">
+        <input type="hidden" id="${id}" value="${escA(atualVal)}">
+        <div class="cbx-list" id="${id}-list" hidden></div>
+      </div>`;
   }
   else if(tipo==="senha_externo") ctrl = FORM_ID
     ? `<div style="display:flex;gap:.7rem;align-items:center;flex-wrap:wrap">
@@ -685,6 +782,102 @@ async function abrirForm(id){
   }}
   // galerias de fotos já existentes
   for(const [k,,tipo] of m.campos) if(tipo==="fotos") desenharFotos("f-"+k);
+  // bloco do responsável: só aparece quando o usuário é menor de 18 anos
+  if(MOD==="pacientes"){
+    const nasc=$("#f-nascimento");
+    if(nasc){ nasc.addEventListener("change",sincMenor); nasc.addEventListener("input",sincMenor); }
+    sincMenor();
+  }
+  // serviços restritos ao profissional escolhido (agenda e prontuário)
+  const campoProf=m.campos.find((c)=>c[3]&&c[3].filtraServicos);
+  if(campoProf){
+    const prof=$("#f-"+campoProf[0]);
+    if(prof){ prof.addEventListener("change",()=>filtrarServicos(false)); }
+    filtrarServicos(true);
+  }
+}
+/* ------------------- combobox com busca (campo "busca") ---------------- */
+function cbxWrap(id){ const el=$("#"+id); return el?el.closest(".cbx"):null; }
+function cbxOpcoes(wrap){ return CACHE[wrap.dataset.tab]||[]; }
+function cbxFiltrar(id){
+  const wrap=cbxWrap(id); if(!wrap) return;
+  const inp=$("#"+id+"-txt"), list=$("#"+id+"-list");
+  const termo=inp.value.trim().toLowerCase();
+  const usaNome=wrap.dataset.valor==="nome";
+  const ops=cbxOpcoes(wrap).filter((r)=>rotuloRef(r).toLowerCase().includes(termo)).slice(0,60);
+  list.innerHTML = ops.length
+    ? ops.map((r)=>{ const v=usaNome?rotuloRef(r):r.id; return `<div class="cbx-op" data-v="${escA(String(v))}" data-l="${escA(rotuloRef(r))}">${escA(rotuloRef(r))}</div>`; }).join("")
+    : '<div class="cbx-vazio">Nenhum resultado</div>';
+  list.hidden=false;
+}
+function cbxEscolher(id,v,l){
+  const hid=$("#"+id); hid.value=v; $("#"+id+"-txt").value=l;
+  const list=$("#"+id+"-list"); if(list) list.hidden=true;
+  hid.dispatchEvent(new Event("change",{bubbles:true}));
+}
+function cbxBlur(id){
+  // fecha depois do clique na opção (mousedown já tratou); valida o texto
+  setTimeout(()=>{
+    const wrap=cbxWrap(id); if(!wrap) return;
+    const list=$("#"+id+"-list"); if(list) list.hidden=true;
+    const inp=$("#"+id+"-txt"), hid=$("#"+id), usaNome=wrap.dataset.valor==="nome";
+    const t=inp.value.trim();
+    if(!t){ hid.value=""; hid.dispatchEvent(new Event("change",{bubbles:true})); return; }
+    const match=cbxOpcoes(wrap).find((r)=>rotuloRef(r).toLowerCase()===t.toLowerCase());
+    if(match){ hid.value=usaNome?rotuloRef(match):match.id; inp.value=rotuloRef(match); }
+    else { const cur=hid.value; const ach=cbxOpcoes(wrap).find((r)=>String(usaNome?rotuloRef(r):r.id)===String(cur));
+      inp.value=ach?rotuloRef(ach):""; if(!ach) hid.value=""; }
+    hid.dispatchEvent(new Event("change",{bubbles:true}));
+  },160);
+}
+function cbxTecla(e,id){
+  const list=$("#"+id+"-list"); if(!list) return;
+  if(e.key==="Escape"){ list.hidden=true; return; }
+  const ops=[...list.querySelectorAll(".cbx-op")]; if(!ops.length) return;
+  let i=ops.findIndex((o)=>o.classList.contains("hi"));
+  if(e.key==="ArrowDown"){ e.preventDefault(); i=Math.min(ops.length-1,i+1); }
+  else if(e.key==="ArrowUp"){ e.preventDefault(); i=Math.max(0,i-1); }
+  else if(e.key==="Enter"){ e.preventDefault(); const alvo=ops[i]||ops[0]; cbxEscolher(id,alvo.dataset.v,alvo.dataset.l); return; }
+  else return;
+  ops.forEach((o)=>o.classList.remove("hi")); if(ops[i]){ ops[i].classList.add("hi"); ops[i].scrollIntoView({block:"nearest"}); }
+}
+// clique numa opção (mousedown para vir antes do blur)
+document.addEventListener("mousedown",(e)=>{
+  const opt=e.target.closest(".cbx-op"); if(!opt) return;
+  e.preventDefault();
+  const wrap=opt.closest(".cbx"); if(wrap) cbxEscolher(wrap.dataset.id,opt.dataset.v,opt.dataset.l);
+});
+/* serviços exibidos ficam restritos aos que o profissional escolhido realiza */
+function servicosDoProfissional(){
+  let profVal="",usaNome=false;
+  if(MOD==="atendimentos"){ const e=$("#f-profissional_id"); profVal=e?e.value:""; }
+  else if(MOD==="prontuario"){ const e=$("#f-profissional"); profVal=e?e.value:""; usaNome=true; }
+  if(!profVal) return null;                       // ninguém escolhido → mostra todos
+  const prof=(CACHE.profissionais||[]).find((p)=>String(usaNome?p.nome:p.id)===String(profVal));
+  if(!prof) return null;
+  let arr=[]; try{ arr=JSON.parse(prof.especialidade||"[]"); if(!Array.isArray(arr)) arr=[]; }catch{ arr=prof.especialidade?[prof.especialidade]:[]; }
+  return new Set(arr);
+}
+function filtrarServicos(inicial){
+  const grid=$("#f-especialidade-grid"); if(!grid) return;
+  const allow=servicosDoProfissional();
+  let algum=false;
+  grid.querySelectorAll(".chk").forEach((lab)=>{
+    const cb=lab.querySelector("input"), ok=!allow||allow.has(cb.value);
+    lab.hidden=!ok; if(ok) algum=true;
+    if(!ok && !inicial) cb.checked=false;   // ao trocar de profissional, desmarca serviços não oferecidos
+  });
+  let aviso=grid.parentElement.querySelector(".chk-aviso");
+  if(allow && !algum){
+    if(!aviso){ aviso=document.createElement("p"); aviso.className="chk-aviso"; aviso.style.cssText="color:var(--dim);margin-top:.45rem;font-size:.82rem"; grid.parentElement.appendChild(aviso); }
+    aviso.textContent="Este profissional não tem serviços vinculados — cadastre os serviços dele em Profissionais."; aviso.hidden=false;
+  } else if(aviso){ aviso.hidden=true; }
+}
+// mostra/esconde os campos do responsável conforme a data de nascimento
+function sincMenor(){
+  const nasc=$("#f-nascimento"); if(!nasc) return;
+  const menor=ehMenor(nasc.value);
+  document.querySelectorAll('#modal-host [data-menor="1"]').forEach((el)=>{ el.hidden=!menor; });
 }
 function fecharModal(){ $("#modal-host").innerHTML=""; }
 // alguns campos não aparecem para certos perfis (ex.: o profissional não escolhe
@@ -693,7 +886,10 @@ function camposDoPerfil(m){ return m.campos.filter((c)=>!(c[3]&&c[3].ocultarPara
 
 function coletar(){
   const m=MODULOS[MOD], out={}, erros=[];
+  const menor = MOD==="pacientes" && ehMenor(($("#f-nascimento")||{}).value);
   for(const [k,lab,tipo,op={}] of camposDoPerfil(m)){
+    if(tipo==="titulo") continue;          // apenas rótulo de seção
+    if(op.menor && !menor){ out[k]=""; continue; }  // limpa dados do responsável quando não é menor
     if(tipo==="senha_externo") continue;   // gerida só pelo botão / servidor
     if(tipo==="servicos_check"){ const g=$("#f-"+k+"-grid"); out[k]=JSON.stringify(g?[...g.querySelectorAll("input:checked")].map((c)=>c.value):[]); continue; }
     const el=$("#f-"+k); if(!el) continue;
@@ -789,8 +985,10 @@ async function imprimirFicha(id){
   const vuln=Number(p.vulneravel)?("Sim"+(p.vulnerabilidade?" — "+p.vulnerabilidade:"")):"Não";
   const corpo=`${p.foto?`<img class="foto" src="${escA(p.foto)}" alt="">`:""}
     <div class="sec">Identificação</div>
-    <table>${L("Nome completo",p.nome)}${L("Data de nascimento",dataBR(p.nascimento))}${L("CPF",p.cpf)}${L("RG",p.rg)}
+    <table>${L("Nome completo",p.nome)}${L("Data de nascimento",dataBR(p.nascimento)+(idadeAnos(p.nascimento)!==null?` (${idadeAnos(p.nascimento)} anos)`:""))}${L("CPF",p.cpf)}${L("RG",p.rg)}
       ${L("Nome da mãe",p.mae)}${L("Nome do pai",p.pai)}</table>
+    ${p.resp_nome?`<div class="sec">Responsável legal</div>
+    <table>${L("Nome",p.resp_nome)}${L("CPF",p.resp_cpf)}${L("RG",p.resp_rg)}${L("Data de nascimento",dataBR(p.resp_nascimento))}</table>`:""}
     <div class="sec">Contato</div>
     <table>${L("Telefone / WhatsApp",p.telefone)}${L("E-mail",p.email)}${L("Endereço",p.endereco)}</table>
     <div class="sec">Dados sociais</div>
@@ -817,6 +1015,61 @@ async function imprimirRelatorio(){
     <div class="sec">Serviços por situação</div>${barras(d.porStatus)}
     <div class="sec">Serviços por mês</div>${barras(d.porMes,mesBR)}`;
   abrirImpressao("Relatório de atividades", corpo);
+}
+
+/* Impressão da agenda de atendimentos, com o timbre do Instituto, agrupada por
+   dia — respeita o filtro ativo (serviço/situação/mês) e a busca. */
+const DIAS_SEMANA=["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"];
+const contatoPac=(id)=>{ const r=CACHE.pacientes.find((p)=>String(p.id)===String(id)); return r?(r.telefone||""):""; };
+const CORES_STATUS={Agendado:"#1EA1E4",Confirmado:"#16a34a",Atendido:"#253282",Faltou:"#dc2626",Remarcado:"#d97706"};
+function somaMin(hora,min){ const [h,m]=String(hora||"").split(":").map(Number); if(Number.isNaN(h)) return ""; const t=h*60+m+min; return `${String(Math.floor(t/60)).padStart(2,"0")}:${String(t%60).padStart(2,"0")}`; }
+function servicosTexto(v){ let a=[]; try{a=JSON.parse(v||"[]");}catch{a=v?[v]:[];} return a.length?a.join(", "):"—"; }
+function imprimirAgenda(){
+  const dados=dadosVisiveis().filter((a)=>a.data).slice()
+    .sort((x,y)=> (x.data===y.data ? String(x.hora||"").localeCompare(String(y.hora||"")) : x.data.localeCompare(y.data)));
+  if(!dados.length) return toast("Nenhum agendamento para imprimir.",true);
+  const datas=[...new Set(dados.map((a)=>a.data))].sort();
+  const periodo=`Período de ${dataBR(datas[0])} até ${dataBR(datas[datas.length-1])}`;
+  const filtro=filtroAgenda?` · Filtro: ${escA(rotuloFiltro())}`:"";
+  const linha=(a)=>{
+    const hini=a.hora||"", hfim=a.hora?somaMin(a.hora,40):"";
+    const faixa=hini?`${hini}${hfim?"–"+hfim:""}`:"—";
+    const cor=CORES_STATUS[a.status||"Agendado"]||"#94a3b8";
+    const svc=servicosTexto(a.especialidade);
+    const val=(a.valor&&String(a.valor).trim())?`R$ ${escA(a.valor)}`:"";
+    const sala=a.sala?escA(a.sala):"";
+    const modal=a.local?escA(a.local):"";
+    const local=[sala,modal].filter(Boolean).join(" · ");
+    const cont=contatoPac(a.paciente_id);
+    const partes=[
+      `<b>${escA(nomePac(a.paciente_id))}</b>`,
+      escA(svc),
+      val,
+      escA(nomeProf(a.profissional_id)),
+      local,
+      cont?`📞 ${escA(cont)}`:"",
+      `<em style="color:${cor};font-style:normal;font-weight:700">${escA(a.status||"Agendado")}</em>`,
+    ].filter(Boolean).join(" &nbsp;·&nbsp; ");
+    return `<div class="ag-l" style="border-left:3px solid ${cor}"><span class="ag-h">${faixa}</span><span class="ag-d">${partes}</span></div>`;
+  };
+  let corpo=`<style>
+     @page{size:A4 landscape;margin:1.2cm}
+     .ag-sub{color:#5a6172;font-size:.82rem;margin:-.4rem 0 1rem}
+     .ag-dia{margin:1.1rem 0 .3rem;color:#253282;font-weight:700;font-size:.9rem;border-bottom:1px solid #e7ecf4;padding-bottom:.25rem;text-transform:capitalize}
+     .ag-l{display:flex;gap:.7rem;align-items:baseline;padding:.34rem .55rem;border-bottom:1px solid #f1f4f9;page-break-inside:avoid}
+     .ag-h{flex:0 0 92px;font-weight:700;color:#253282;font-variant-numeric:tabular-nums;font-size:.82rem}
+     .ag-d{flex:1;font-size:.82rem;color:#232733;line-height:1.5}
+     .ag-tot{margin-top:1rem;font-size:.8rem;color:#5a6172;font-weight:600}
+   </style>
+   <p class="ag-sub">${escA(periodo)}${filtro}</p>`;
+  for(const dia of datas){
+    const [a,mth,d]=dia.split("-").map(Number);
+    const dow=DIAS_SEMANA[new Date(a,mth-1,d).getDay()];
+    corpo+=`<div class="ag-dia">${dow}, ${d} de ${MESES_PT[mth-1]} de ${a}</div>`;
+    corpo+=dados.filter((x)=>x.data===dia).map(linha).join("");
+  }
+  corpo+=`<p class="ag-tot">Total de registros: ${dados.length}</p>`;
+  abrirImpressao("Agenda de serviços", corpo);
 }
 
 /* Mostra a senha do portal UMA vez (não fica recuperável depois). */
