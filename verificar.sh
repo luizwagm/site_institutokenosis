@@ -12,8 +12,27 @@ echo "===================== ESTADO DA PRODUÇÃO ====================="
 echo
 echo "Commit atual : $(git rev-parse --short HEAD) — $(git log -1 --format=%s)"
 echo "Node         : $(node -v)"
+echo "Driver SQLite: $(node -p 'require("./db").DRIVER_NOME + (require("./db").DRIVER_AVISO ? "  ⚠ " + require("./db").DRIVER_AVISO : "")' 2>/dev/null || echo '—')"
 echo "Serviço      : $(systemctl is-active "$SERVICO" 2>/dev/null)"
 printf "Site         : HTTP %s\n" "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORTA/")"
+echo
+
+# O /restrito é uma página só, com todo o JavaScript embutido. Um erro de
+# sintaxe ali não aparece em lugar nenhum: o servidor entrega o arquivo, o
+# navegador desiste de interpretar e a tela fica em branco, sem erro no log.
+# Uma crase dentro do CSS (que mora num template literal) já causou isso.
+echo "--- O JavaScript do /restrito compila? ---"
+node -e '
+  const fs=require("fs");
+  const s=fs.readFileSync("restrito/app.html","utf8");
+  const i=s.indexOf("<script>"), j=s.lastIndexOf("</script>");
+  if(i<0||j<0){ console.log("  não achei o bloco <script> em restrito/app.html"); process.exit(0); }
+  const tmp=require("os").tmpdir()+"/bem-app-check.js";
+  fs.writeFileSync(tmp, s.slice(i+8,j));
+  try { new (require("vm").Script)(fs.readFileSync(tmp,"utf8"), {filename:"app.html"}); console.log("  OK: sem erro de sintaxe"); }
+  catch(e){ console.log("  ERRO DE SINTAXE — a tela do /restrito NÃO vai abrir:"); console.log("  " + e.message); }
+  finally { try{ fs.unlinkSync(tmp); }catch{} }
+' 2>/dev/null || echo "  não consegui verificar"
 echo
 
 echo "--- O banco corre risco no próximo pull? ---"
@@ -44,20 +63,12 @@ echo "--- Conteúdo do banco ---"
 if [ -f data/site.db ]; then
   echo "  arquivo: $(du -h data/site.db | cut -f1)"
   node -e '
-    const { DatabaseSync } = require("node:sqlite");
+    const { abrirBanco } = require("./db");
     try {
-      const db = new DatabaseSync("data/site.db");
-      for (const t of ["services","projetos","documentos","team","posts","portfolio","settings","visits"])
+      const db = abrirBanco("data/site.db");
+      for (const t of ["services","team","posts","portfolio","documentos","galeria","settings","visits"])
         console.log("  " + t.padEnd(14) + db.prepare(`SELECT COUNT(*) c FROM ${t}`).get().c);
       console.log("  integridade   " + db.prepare("PRAGMA integrity_check").get().integrity_check);
-      const g = (k) => db.prepare("SELECT value FROM settings WHERE key=?").get(k)?.value;
-      console.log("  manutencao    " + (g("manutencao") === "1" ? "LIGADA — o site esta fora do ar" : "desligada"));
-      const crypto = require("node:crypto");
-      const h = g("admin_password_hash") || "";
-      const [, N, r, pp, salt, dk] = h.split("$");
-      const padrao = dk && crypto.scryptSync("kenosis-admin", Buffer.from(salt, "hex"),
-        dk.length / 2, { N: +N, r: +r, p: +pp }).toString("hex") === dk;
-      console.log("  senha painel  " + (padrao ? "AINDA E A PADRAO — troque no painel" : "trocada, ok"));
     } catch (e) { console.log("  ERRO ao ler: " + e.message); }
   ' 2>/dev/null
 else
@@ -65,30 +76,53 @@ else
 fi
 echo
 
-echo "--- Sistema de gestão (/restrito) ---"
-if [ -f data/gestao.db ]; then
-  node -e '
-    const { DatabaseSync } = require("node:sqlite");
-    const crypto = require("node:crypto");
+echo "--- Banco da gestão (/restrito · PostgreSQL) ---"
+echo "  serviço postgres : $(systemctl is-active postgresql 2>/dev/null || echo '—')"
+echo "  pg_dump          : $(command -v pg_dump >/dev/null 2>&1 && pg_dump --version | head -1 || echo 'AUSENTE — instale postgresql-client, o backup depende dele')"
+node -e '
+  const { Q, carregarAmbiente } = require("./pg");
+  carregarAmbiente();
+  (async () => {
     try {
-      const db = new DatabaseSync("data/gestao.db");
-      const n = (t) => db.prepare(`SELECT COUNT(*) c FROM ${t}`).get().c;
-      console.log("  arquivo: " + require("fs").statSync("data/gestao.db").size + " bytes");
-      console.log(`  pacientes ${n("pacientes")} · associados ${n("associados")} · atendimentos ${n("atendimentos")} · eventos ${n("eventos")}`);
-      const u = db.prepare("SELECT senha_hash FROM g_usuarios WHERE email=?").get("admin");
-      if (u) { const [,N,r,p,salt,dk]=u.senha_hash.split("$");
-        const padrao = dk && crypto.scryptSync("kenosis-gestao", Buffer.from(salt,"hex"), dk.length/2, {N:+N,r:+r,p:+p}).toString("hex")===dk;
-        console.log("  senha admin: " + (padrao ? "AINDA E A PADRAO — troque em /restrito" : "trocada, ok")); }
-    } catch (e) { console.log("  ERRO ao ler: " + e.message); }
-  ' 2>/dev/null
-else
-  echo "  data/gestao.db ainda não existe (será criado no 1º boot)"
+      const v = await Q.versao();
+      console.log("  conexão          OK — " + v.d + " (usuário " + v.u + ")");
+      for (const t of ["pacientes","associados","profissionais","atendimentos","prontuario","beneficios","eventos","documentos_gestao","projetos","servicos"]) {
+        const r = await Q.get(`SELECT COUNT(*) c FROM ${t}`);
+        console.log("  " + t.padEnd(22) + r.c);
+      }
+      const m = await Q.all("SELECT versao FROM schema_migrations ORDER BY versao");
+      console.log("  migrations aplicadas   " + m.length + (m.length ? " (última: " + m[m.length-1].versao + ")" : ""));
+      /* Tamanho ocupado: é o número que avisa quando o disco vai apertar, muito
+         antes de o serviço parar por falta de espaço. */
+      const s = await Q.get("SELECT pg_size_pretty(pg_database_size(current_database())) t");
+      console.log("  tamanho                " + s.t);
+    } catch (e) {
+      console.log("  ✖ NÃO CONECTOU: " + e.message.split("\n")[0]);
+      console.log("    confira /etc/kenosis.env e: systemctl status postgresql");
+    }
+    await Q.fechar().catch(() => {});
+  })();
+' 2>/dev/null
+
+# O arquivo antigo do SQLite, se ainda estiver no disco, é ARQUIVO MORTO: o
+# sistema não o abre mais desde a v1.12.0. Avisar evita a leitura errada de que
+# os prontuários ainda estão ali — e lembra que ele guarda dado sensível.
+if [ -f data/gestao.db ]; then
+  echo
+  echo "  ⚠ data/gestao.db ainda existe ($(du -h data/gestao.db | cut -f1)) — é o banco ANTES"
+  echo "    da migração para o PostgreSQL. Não é mais lido. Guarde-o fora do servidor"
+  echo "    (contém prontuário) ou renomeie para .antes-do-postgres."
 fi
 echo
 
-echo "--- Backups guardados ---"
+echo "--- Backup automático ---"
+node server.js --backup-status 2>/dev/null | sed 's/^/  /' || echo "  não consegui consultar"
+echo
+echo "--- Últimos backups no disco ---"
 # o || não pega o caso vazio porque quem define o código de saída é o sed
-LISTA=$(ls -1t backups/site.db.* 2>/dev/null | head -5)
-if [ -n "$LISTA" ]; then echo "$LISTA" | sed 's/^/  /'; else echo "  nenhum ainda (o primeiro sai no próximo deploy)"; fi
+LISTA=$(ls -1t backups/*.db 2>/dev/null | head -8)
+if [ -n "$LISTA" ]; then echo "$LISTA" | sed 's/^/  /'; else echo "  nenhum ainda (o primeiro sai em até 24h ou no próximo deploy)"; fi
+echo "  restaurar:  sudo ./restaurar.sh          (lista)"
+echo "              sudo ./restaurar.sh gestao   (restaura o mais recente)"
 echo
 echo "=============================================================="

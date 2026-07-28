@@ -152,6 +152,215 @@
     .toast.on{transform:translate(-50%,0)}.toast.err{background:var(--red)}
     @media(max-width:820px){.app{grid-template-columns:1fr}aside{position:static;height:auto}main{padding:1.1rem}.formgrid,.rel-cols{grid-template-columns:1fr}}
     @media print{aside,.appbar,.topbar .btn,.navbtn{display:none}.app{grid-template-columns:1fr}}
+    /* ------------------------ Mini editor de texto ---------------------- */
+    .ed-caixa{border:1px solid var(--line2);border-radius:10px;overflow:hidden;background:#fff}
+    .ed-caixa:focus-within{border-color:var(--celeste);box-shadow:0 0 0 3px rgba(30,161,228,.16)}
+    .ed-barra{display:flex;flex-wrap:wrap;gap:.15rem;padding:.35rem;background:#f7f9fc;border-bottom:1px solid var(--line)}
+    .ed-bt{min-width:30px;height:28px;border:1px solid transparent;border-radius:6px;background:none;
+      cursor:pointer;font:inherit;font-size:.85rem;color:var(--muted);line-height:1}
+    .ed-bt:hover:not(:disabled){background:#fff;border-color:var(--line2);color:var(--marinho)}
+    .ed-bt:disabled{opacity:.4;cursor:not-allowed}
+    .ed-sep{width:1px;background:var(--line2);margin:.2rem .25rem}
+    .ed-area{min-height:230px;max-height:52vh;overflow:auto;padding:.8rem .9rem;line-height:1.6;
+      font-size:.95rem;color:var(--text);outline:none}
+    .ed-area:empty::before{content:"Escreva aqui…";color:var(--dim)}
+    .ed-off .ed-area{background:#f7f9fc;color:var(--muted)}
+
+    /* Como o texto formatado aparece — na tela e no papel. Sem isto, o <ul>
+       herdaria o reset `*{margin:0}` lá de cima e a lista sairia sem recuo
+       nenhum, colada na margem. */
+    .texto-rico{line-height:1.6;overflow-wrap:break-word}
+    .texto-rico p{margin:0 0 .6rem}
+    .texto-rico p:last-child{margin-bottom:0}
+    .texto-rico ul,.texto-rico ol{margin:.4rem 0 .7rem;padding-left:1.5rem}
+    .texto-rico li{margin:.15rem 0}
+    .texto-rico b,.texto-rico strong{font-weight:700}
+    .ed-area p{margin:0 0 .6rem}
+    .ed-area ul,.ed-area ol{margin:.4rem 0 .7rem;padding-left:1.5rem}
+
+    /* ------------------ Atalho para os outros sistemas ------------------ */
+    /* A barra do topo alinha à direita (justify-content:flex-end). Este bloco
+       usa margin-right:auto para ficar colado no menu da conta, e não jogado
+       no canto oposto da tela. */
+    .ap-drop{position:relative;margin-left:auto}
+    .ap-trigger{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;
+      border:1px solid transparent;border-radius:10px;background:none;color:var(--muted);cursor:pointer}
+    .ap-trigger svg{fill:currentColor}
+    .ap-trigger:hover{background:#f0f3f8;color:var(--marinho)}
+    .ap-drop.aberto .ap-trigger{background:#f0f3f8;border-color:var(--line);color:var(--marinho)}
+    .ap-trigger:focus-visible{outline:2px solid var(--celeste);outline-offset:2px}
+
+    /* Os dois atalhos ficam LADO A LADO, como pedido. */
+    .ap-painel{position:absolute;right:0;top:calc(100% + 6px);z-index:120;display:none;
+      grid-template-columns:repeat(2,132px);gap:.4rem;padding:.5rem;
+      background:#fff;border:1px solid var(--line2);border-radius:12px;box-shadow:0 14px 32px rgba(37,50,130,.18)}
+    .ap-drop.aberto .ap-painel{display:grid}
+    .ap-item{display:flex;flex-direction:column;align-items:center;gap:.35rem;text-align:center;
+      padding:.8rem .5rem;border-radius:10px;text-decoration:none;color:var(--text)}
+    .ap-item:hover{background:#f4f6fb}
+    .ap-item b{font-size:.83rem;font-weight:600;color:var(--marinho);line-height:1.25}
+    .ap-item small{font-size:.72rem;color:var(--dim);line-height:1.3}
+    .ap-icone{display:grid;place-items:center;width:46px;height:46px;border-radius:12px;color:#fff}
+    .ap-icone--painel{background:linear-gradient(135deg,var(--marinho),var(--celeste))}
+    .ap-icone--site{background:linear-gradient(135deg,#1c7a45,#37b06d)}
+
+    /* ------------------- Botão ocupado (espera visível) ----------------- */
+    /* O giro entra ANTES do rótulo e o texto continua legível: quem clicou em
+       "Salvar" precisa continuar vendo que era Salvar. Trocar o texto por
+       "Aguarde…" faria o botão mudar de largura e a barra de ações pular. */
+    button.ocupado, .btn.ocupado{position:relative;padding-left:2.1rem!important;cursor:progress}
+    button.ocupado::before, .btn.ocupado::before{
+      content:"";position:absolute;left:.85rem;top:50%;width:13px;height:13px;margin-top:-6.5px;
+      border:2px solid currentColor;border-right-color:transparent;border-radius:50%;
+      animation:girando .6s linear infinite;opacity:.9}
+    @keyframes girando{to{transform:rotate(360deg)}}
+    /* Desabilitado pela espera: some a cor de ação, fica claro que não adianta
+       clicar. `not(.ocupado)` para o botão clicado manter o destaque. */
+    button:disabled:not(.ocupado), .btn:disabled:not(.ocupado){opacity:.5;cursor:not-allowed}
+    @media (prefers-reduced-motion: reduce){
+      button.ocupado::before, .btn.ocupado::before{animation-duration:2s}
+    }
+
+    /* --------------------- Ações das linhas da tabela ------------------- */
+    .col-acoes{text-align:right;white-space:nowrap}
+
+    /* Lupa: uma cor só, como pedido. O significado vem da forma, não da cor. */
+    .acao-lupa{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;
+      border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--muted);
+      cursor:pointer;transition:border-color var(--t,.15s),color .15s;vertical-align:middle}
+    .acao-lupa:hover{border-color:var(--celeste);color:var(--celeste)}
+    .acao-lupa:focus-visible{outline:2px solid var(--celeste);outline-offset:2px}
+
+    /* Menu de três pontos */
+    .acao-menu{position:relative;display:inline-block;text-align:left}
+    .acao-trigger{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;
+      border:1px solid transparent;border-radius:8px;background:none;color:var(--muted);cursor:pointer}
+    .acao-trigger:hover{background:#f0f3f8;color:var(--text)}
+    .acao-menu.aberto .acao-trigger{background:#f0f3f8;border-color:var(--line);color:var(--text)}
+    .acao-trigger:focus-visible{outline:2px solid var(--celeste);outline-offset:2px}
+    .acao-trigger svg{fill:currentColor}
+
+    /* POSITION: FIXED, e não absolute.
+
+       A tabela vive num cartão com `overflow:auto` (ele precisa disso para
+       rolar na horizontal em tela estreita). Qualquer filho posicionado de
+       forma ABSOLUTA é recortado por esse overflow — foi o que aconteceu: o
+       menu abria com 162px de altura dentro de um cartão que terminava 104px
+       acima, e metade dele sumia.
+
+       `fixed` sai do fluxo do cartão e se posiciona em relação à JANELA, então
+       nenhum ancestral consegue recortá-lo. O preço é que ele não acompanha a
+       rolagem sozinho — por isso o menu fecha ao rolar (ver o listener). */
+    .acao-lista{position:fixed;z-index:200;min-width:210px;
+      background:#fff;border:1px solid var(--line2);border-radius:10px;padding:.3rem;
+      box-shadow:0 12px 28px rgba(37,50,130,.18);display:none}
+    .acao-menu.aberto .acao-lista{display:block}
+    .acao-lista button{display:block;width:100%;text-align:left;border:0;background:none;
+      padding:.5rem .65rem;border-radius:7px;cursor:pointer;font:inherit;font-size:.87rem;
+      color:var(--text);white-space:nowrap}
+    .acao-lista button:hover{background:#f0f3f8;color:var(--marinho)}
+
+    /* ------------------------------- Auditoria -------------------------- */
+    .au-rolagem{overflow-x:auto}
+    #au-tabela td,#au-tabela th{vertical-align:top}
+    #au-tabela .au-quando{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--muted);font-size:.84rem}
+    #au-tabela .au-ip{white-space:nowrap;color:var(--dim);font-size:.8rem}
+    /* o resumo é o que mais ocupa: deixa quebrar e limita para a linha não
+       virar um parágrafo dentro da tabela */
+    #au-tabela .au-resumo{overflow-wrap:break-word;min-width:260px}
+    .au-tag{display:inline-block;padding:.1rem .5rem;border-radius:999px;font-size:.74rem;
+      font-weight:700;white-space:nowrap;background:#eef1f6;color:var(--muted)}
+    .au-tag.entrada{background:#e7f6ee;color:var(--verde)}
+    .au-tag.saida{background:#eef1f6;color:var(--muted)}
+    .au-tag.criar{background:#e8f0fd;color:#2c5fb3}
+    .au-tag.editar{background:#fdf4e6;color:var(--ambar)}
+    .au-tag.excluir{background:#fdecef;color:var(--red)}
+    .au-tag.alerta{background:#fdecef;color:var(--red)}
+    /* a linha só é clicável quando existe detalhe para abrir — cursor de mão
+       numa linha que não faz nada é promessa quebrada */
+    .au-clicavel{cursor:pointer}
+    .au-clicavel:hover{background:#f7f9fc}
+    .au-lupa{color:var(--celeste);font-size:.8rem;white-space:nowrap}
+    .au-pag{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end;
+      margin-top:.9rem;font-size:.85rem;color:var(--muted)}
+    .au-pag button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:.3rem .65rem;
+      cursor:pointer;font:inherit;color:var(--text)}
+    .au-pag button:hover:not(:disabled){border-color:var(--celeste);color:var(--celeste)}
+    .au-pag button:disabled{opacity:.45;cursor:default}
+    .au-pag .atual{font-weight:700;color:var(--text)}
+
+    /* Modal do detalhe */
+    .au-meta{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.7rem;margin-bottom:1rem}
+    .au-meta span{display:block;font-size:.74rem;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+    .au-meta b{overflow-wrap:anywhere}
+    .au-dif{width:100%;border-collapse:collapse;font-size:.86rem}
+    .au-dif th{text-align:left;padding:.4rem .5rem;border-bottom:1px solid var(--line);color:var(--muted);font-size:.78rem}
+    .au-dif td{padding:.45rem .5rem;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:break-word}
+    .au-de{color:var(--red)}
+    .au-para{color:var(--verde)}
+    .au-json{background:#f7f9fc;border:1px solid var(--line);border-radius:8px;padding:.7rem;
+      font-family:ui-monospace,Consolas,monospace;font-size:.78rem;white-space:pre-wrap;overflow-wrap:anywhere;max-height:50vh;overflow:auto}
+
+    /* ---------------------------- Sobre o sistema ---------------------- */
+    .sb-atual{background:linear-gradient(135deg,var(--marinho),var(--celeste));color:#fff;border:0}
+    .sb-atual h2,.sb-atual h3{color:#fff}
+    .sb-selo{display:inline-block;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);
+      border-radius:999px;padding:.15rem .7rem;font-size:.78rem;font-weight:700;letter-spacing:.04em}
+    .sb-data{font-size:.8rem;opacity:.85}
+    /* A lista de mudanças usa marcador próprio: o disco padrão some no fundo
+       escuro do cartão da versão atual. */
+    .sb-lista{list-style:none;padding:0;margin:.7rem 0 0}
+    .sb-lista li{position:relative;padding-left:1.15rem;margin:.35rem 0;line-height:1.5}
+    .sb-lista li::before{content:"";position:absolute;left:0;top:.62em;width:6px;height:6px;
+      border-radius:50%;background:currentColor;opacity:.55}
+
+    /* Sanfona das versões anteriores */
+    .sb-acc{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+    .sb-acc + .sb-acc{margin-top:.5rem}
+    .sb-cab{width:100%;display:flex;align-items:center;gap:.7rem;padding:.8rem 1rem;background:none;
+      border:0;cursor:pointer;text-align:left;font:inherit;color:var(--text)}
+    .sb-cab:hover{background:#f7f9fc}
+    .sb-cab b{color:var(--marinho);font-size:.95rem}
+    .sb-cab .sb-tit{color:var(--muted);font-size:.86rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .sb-cab .sb-seta{color:var(--dim);transition:transform .2s;flex-shrink:0}
+    .sb-acc.aberta .sb-seta{transform:rotate(180deg)}
+    /* hidden no corpo (e não max-height animado): conteúdo escondido que
+       continua no fluxo é lido por leitor de tela e achado pelo Ctrl+F,
+       confundindo quem procura em qual versão algo entrou. */
+    .sb-corpo{padding:0 1rem 1rem 1rem;border-top:1px solid var(--line)}
+
+    .sb-tec{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:.7rem}
+    .sb-tec div{border:1px solid var(--line);border-radius:10px;padding:.7rem .85rem;background:#fbfcfe}
+    .sb-tec b{display:block;color:var(--marinho)}
+    .sb-tec span{display:block;font-size:.83rem;color:var(--muted)}
+    .sb-tec small{display:block;font-size:.76rem;color:var(--dim);margin-top:.15rem;overflow-wrap:anywhere}
+
+    .sb-banco{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.8rem}
+    .sb-banco div span{display:block;font-size:.76rem;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+    .sb-banco div b{font-size:1rem;color:var(--text);overflow-wrap:anywhere}
+    @media(max-width:640px){ .sb-cab .sb-tit{display:none} }
+
+    /* barra de paginação: quantos por página + navegação */
+    .paginacao{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;margin:.7rem 0 1rem}
+    .paginacao:empty{display:none}
+    .pglbl{font-size:.82rem;font-weight:600;color:var(--muted)}
+    .pgsel{width:auto;margin:0;padding:.3rem .5rem;font-size:.85rem}
+    .pginfo{color:var(--dim);font-size:.82rem}
+    .pgnav{display:flex;align-items:center;gap:.25rem;margin-left:auto;flex-wrap:wrap}
+    .pgbtn{min-width:32px;padding:.28rem .5rem;border:1px solid var(--line2);background:#fff;
+      color:var(--marinho);border-radius:8px;font-weight:600;font-size:.84rem;cursor:pointer}
+    .pgbtn:hover:not(:disabled){background:#eef4fb}
+    .pgbtn.on{background:var(--celeste);color:#fff;border-color:var(--celeste)}
+    .pgbtn:disabled{opacity:.4;cursor:default}
+    .pgsep{color:var(--dim);padding:0 .1rem}
+    @media print{.paginacao{display:none}}
+    /* filtro de período: dois campos de data lado a lado */
+    .filtro-data{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem}
+    .filtro-data:empty{display:none}
+    .filtro-data label{margin:0;font-size:.8rem}
+    .filtro-data input[type=date]{width:auto;padding:.35rem .5rem;font-size:.85rem}
+    .pd-info{font-size:.8rem;color:var(--dim)}
+    @media print{.filtro-data{display:none}}
   </style>
 </head>
 <body>
@@ -188,19 +397,54 @@
     <button class="navbtn" data-nav="atendimentos">Agendamento</button>
     <button class="navbtn" data-nav="documentos_gestao">Documentos</button>
     <button class="navbtn" data-nav="relatorios">Relatórios</button>
+    <button class="navbtn" data-nav="relatorios_pacientes">Usuários ativos / inativos</button>
     <div class="side-credito">Produzido por<br>LA Software House.</div>
   </aside>
 
   <div class="conteudo">
     <header class="appbar">
+      <!-- Atalhos para os outros sistemas. À ESQUERDA do menu da conta.
+           O painel do site só aparece para o administrador. -->
+      <div class="ap-drop" id="ap-drop">
+        <button type="button" class="ap-trigger" id="ap-trigger" aria-haspopup="true" aria-expanded="false"
+                title="Ir para" aria-label="Ir para outros sistemas" onclick="abrirAtalhos(event)">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <circle cx="5" cy="5" r="1.9"/><circle cx="12" cy="5" r="1.9"/><circle cx="19" cy="5" r="1.9"/>
+            <circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/>
+            <circle cx="5" cy="19" r="1.9"/><circle cx="12" cy="19" r="1.9"/><circle cx="19" cy="19" r="1.9"/>
+          </svg>
+        </button>
+        <div class="ap-painel" role="menu">
+          <a class="ap-item" id="ap-admin" role="menuitem" href="/restrito/painel-do-site" target="_blank" rel="noopener" hidden>
+            <span class="ap-icone ap-icone--painel" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7"
+                   stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/>
+                <path d="M3 9h18M8 9v11"/><path d="M11.5 12.5h6M11.5 16h4"/></svg>
+            </span>
+            <b>Painel do site</b><small>Editar o conteúdo</small>
+          </a>
+          <a class="ap-item" role="menuitem" href="/" target="_blank" rel="noopener">
+            <span class="ap-icone ap-icone--site" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7"
+                   stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/>
+                <path d="M12 3c2.6 2.7 3.9 5.7 3.9 9s-1.3 6.3-3.9 9c-2.6-2.7-3.9-5.7-3.9-9S9.4 5.7 12 3z"/></svg>
+            </span>
+            <b>Site do instituto</b><small>Ver como o público vê</small>
+          </a>
+        </div>
+      </div>
+
       <div class="tn-drop">
         <button class="tn-trigger" type="button"><span class="tn-quem" id="quem"></span> <span class="tn-caret">▼</span></button>
         <div class="tn-panel">
           <button class="navbtn" data-nav="conta">Minha conta</button>
           <button class="navbtn" data-nav="usuarios">Usuários do Sistema</button>
           <hr class="tn-sep">
-          <a class="navbtn" href="/" target="_blank">↗ Ver o site</a>
-          <hr class="tn-sep">
+          <!-- Backup: só o admin vê (o JS esconde para os demais perfis) -->
+          <button class="navbtn" id="btn-backup" onclick="baixarBackup(this)" hidden>⬇ Backup do banco</button>
+          <hr class="tn-sep" id="sep-backup" hidden>
+          <button class="navbtn" data-nav="auditoria">Auditoria</button>
+          <button class="navbtn" data-nav="sobre">Sobre o sistema</button>
           <button class="navbtn" onclick="sair()">Sair</button>
           <p class="tn-versao">Versão do Sistema v{{VERSAO}}</p>
         </div>
@@ -219,16 +463,19 @@
         <h1 id="mod-titulo"></h1>
         <div style="display:flex;gap:.5rem">
           <button class="btn btn-ghost btn-sm" id="mod-imprimir" onclick="imprimirAgenda()" hidden>🖨 Imprimir</button>
+          <button class="btn btn-ghost btn-sm" id="mod-relacao" onclick="imprimirRelacaoUsuarios()" hidden>🖨 Imprimir relação</button>
           <button class="btn btn-ghost btn-sm" onclick="exportarCSV()">Exportar CSV</button>
           <button class="btn btn-navy" id="mod-novo" onclick="abrirForm()">+ Novo</button>
         </div>
       </div>
-      <input class="busca" id="mod-busca" placeholder="Buscar por nome ou CPF…" oninput="carregarLista()" style="margin-bottom:1rem" hidden>
+      <input class="busca" id="mod-busca" placeholder="Buscar por nome ou CPF…" oninput="buscarNaLista()" style="margin-bottom:1rem" hidden>
       <div id="mod-vistas" class="vista-toggle" hidden>
         <button class="vbtn on" data-v="tabela" onclick="trocarVista('tabela')">☰ Tabela</button>
         <button class="vbtn" data-v="agenda" onclick="trocarVista('agenda')">▦ Agenda</button>
         <button class="vbtn" data-v="kanban" onclick="trocarVista('kanban')">▤ Kanban</button>
       </div>
+      <div id="mod-situacao" class="filtro-data"></div>
+      <div id="mod-periodo" class="filtro-data"></div>
       <div id="mod-filtro"></div>
       <div class="card" id="mod-tabela" style="padding:0;overflow:auto">
         <table>
@@ -236,18 +483,59 @@
           <tbody id="mod-tbody"><tr><td class="vazio">Carregando…</td></tr></tbody>
         </table>
       </div>
+      <div id="mod-paginacao" class="paginacao"></div>
       <div id="mod-agenda" hidden></div>
       <div id="mod-kanban" hidden></div>
     </section>
 
     <section class="panel" id="pane-relatorios">
       <div class="topbar"><h1>Relatórios</h1><button class="btn btn-ghost btn-sm" onclick="imprimirRelatorio()">Imprimir / PDF</button></div>
+      <div id="rel-periodo" class="filtro-data"></div>
       <div class="stat-grid" id="rel-stats"></div>
       <div class="rel-cols">
         <div class="card"><h3 style="margin-bottom:.6rem">Atendimentos por serviço</h3><div id="rel-esp"></div></div>
         <div class="card"><h3 style="margin-bottom:.6rem">Serviços por situação</h3><div id="rel-status"></div></div>
       </div>
       <div class="card"><h3 style="margin-bottom:.6rem">Serviços por mês</h3><div id="rel-mes"></div></div>
+    </section>
+
+    <!-- Relação para retomar contato: quem está ativo, quem saiu, onde mora. -->
+    <section class="panel" id="pane-relpac">
+      <div class="topbar">
+        <h1>Usuários ativos / inativos</h1>
+        <button class="btn btn-ghost btn-sm" onclick="imprimirRelPacientes()">🖨 Imprimir relação</button>
+      </div>
+      <div class="filtro-data" id="relpac-filtro"></div>
+      <div class="stat-grid" id="relpac-stats"></div>
+      <div class="card" id="relpac-tabela" style="padding:0;overflow:auto"></div>
+      <div id="relpac-paginacao" class="paginacao"></div>
+    </section>
+
+    <!-- Auditoria: tudo o que acontece no sistema. Só o admin. -->
+    <section class="panel" id="pane-auditoria">
+      <div class="topbar"><h1>Auditoria</h1>
+        <button class="btn btn-ghost btn-sm" onclick="carregarAuditoria(1)">↻ Atualizar</button></div>
+      <div class="card">
+        <div class="formgrid">
+          <div><label>De</label><input type="date" id="au-de"></div>
+          <div><label>Até</label><input type="date" id="au-ate"></div>
+          <div><label>Quem</label><select id="au-usuario"><option value="">Todos</option></select></div>
+          <div><label>Ação</label><select id="au-acao"><option value="">Todas</option></select></div>
+          <div><label>Tela</label><select id="au-modulo"><option value="">Todas</option></select></div>
+          <div style="display:flex;align-items:flex-end;gap:.5rem">
+            <button class="btn btn-navy btn-sm" onclick="carregarAuditoria(1)">Filtrar</button>
+            <button class="btn btn-ghost btn-sm" onclick="limparAuditoria()">Limpar</button>
+          </div>
+        </div>
+      </div>
+      <div class="card"><div class="au-rolagem"><table id="au-tabela"></table></div>
+        <div id="au-paginacao" class="au-pag"></div></div>
+    </section>
+
+    <!-- Sobre o sistema: versão, histórico, tecnologias e banco ativo. -->
+    <section class="panel" id="pane-sobre">
+      <div class="topbar"><h1>Sobre o sistema</h1></div>
+      <div id="sobre-corpo"><p class="vazio">Carregando…</p></div>
     </section>
 
     <section class="panel" id="pane-conta">
@@ -274,10 +562,91 @@ const soDig = (s) => String(s ?? "").replace(/\D/g, "");
 let toastT;
 function toast(m, err) { const t = $("#toast"); t.textContent = m; t.classList.toggle("err", !!err); t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 3000); }
 
+/* ==========================================================================
+   ESPERA VISÍVEL — o botão diz que está trabalhando, e o resto trava
+
+   Antes, clicar em Salvar não dava sinal nenhum: quem não visse a tela mudar
+   clicava de novo. Em cadastro isso vira registro duplicado; em agendamento,
+   dois horários marcados.
+
+   Como funciona, sem precisar mexer em nenhum dos ~80 onclick existentes:
+
+     1. Um ouvinte na fase de CAPTURA anota qual botão foi clicado. Captura, e
+        não bolha, porque o handler do próprio botão roda antes da bolha chegar
+        aqui — anotar tarde demais não serviria de nada.
+     2. Qualquer chamada ao servidor feita a partir dali marca ESSE botão como
+        ocupado (com um giro) e desabilita TODOS os outros.
+     3. Quando a última chamada termina, tudo volta ao normal.
+
+   O contador existe porque uma ação costuma disparar várias chamadas em
+   sequência (salvar, recarregar a lista, repintar). Sem ele, a primeira a
+   terminar liberaria a tela enquanto as outras ainda estivessem correndo.
+   ========================================================================== */
+let BOTAO_ATIVO = null, CHAMADAS_ABERTAS = 0;
+
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button, .btn");
+  /* Só botões de AÇÃO. Navegar entre telas, abrir um menu ou paginar não é
+     operação que precise travar a tela — e travá-la deixaria o sistema com
+     cara de lento sem motivo. */
+  if (!b || b.disabled) return;
+  if (b.classList.contains("navbtn") || b.classList.contains("tn-trigger")
+      || b.classList.contains("side-head") || b.closest(".acao-menu")
+      || b.closest("#au-paginacao") || b.closest(".paginacao")) return;
+  BOTAO_ATIVO = b;
+  // se nenhuma chamada começar logo em seguida, o clique não era de servidor
+  setTimeout(() => { if (!CHAMADAS_ABERTAS) BOTAO_ATIVO = null; }, 0);
+}, true);
+
+function travarTela(botao) {
+  CHAMADAS_ABERTAS++;
+  if (CHAMADAS_ABERTAS > 1) return;                 // já está travado
+  document.querySelectorAll("button, .btn").forEach((b) => {
+    if (b.disabled) return;
+    b.dataset.travado = "1";                        // marca só o que NÓS desabilitamos
+    b.disabled = true;
+  });
+  if (botao) { botao.classList.add("ocupado"); botao.setAttribute("aria-busy", "true"); }
+}
+
+function destravarTela(botao) {
+  CHAMADAS_ABERTAS = Math.max(0, CHAMADAS_ABERTAS - 1);
+  if (CHAMADAS_ABERTAS) return;                     // ainda há chamada em curso
+  /* Só reabilita o que foi desabilitado por nós. Um botão que já estava
+     desabilitado por regra de negócio (anamnese finalizada, por exemplo)
+     precisa continuar desabilitado. */
+  document.querySelectorAll('[data-travado="1"]').forEach((b) => {
+    b.disabled = false; delete b.dataset.travado;
+  });
+  if (botao) { botao.classList.remove("ocupado"); botao.removeAttribute("aria-busy"); }
+  BOTAO_ATIVO = null;
+}
+
 async function api(url, method = "GET", body) {
+  const botao = BOTAO_ATIVO;
+  travarTela(botao);
+  try {
+    return await apiCrua(url, method, body);
+  } finally {
+    /* finally: se a chamada falhar, a tela TEM de destravar do mesmo jeito —
+       senão um erro de rede deixaria o sistema inutilizável até recarregar. */
+    destravarTela(botao);
+  }
+}
+
+async function apiCrua(url, method = "GET", body) {
   const r = await fetch("/restrito/api/" + url, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || r.statusText);
+  if (!r.ok) {
+    /* "Rota não encontrada" numa tela que existe = o navegador já está com a
+       versão nova (o HTML é lido do disco a cada acesso), mas o processo Node
+       continua rodando o código antigo em memória. Acontece quando se atualiza
+       o servidor sem reiniciá-lo. Melhor dizer isso do que deixar o usuário
+       diante de um erro sem sentido. */
+    if (r.status === 404 && /rota não encontrada/i.test(j.error || ""))
+      throw new Error("Esta função não existe no servidor que está rodando. O sistema foi atualizado, mas o serviço não foi reiniciado — peça para reiniciar (systemctl restart kenosis) e tente de novo.");
+    throw new Error(j.error || r.statusText);
+  }
   return j;
 }
 
@@ -289,7 +658,16 @@ function mTel(v){ v=soDig(v).slice(0,11);
 function mNIS(v){ v=soDig(v).slice(0,11); return v.replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{5})(\d)/,"$1.$2").replace(/(\d{2})(\d)$/,"$1-$2"); } /* 000.00000.00-0 */
 function mSUS(v){ v=soDig(v).slice(0,15); return v.replace(/(\d{3})(\d)/,"$1 $2").replace(/(\d{4})(\d)/,"$1 $2").replace(/(\d{4})(\d)/,"$1 $2"); }   /* 000 0000 0000 0000 */
 function mMoney(v){ let n=soDig(v); if(!n) return ""; n=(parseInt(n,10)/100).toFixed(2); return "R$ "+n.replace(".",",").replace(/\B(?=(\d{3})+(?!\d))/g,"."); }
-const MASCARA = { cpf:mCPF, tel:mTel, nis:mNIS, sus:mSUS, money:mMoney };
+function mCEP(v){ v=soDig(v).slice(0,8); return v.replace(/(\d{5})(\d)/,"$1-$2"); }                          /* 00000-000 */
+/* O endereço em uma linha, para a impressão e a relação. Junta só o que existe:
+   quem foi cadastrado antes da divisão em partes tem apenas `endereco`, e o
+   resultado precisa continuar legível — sem vírgula solta nem " - " no fim. */
+function enderecoCompleto(r){
+  const rua=[r.endereco, r.numero].filter(Boolean).join(", ");
+  const local=[r.bairro, r.cidade].filter(Boolean).join(" · ");
+  return [rua, r.complemento, local].filter(Boolean).join(" — ");
+}
+const MASCARA = { cpf:mCPF, tel:mTel, nis:mNIS, sus:mSUS, money:mMoney, cep:mCEP };
 function aplicarMascara(tipo, v){ return MASCARA[tipo] ? MASCARA[tipo](v) : v; }
 
 function cpfValido(cpf){ cpf=soDig(cpf); if(cpf.length!==11||/^(\d)\1{10}$/.test(cpf)) return false;
@@ -321,7 +699,7 @@ const nomeProf = (id) => { const r=CACHE.profissionais.find((p)=>String(p.id)===
 /* ========================= definição dos módulos ===================== */
 const MODULOS = {
   pacientes: { titulo:"Usuários", novo:"Cadastrar Usuário", busca:true, imprimir:true,
-    colunas:[["nome","Nome"],["nascimento","Nascimento","data"],["cpf","CPF"],["telefone","Telefone"],["vulneravel","Vulnerável","bool"]],
+    colunas:[["nome","Nome"],["nascimento","Nascimento","data"],["cpf","CPF"],["telefone","Telefone"],["vulneravel","Vulnerável","bool"],["ativo","Situação","situacao"]],
     campos:[
       ["foto","Foto do usuário","foto",{full:1}],
       ["nome","Nome completo","text",{req:1}],
@@ -336,7 +714,12 @@ const MODULOS = {
       ["resp_nascimento","Data de nascimento do responsável","date",{menor:1}],
       ["telefone","Telefone / WhatsApp","tel"],
       ["email","E-mail","email"],
-      ["endereco","Endereço completo","text",{full:1}],
+      ["cep","CEP","cep"],
+      ["endereco","Logradouro (rua / avenida)","text",{full:1}],
+      ["numero","Número","text"],
+      ["complemento","Complemento","text"],
+      ["bairro","Bairro","text"],
+      ["cidade","Cidade / UF","text"],
       ["escolaridade","Escolaridade","select",{opcoes:ESCOLARIDADE,placeholder:"Selecione…"}],
       ["primeiro_atendimento","Data do 1º atendimento","date"],
       ["nis","NIS (opcional)","nis"],
@@ -354,7 +737,12 @@ const MODULOS = {
       ["nome","Nome completo","text",{req:1}],
       ["cpf","CPF","cpf"],
       ["contato","Contato","tel"],
-      ["endereco","Endereço","text",{full:1}],
+      ["cep","CEP","cep"],
+      ["endereco","Logradouro (rua / avenida)","text",{full:1}],
+      ["numero","Número","text"],
+      ["complemento","Complemento","text"],
+      ["bairro","Bairro","text"],
+      ["cidade","Cidade / UF","text"],
       ["vinculo","Tipo de vínculo","select",{opcoes:["Contribuinte","Voluntário","Colaborador"],placeholder:"Selecione…"}],
       ["adesao","Data de adesão","date"],
       ["mensalidade","Valor da mensalidade","money"],
@@ -388,13 +776,21 @@ const MODULOS = {
     colunas:[["data","Data","data"],["paciente_id","Usuário","pac"],["especialidade","Serviço","servicos"],["profissional","Profissional"]],
     campos:[
       ["paciente_id","Usuário","busca",{tabela:"pacientes",req:1}],
-      ["profissional","Profissional responsável","busca",{tabela:"profissionais",valor:"nome",filtraServicos:1}],
+      /* Oculto para o próprio profissional: o registro é sempre dele (o
+         servidor carimba o dono), e deixar o campo à mostra só permitiria
+         escrever ali o nome de um colega — o prontuário continuaria sendo dele,
+         mas exibiria outro responsável. */
+      ["profissional","Profissional responsável","busca",{tabela:"profissionais",valor:"nome",filtraServicos:1,ocultarPara:"profissional"}],
       ["data","Data do atendimento","date",{req:1}],
       ["especialidade","Serviço","servicos_check",{full:1}],
-      ["avaliacao","Avaliação inicial","textarea",{full:1}],
-      ["evolucao","Evolução da sessão","textarea",{full:1}],
-      ["plano","Plano terapêutico","textarea",{full:1}],
-      ["encaminhamentos","Encaminhamentos","textarea",{full:1}],
+      /* "rico" e não "textarea": registro de atendimento não é texto corrido —
+         tem lista de encaminhamentos, item em negrito, parágrafo separando
+         sessões. São os únicos campos do sistema que aceitam formatação; o
+         servidor higieniza o HTML na gravação (ver htmlLimpo). */
+      ["avaliacao","Avaliação inicial","rico",{full:1}],
+      ["evolucao","Evolução da sessão","rico",{full:1}],
+      ["plano","Plano terapêutico","rico",{full:1}],
+      ["encaminhamentos","Encaminhamentos","rico",{full:1}],
       ["anexos","Anexo (foto/PDF)","arquivo",{full:1}],
       ["responsavel","Assinatura / responsável técnico","text"],
     ]},
@@ -468,7 +864,7 @@ const PERFIL_ROTULO = { admin:"Administrador", secretaria:"Secretaria", profissi
    aqui é só para esconder o que não interessa). admin vê tudo. */
 const PERM_CLIENTE = {
   admin: null,
-  secretaria: new Set(["painel","pacientes","associados","profissionais","atendimentos","servicos","projetos","documentos_gestao","beneficios","eventos","relatorios","conta"]),
+  secretaria: new Set(["painel","pacientes","associados","profissionais","atendimentos","servicos","projetos","documentos_gestao","beneficios","eventos","relatorios","relatorios_pacientes","conta"]),
   profissional: new Set(["atendimentos","prontuario","conta"]),   // SOMENTE a sua agenda e os seus prontuários
 };
 function aplicarPermissoes(perfil){
@@ -497,10 +893,401 @@ async function entrar(){ $("#lg-erro").textContent="";
   catch(e){ $("#lg-erro").textContent=e.message; } }
 async function sair(){ try{ await api("logout","POST"); }catch{} location.reload(); }
 
+/* ==========================================================================
+   MINI EDITOR DE TEXTO (prontuário)
+
+   Registro clínico não é texto corrido: tem lista de sintomas, item em negrito,
+   parágrafo separando sessões. Os campos do prontuário passaram a aceitar HTML
+   e ganharam esta barra de formatação.
+
+   POR QUE contenteditable + execCommand, e não uma biblioteca:
+   o sistema inteiro é uma página só, sem framework e sem dependência de front.
+   Trazer um editor pronto significaria carregar centenas de KB de terceiros
+   numa tela que exibe prontuário — e a CSP daqui não libera script externo.
+   O execCommand é antigo e marcado como obsoleto, mas funciona em todos os
+   navegadores atuais e cobre exatamente o que o instituto precisa: negrito,
+   itálico, sublinhado, listas e desfazer.
+
+   O QUE ELE NÃO FAZ: colar formatação de fora. Texto colado do Word entra
+   como TEXTO PURO (ver o handler de paste). Colar HTML de fora traria estilos
+   inline, fontes e, no pior caso, conteúdo perigoso — e o servidor descartaria
+   quase tudo na higienização, deixando o usuário sem entender por que o que
+   ele colou "sumiu".
+   ========================================================================== */
+const EDITOR_BOTOES = [
+  ["bold", "N", "Negrito (Ctrl+B)", "font-weight:800"],
+  ["italic", "I", "Itálico (Ctrl+I)", "font-style:italic"],
+  ["underline", "S", "Sublinhado (Ctrl+U)", "text-decoration:underline"],
+  ["|", "", "", ""],
+  ["insertUnorderedList", "•—", "Lista com marcadores", ""],
+  ["insertOrderedList", "1—", "Lista numerada", ""],
+  ["|", "", "", ""],
+  ["removeFormat", "T̶", "Limpar formatação", ""],
+  ["undo", "↶", "Desfazer (Ctrl+Z)", ""],
+  ["redo", "↷", "Refazer (Ctrl+Y)", ""],
+];
+
+/* Monta o editor. `id` é o do campo oculto que guarda o HTML — assim o resto
+   do código continua lendo o valor por $("#lc-texto").value, como sempre fez. */
+function editorRico(id, html, desabilitado){
+  const barra = EDITOR_BOTOES.map(([cmd, rot, titulo, estilo]) =>
+    cmd === "|" ? '<span class="ed-sep"></span>'
+      : `<button type="button" class="ed-bt" title="${escA(titulo)}" aria-label="${escA(titulo)}"
+           onmousedown="event.preventDefault()" onclick="edCmd('${id}','${cmd}')"
+           ${desabilitado?"disabled":""} style="${estilo}">${rot}</button>`).join("");
+  return `<div class="ed-caixa${desabilitado?" ed-off":""}">
+    <div class="ed-barra" role="toolbar" aria-label="Formatação">${barra}</div>
+    <div class="ed-area" id="${id}-ed" ${desabilitado?"":'contenteditable="true"'}
+         role="textbox" aria-multiline="true"
+         oninput="edSincronizar('${id}')" onblur="edSincronizar('${id}')"
+         onpaste="edColar(event)">${html||""}</div>
+    <input type="hidden" id="${id}" value="${escA(html||"")}">
+  </div>`;
+}
+
+function edCmd(id, cmd){
+  const area = document.getElementById(id+"-ed");
+  area.focus();
+  document.execCommand(cmd, false, null);
+  edSincronizar(id);
+}
+
+/* Espelha o conteúdo editado no campo oculto. É ele que o salvar lê. */
+function edSincronizar(id){
+  const area = document.getElementById(id+"-ed");
+  const campo = document.getElementById(id);
+  if(!area || !campo) return;
+  const html = area.innerHTML.trim();
+  /* Apagar tudo raramente deixa a caixa realmente vazia: o navegador guarda um
+     "<br>" solto e, se o texto estava numa lista, guarda a lista inteira —
+     "<ul><li><br></li></ul>". Salvo assim, o campo esvaziado passaria pela
+     validação de "escreva o conteúdo" e ainda apareceria na tela e na
+     impressão como um marcador sozinho, sem texto nenhum ao lado.
+
+     A regra é o que se ENXERGA: sem texto visível, o campo está vazio. */
+  campo.value = area.textContent.trim() === "" ? "" : html;
+}
+
+/* Colar sempre como texto puro (ver o comentário do bloco). */
+function edColar(ev){
+  ev.preventDefault();
+  const texto = (ev.clipboardData || window.clipboardData).getData("text/plain");
+  document.execCommand("insertText", false, texto);
+}
+
+/* O texto sem marcação nenhuma, para onde só cabe uma linha (listas, resumos).
+   Usa o próprio navegador para interpretar o HTML: mais confiável que tentar
+   remover tags com expressão regular, que erra em atributo com ">" dentro. */
+function semHtml(html){
+  if(!html) return "";
+  const d = document.createElement("div");
+  d.innerHTML = html;
+  return (d.textContent || "").replace(/\s+/g, " ").trim();
+}
+
+/* ==========================================================================
+   AUDITORIA — a trilha de tudo que acontece no sistema
+
+   É a única tela que pagina no SERVIDOR. As demais recebem a lista inteira e
+   fatiam aqui, porque são listas de tamanho humano. A auditoria ganha uma linha
+   por ação de cada pessoa, todo dia, para sempre — trazê-la inteira travaria o
+   navegador e carregaria dado sensível à toa para a memória do cliente.
+   ========================================================================== */
+let AU_PAGINA = 1, AU_POR = 30, AU_FILTROS_MONTADOS = false;
+
+const AU_CLASSE = {           // cor da etiqueta por tipo de ação
+  login:"entrada", logout:"saida", login_falhou:"alerta",
+  criar:"criar", editar:"editar", excluir:"excluir",
+  inativar:"editar", reativar:"criar", alta:"editar", reabrir:"criar",
+  backup:"alerta", senha:"alerta", bloquear:"alerta",
+};
+
+async function carregarAuditoria(pagina){
+  if(pagina) AU_PAGINA = pagina;
+  const corpo = $("#au-tabela");
+  const p = new URLSearchParams({ pagina: AU_PAGINA, por: AU_POR });
+  for(const [campo, chave] of [["au-de","de"],["au-ate","ate"],["au-usuario","usuario"],["au-acao","acao"],["au-modulo","modulo"]]){
+    const v = $("#"+campo)?.value; if(v) p.set(chave, v);
+  }
+  corpo.innerHTML = '<tr><td class="vazio">Carregando…</td></tr>';
+  try{
+    const d = await api("auditoria?"+p.toString());
+    montarFiltrosAuditoria(d);
+    pintarAuditoria(d);
+  }catch(e){
+    corpo.innerHTML = '<tr><td class="vazio">'+escA(e.message||"Não consegui carregar.")+'</td></tr>';
+    $("#au-paginacao").innerHTML = "";
+  }
+}
+
+/* Os seletores de ação, tela e pessoa vêm do servidor e são montados UMA vez —
+   remontar a cada filtragem perderia a opção que o usuário acabou de escolher. */
+function montarFiltrosAuditoria(d){
+  if(AU_FILTROS_MONTADOS) return;
+  AU_FILTROS_MONTADOS = true;
+  const preencher = (id, itens) => {
+    const s = $("#"+id);
+    s.innerHTML = s.options[0].outerHTML + itens.map(([v,r])=>`<option value="${escA(v)}">${escA(r)}</option>`).join("");
+  };
+  preencher("au-acao", Object.entries(d.rotulos||{}));
+  preencher("au-modulo", Object.entries(d.modulos||{}));
+  preencher("au-usuario", (d.usuarios||[]).map((u)=>[String(u.id), u.nome||("#"+u.id)]));
+}
+
+function pintarAuditoria(d){
+  const linhas = d.linhas || [];
+  if(!linhas.length){
+    $("#au-tabela").innerHTML = '<tr><td class="vazio">Nenhum registro no período.</td></tr>';
+    $("#au-paginacao").innerHTML = "";
+    return;
+  }
+  const quando = (iso) => {
+    const dt = new Date(iso);
+    if(isNaN(dt)) return escA(iso||"");
+    return dt.toLocaleDateString("pt-BR")+"<br>"+dt.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  };
+  $("#au-tabela").innerHTML =
+    '<tr><th style="width:96px">Data / hora</th><th style="width:150px">Usuário</th>'
+    + '<th style="width:130px">Ação</th><th style="width:120px">Tela</th>'
+    + '<th>O que foi feito</th><th style="width:118px">Origem</th></tr>'
+    + linhas.map((l)=>{
+        const clicavel = l.tem_detalhe;
+        return `<tr class="${clicavel?"au-clicavel":""}"${clicavel?` onclick="verDetalheAuditoria(${l.id})"`:""}>
+          <td class="au-quando">${quando(l.criado)}</td>
+          <td>${escA(l.usuario_nome||"—")}${l.perfil?`<br><small style="color:var(--dim)">${escA(PERFIL_ROTULO[l.perfil]||l.perfil)}</small>`:""}</td>
+          <td><span class="au-tag ${AU_CLASSE[l.acao]||""}">${escA((d.rotulos||{})[l.acao]||l.acao)}</span></td>
+          <td>${escA(l.modulo?((d.modulos||{})[l.modulo]||l.modulo):"—")}</td>
+          <td class="au-resumo">${escA(l.resumo||"—")}${clicavel?' <span class="au-lupa">· ver detalhes</span>':""}</td>
+          <td class="au-ip">${escA(l.ip||"—")}</td>
+        </tr>`;
+      }).join("");
+
+  const ini = (d.pagina-1)*d.porPagina + 1;
+  const fim = Math.min(d.pagina*d.porPagina, d.total);
+  $("#au-paginacao").innerHTML =
+    `<span>${d.total ? `${ini}–${fim} de ${d.total}` : "nenhum"}</span>`
+    + `<select onchange="AU_POR=Number(this.value);carregarAuditoria(1)" style="width:auto;padding:.3rem .5rem">`
+    + [10,30,50,100,200].map((n)=>`<option value="${n}"${n===d.porPagina?" selected":""}>${n} por página</option>`).join("")
+    + `</select>`
+    + `<button onclick="carregarAuditoria(1)" ${d.pagina<=1?"disabled":""}>« primeira</button>`
+    + `<button onclick="carregarAuditoria(${d.pagina-1})" ${d.pagina<=1?"disabled":""}>‹ anterior</button>`
+    + `<span class="atual">${d.pagina} / ${d.paginas}</span>`
+    + `<button onclick="carregarAuditoria(${d.pagina+1})" ${d.pagina>=d.paginas?"disabled":""}>próxima ›</button>`
+    + `<button onclick="carregarAuditoria(${d.paginas})" ${d.pagina>=d.paginas?"disabled":""}>última »</button>`;
+}
+
+function limparAuditoria(){
+  ["au-de","au-ate","au-usuario","au-acao","au-modulo"].forEach((id)=>{ $("#"+id).value=""; });
+  carregarAuditoria(1);
+}
+
+/* O detalhe é buscado só no clique: ele carrega o antes/depois completo, que
+   pode ser grande e é dado sensível — não faz sentido trafegar isso para as
+   30 linhas da tabela quando o usuário vai olhar uma. */
+async function verDetalheAuditoria(id){
+  const host = $("#modal-host");
+  host.innerHTML = `<div class="modal-bg"><div class="modal" style="width:min(820px,96vw)">
+    <h2>Detalhe da ação</h2><div class="modal-corpo"><p class="vazio">Carregando…</p></div></div></div>`;
+  try{
+    const d = await api("auditoria/"+id);
+    const dt = new Date(d.criado);
+    const meta = [
+      ["Quando", isNaN(dt) ? d.criado : dt.toLocaleString("pt-BR")],
+      ["Usuário", d.usuario_nome || "—"],
+      ["Perfil", PERFIL_ROTULO[d.perfil] || d.perfil || "—"],
+      ["Ação", d.rotulo],
+      ["Tela", d.modulo_rotulo || "—"],
+      ["Registro", d.entidade_id ? "#"+d.entidade_id : "—"],
+      ["IP de origem", d.ip || "—"],
+      ["Rota", (d.metodo||"")+" "+(d.rota||"")],
+    ];
+    host.querySelector(".modal-corpo").innerHTML =
+      `<p style="margin-bottom:1rem"><b>${escA(d.resumo||"")}</b></p>`
+      + `<div class="au-meta">${meta.map(([r,v])=>`<div><span>${escA(r)}</span><b>${escA(String(v))}</b></div>`).join("")}</div>`
+      + corpoDetalheAuditoria(d.detalhe);
+    host.querySelector(".modal").insertAdjacentHTML("beforeend",
+      `<div class="acoes"><button class="btn btn-ghost" onclick="fecharModal()">Fechar</button></div>`);
+  }catch(e){
+    host.querySelector(".modal-corpo").innerHTML = '<p class="vazio">'+escA(e.message||"Não consegui carregar.")+'</p>';
+  }
+}
+
+function corpoDetalheAuditoria(det){
+  if(!det) return '<p class="vazio">Sem detalhes registrados.</p>';
+
+  // EDIÇÃO: mostra campo a campo o que virou o quê
+  if(det.alteracoes){
+    const itens = Object.entries(det.alteracoes);
+    if(!itens.length) return '<p class="vazio">Nada mudou.</p>';
+    return `<h3 style="font-size:.95rem;margin-bottom:.5rem">O que mudou (${itens.length})</h3>`
+      + `<table class="au-dif"><tr><th style="width:150px">Campo</th><th>Antes</th><th>Depois</th></tr>`
+      + itens.map(([campo,v])=>`<tr>
+          <td><b>${escA(campo)}</b>${v.protegido?'<br><small style="color:var(--dim)">protegido</small>':""}</td>
+          <td class="au-de">${escA(v.de||"—")}</td>
+          <td class="au-para">${escA(v.para||"—")}</td>
+        </tr>`).join("")
+      + `</table>`;
+  }
+  // CRIAÇÃO: os campos preenchidos no cadastro
+  if(det.campos) return listaCamposAuditoria("Dados informados", det.campos);
+  // EXCLUSÃO: o registro que deixou de existir
+  if(det.registro_excluido) return listaCamposAuditoria("Registro excluído", det.registro_excluido);
+  // demais ações: o JSON como está
+  return `<h3 style="font-size:.95rem;margin-bottom:.5rem">Detalhes</h3>`
+    + `<div class="au-json">${escA(JSON.stringify(det,null,2))}</div>`;
+}
+
+function listaCamposAuditoria(titulo, obj){
+  const itens = Object.entries(obj).filter(([,v])=>v!==null&&v!==undefined&&v!=="");
+  if(!itens.length) return '<p class="vazio">Nenhum campo preenchido.</p>';
+  return `<h3 style="font-size:.95rem;margin-bottom:.5rem">${escA(titulo)} (${itens.length})</h3>`
+    + `<table class="au-dif"><tr><th style="width:170px">Campo</th><th>Conteúdo</th></tr>`
+    + itens.map(([k,v])=>`<tr><td><b>${escA(k)}</b></td><td>${escA(typeof v==="object"?JSON.stringify(v):String(v))}</td></tr>`).join("")
+    + `</table>`;
+}
+
+/* ==========================================================================
+   SOBRE O SISTEMA
+
+   Tudo vem do servidor (versão, histórico, tecnologias, banco). Nada é escrito
+   na tela: se a lista morasse aqui, ela envelheceria em silêncio enquanto o
+   sistema sobe de versão — e a tela passaria a mentir sobre o que está no ar.
+   ========================================================================== */
+let SOBRE_CARREGADO = false;
+
+async function carregarSobre(){
+  if(SOBRE_CARREGADO) return;                 // não recarrega a cada visita
+  const alvo = $("#sobre-corpo");
+  try{
+    const d = await api("sobre");
+    alvo.innerHTML = montarSobre(d);
+    SOBRE_CARREGADO = true;
+  }catch(e){
+    alvo.innerHTML = '<div class="card"><p class="vazio">'+escA(e.message||"Não consegui carregar.")+'</p></div>';
+  }
+}
+
+function montarSobre(d){
+  const lista = (itens) => '<ul class="sb-lista">'+itens.map((t)=>"<li>"+escA(t)+"</li>").join("")+"</ul>";
+  const dataBR = (iso) => { const p=String(iso||"").split("-"); return p.length===3 ? p[2]+"/"+p[1]+"/"+p[0] : ""; };
+
+  const atual = d.historico[0] || { versao:d.versao, titulo:"", mudancas:[] };
+  const anteriores = d.historico.slice(1);
+
+  /* --- versão atual em destaque --- */
+  let h = '<div class="card sb-atual">'
+    + '<div style="display:flex;align-items:center;gap:.7rem;flex-wrap:wrap">'
+    +   '<span class="sb-selo">VERSÃO ATUAL</span>'
+    +   '<h2 style="margin:0">v'+escA(atual.versao)+'</h2>'
+    +   '<span class="sb-data">'+escA(dataBR(atual.data))+'</span>'
+    + '</div>'
+    + (atual.titulo ? '<h3 style="margin:.6rem 0 0;font-size:1rem">'+escA(atual.titulo)+'</h3>' : '')
+    + lista(atual.mudancas)
+    + '</div>';
+
+  /* --- banco de dados ativo --- */
+  const b = d.banco || {};
+  h += '<div class="card"><h3 style="margin-bottom:.8rem">Banco de dados ativo</h3>';
+  if(b.conectado){
+    h += '<div class="sb-banco">'
+      + '<div><span>Motor</span><b>'+escA(b.motor)+(b.versao?" "+escA(b.versao):"")+'</b></div>'
+      + '<div><span>Base</span><b>'+escA(b.base)+'</b></div>'
+      + '<div><span>Usuário</span><b>'+escA(b.usuario)+'</b></div>'
+      + '<div><span>Tamanho</span><b>'+escA(b.tamanho)+'</b></div>'
+      + '<div><span>Migrations</span><b>'+escA(String(b.migrations))+'</b></div>'
+      + '</div>'
+      + (b.ultimaMigration ? '<p style="margin-top:.7rem;font-size:.82rem;color:var(--dim)">Última alteração de estrutura: '+escA(b.ultimaMigration)+'</p>' : '');
+  } else {
+    h += '<p style="color:var(--red)">Não conectado'+(b.erro?" — "+escA(b.erro):"")+'</p>';
+  }
+  h += '</div>';
+
+  /* --- tecnologias --- */
+  h += '<div class="card"><h3 style="margin-bottom:.3rem">Tecnologias do sistema</h3>'
+    + '<p style="font-size:.83rem;color:var(--dim);margin-bottom:.8rem">O que faz o sistema de gestão funcionar. O site do instituto é outro projeto, com outra estrutura.</p>'
+    + '<div class="sb-tec">'
+    + d.tecnologias.map((t)=>'<div><b>'+escA(t.nome)+'</b><span>'+escA(t.papel)+'</span>'
+        +(t.detalhe?'<small>'+escA(t.detalhe)+'</small>':'')+'</div>').join("")
+    + '</div></div>';
+
+  /* --- versões anteriores em sanfona --- */
+  if(anteriores.length){
+    h += '<div class="card"><h3 style="margin-bottom:.8rem">Versões anteriores</h3>'
+      + anteriores.map((v,i)=>
+          '<div class="sb-acc" data-acc="'+i+'">'
+          + '<button type="button" class="sb-cab" onclick="alternarVersao(this)" aria-expanded="false">'
+          +   '<b>v'+escA(v.versao)+'</b>'
+          +   '<span class="sb-tit">'+escA(v.titulo||"")+'</span>'
+          +   '<span class="sb-data" style="color:var(--dim)">'+escA(dataBR(v.data))+'</span>'
+          +   '<span class="sb-seta">▾</span>'
+          + '</button>'
+          + '<div class="sb-corpo" hidden>'+lista(v.mudancas)+'</div>'
+          + '</div>').join("")
+      + '</div>';
+  }
+  return h;
+}
+
+function alternarVersao(botao){
+  const caixa = botao.closest(".sb-acc");
+  const corpo = caixa.querySelector(".sb-corpo");
+  const abrindo = corpo.hidden;
+  corpo.hidden = !abrindo;
+  caixa.classList.toggle("aberta", abrindo);
+  botao.setAttribute("aria-expanded", abrindo ? "true" : "false");
+}
+
+/* ==========================================================================
+   BACKUP DO BANCO — baixa o dump SQL completo da gestão
+
+   Não uso um <a download> simples porque, se o servidor responder erro, o
+   navegador salvaria o JSON do erro como se fosse o backup — e o usuário
+   guardaria um arquivo inútil achando que está protegido. Buscando por fetch
+   dá para conferir a resposta ANTES de salvar.
+
+   Em compensação o arquivo passa pela memória do navegador. Para o tamanho
+   deste banco (uma OSC, não uma rede) isso é irrelevante.
+   ========================================================================== */
+async function baixarBackup(botao){
+  const rotulo = botao.textContent;
+  botao.disabled = true; botao.textContent = "Gerando backup…";
+  try{
+    const r = await fetch("/restrito/api/backup/sql", { credentials: "same-origin" });
+    if(!r.ok){
+      let msg = "Não consegui gerar o backup.";
+      try{ msg = (await r.json()).error || msg; }catch{}
+      throw new Error(msg);
+    }
+    const blob = await r.blob();
+    // o nome do arquivo vem do Content-Disposition que o servidor mandou
+    const cd = r.headers.get("Content-Disposition") || "";
+    const nome = (/filename="([^"]+)"/.exec(cd) || [])[1] || "kenosis-gestao.sql";
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = nome;
+    document.body.appendChild(a); a.click(); a.remove();
+    // sem o revoke, o blob (o banco inteiro) fica preso na memória da aba
+    setTimeout(()=>URL.revokeObjectURL(url), 30000);
+    toast("Backup baixado: "+nome);
+  }catch(e){
+    toast(e.message, true);
+  }finally{
+    botao.disabled = false; botao.textContent = rotulo;
+  }
+}
+
 async function iniciarApp(me){
   ME=me;
   $("#login").hidden=true; $("#app").hidden=false;
   $("#quem").textContent=me.nome+" · "+(PERFIL_ROTULO[me.perfil]||me.perfil);
+  /* O backup leva o instituto inteiro embora num arquivo — CPF, endereço e
+     prontuário de todo mundo. Só o admin. Esconder aqui é conforto; quem barra
+     de verdade é o servidor, que responde 403 para os demais. O mesmo vale
+     para o painel do site, que edita o conteúdo público. */
+  const soAdmin = me.perfil === "admin";
+  $("#btn-backup").hidden = !soAdmin;
+  $("#sep-backup").hidden = !soAdmin;
+  $("#ap-admin").hidden = !soAdmin;
   aplicarPermissoes(me.perfil);
   $("#dl-esp").innerHTML=ESPECIALIDADES.map((e)=>`<option value="${escA(e)}">`).join("");
   await recarregarCache();
@@ -518,11 +1305,38 @@ document.querySelectorAll(".navbtn[data-nav]").forEach((b)=>b.addEventListener("
   document.querySelectorAll(".panel").forEach((x)=>x.classList.remove("on"));
   if(nav==="painel"){ $("#pane-painel").classList.add("on"); carregarPainel(); }
   else if(nav==="conta"){ $("#pane-conta").classList.add("on"); }
+  else if(nav==="sobre"){ $("#pane-sobre").classList.add("on"); carregarSobre(); }
+  else if(nav==="auditoria"){ $("#pane-auditoria").classList.add("on"); carregarAuditoria(1); }
   else if(nav==="relatorios"){ $("#pane-relatorios").classList.add("on"); carregarRelatorios(); }
+  else if(nav==="relatorios_pacientes"){ $("#pane-relpac").classList.add("on"); carregarRelacaoPacientes(); }
   else { MOD=nav; $("#pane-mod").classList.add("on"); mostrarModulo(); }
   fecharDropdowns(); marcarTriggers();
 }));
 /* dropdown da conta (topo direito): abre no clique além do hover */
+/* ==========================================================================
+   ATALHO PARA OS OUTROS SISTEMAS (os 9 pontos)
+
+   O item "Painel do site" leva para /restrito/painel-do-site, que valida a sessão do
+   /restrito NO SERVIDOR e cria a sessão do painel sem pedir senha de novo.
+   Nenhuma credencial passa pelo navegador — o link é só uma navegação comum.
+   ========================================================================== */
+function abrirAtalhos(ev){
+  ev.stopPropagation();
+  const d=$("#ap-drop");
+  const abrindo=!d.classList.contains("aberto");
+  fecharDropdowns(); fecharMenusLinha(); d.classList.remove("aberto");
+  if(!abrindo) return;
+  d.classList.add("aberto");
+  $("#ap-trigger").setAttribute("aria-expanded","true");
+}
+function fecharAtalhos(){
+  const d=$("#ap-drop"); if(!d) return;
+  d.classList.remove("aberto");
+  $("#ap-trigger")?.setAttribute("aria-expanded","false");
+}
+document.addEventListener("click", fecharAtalhos);
+document.addEventListener("keydown",(e)=>{ if(e.key==="Escape") fecharAtalhos(); });
+
 function fecharDropdowns(){ document.querySelectorAll(".tn-drop.open").forEach((d)=>d.classList.remove("open")); }
 // marca a seção/aba ativa e mantém aberta a seção lateral do item selecionado
 function marcarTriggers(){
@@ -555,11 +1369,225 @@ async function carregarPainel(){
 
 /* ==================== lista genérica de um módulo ===================== */
 let vistaAgenda = "tabela", agendaYM = null;
+/* ==========================================================================
+   FILTRO DE PERÍODO — dois campos, início e fim.
+
+   Cada tela guarda o seu par de datas, então trocar de módulo não embaralha o
+   filtro do outro. Qualquer um dos lados pode ficar vazio: só início = "daí em
+   diante", só fim = "até essa data".
+   ========================================================================== */
+const PERIODOS = {};                       // { atendimentos:{de,ate}, … }
+const periodoDe = (chave) => (PERIODOS[chave] = PERIODOS[chave] || { de:"", ate:"" });
+/* A data do registro só com a parte AAAA-MM-DD — `data` quando existe (é a
+   data do fato) e, na falta dela, `criado` (o carimbo de cadastro). */
+const dataDoRegistro = (r) => String(r.data || r.criado || "").slice(0,10);
+function dentroDoPeriodo(r, chave){
+  const p = periodoDe(chave);
+  if(!p.de && !p.ate) return true;
+  const d = dataDoRegistro(r);
+  if(!d) return false;                     // sem data não entra num recorte por data
+  if(p.de && d < p.de) return false;
+  if(p.ate && d > p.ate) return false;
+  return true;
+}
+/* Quem recarrega a tela quando o período muda. Um mapa, e não o nome da função
+   em texto: a CSP do /restrito proíbe `unsafe-eval`, então nada de
+   `new Function(...)` — e é melhor assim, o destino fica explícito. */
+const APLICAR_PERIODO = {
+  relatorios: () => aplicarPeriodoRelatorio(),
+  atendimentos: () => aplicarPeriodoLista(),
+  prontuario: () => aplicarPeriodoLista(),
+  beneficios: () => aplicarPeriodoLista(),
+  eventos: () => aplicarPeriodoLista(),
+  documentos_gestao: () => aplicarPeriodoLista(),
+};
+function mudouPeriodo(chave){ (APLICAR_PERIODO[chave] || (()=>{}))(); }
+/* O "Limpar" é desenhado SEMPRE e apenas se esconde: o HTML do filtro só é
+   montado ao entrar na tela, então um botão condicional nunca apareceria depois
+   de o usuário digitar uma data. Quem o mostra/esconde é pintarPeriodo(). */
+function periodoHTML(chave){
+  const p = periodoDe(chave);
+  return `<label>De</label><input type="date" id="pd-${chave}-de" value="${escA(p.de)}" onchange="mudouPeriodo('${chave}')">
+    <label>até</label><input type="date" id="pd-${chave}-ate" value="${escA(p.ate)}" onchange="mudouPeriodo('${chave}')">
+    <button class="btn btn-ghost btn-sm" id="pd-${chave}-limpar" onclick="limparPeriodo('${chave}')" hidden>Limpar</button>
+    <span class="pd-info" id="pd-${chave}-info"></span>`;
+}
+function pintarPeriodo(chave, texto){
+  const p = periodoDe(chave), ativo = !!(p.de || p.ate);
+  const bt = $("#pd-"+chave+"-limpar"); if(bt) bt.hidden = !ativo;
+  const inf = $("#pd-"+chave+"-info"); if(inf) inf.textContent = texto;
+}
+function lerPeriodo(chave){
+  const p = periodoDe(chave);
+  const de=$("#pd-"+chave+"-de"), ate=$("#pd-"+chave+"-ate");
+  p.de = de?de.value:""; p.ate = ate?ate.value:"";
+  // início depois do fim não filtra nada: avisa em vez de mostrar lista vazia
+  if(p.de && p.ate && p.de > p.ate){ const t=p.de; p.de=p.ate; p.ate=t;
+    if(de) de.value=p.de; if(ate) ate.value=p.ate;
+    toast("As datas estavam invertidas — corrigi a ordem.");
+  }
+  return p;
+}
+function limparPeriodo(chave){
+  const p = periodoDe(chave); p.de=""; p.ate="";
+  const de=$("#pd-"+chave+"-de"), ate=$("#pd-"+chave+"-ate");
+  if(de) de.value=""; if(ate) ate.value="";
+  mudouPeriodo(chave);
+}
+/* Telas em que filtrar por data faz sentido — a data que importa em cada uma. */
+const COM_PERIODO = new Set(["atendimentos","prontuario","beneficios","eventos","documentos_gestao"]);
+const filtroData = () => { const p=PERIODOS[MOD]; return !!(p && (p.de||p.ate)); };
+function aplicarPeriodoLista(){ lerPeriodo(MOD); renderPeriodoInfo(); reiniciarPagina(MOD); carregarLista(); }
+function renderPeriodoInfo(){
+  const p=periodoDe(MOD);
+  pintarPeriodo(MOD, (p.de||p.ate)
+    ? `mostrando ${p.de?"de "+dataBR(p.de):"tudo"}${p.ate?" até "+dataBR(p.ate):" em diante"}`
+    : "");
+}
+
+/* ==========================================================================
+   PAGINAÇÃO
+
+   Uma tabela de 800 usuários trava o navegador e não se lê. Cada tela guarda o
+   seu tamanho de página e a página atual, então trocar de módulo não embaralha
+   o outro.
+
+   Quem pagina é a TELA, não o banco: as listas daqui são de tamanho humano e
+   já sobem inteiras (a busca por CPF, aliás, depende disso — o campo é cifrado
+   e o recorte acontece depois de decifrar). A única lista que pagina no
+   servidor é a auditoria, que cresce para sempre.
+
+   Trocar de tamanho volta para a página 1 — senão, quem estava na página 9 de
+   10-em-10 cairia num vazio ao passar para 100-em-100.
+   ========================================================================== */
+const TAMANHOS_PAGINA = [10, 15, 30, 50, 100];
+const PAG = {};
+const pagDe = (chave) => (PAG[chave] = PAG[chave] || { tam: 15, pag: 1 });
+/* Recorta a lista e devolve o pedaço + o que a barra precisa saber. */
+function fatiar(chave, lista){
+  const p = pagDe(chave);
+  const paginas = Math.max(1, Math.ceil(lista.length / p.tam));
+  if(p.pag > paginas) p.pag = paginas;      // a lista encolheu (filtro/exclusão)
+  if(p.pag < 1) p.pag = 1;
+  const ini = (p.pag - 1) * p.tam;
+  return { itens: lista.slice(ini, ini + p.tam), total: lista.length, paginas, pagina: p.pag, ini };
+}
+function barraPaginacao(alvo, chave, info){
+  const el = $("#" + alvo); if(!el) return;
+  if(!info.total){ el.innerHTML = ""; return; }
+  const p = pagDe(chave);
+  const de = info.ini + 1, ate = Math.min(info.ini + p.tam, info.total);
+  const bt = (num, rot, ativo, desab) =>
+    `<button class="pgbtn${ativo?" on":""}" ${desab?"disabled":""} onclick="irParaPagina('${chave}',${num})">${rot}</button>`;
+  /* Só as páginas em volta da atual: com 40 páginas, mostrar todas é pior que
+     não mostrar nenhuma. */
+  const paginas = [];
+  const ini = Math.max(1, info.pagina - 2), fim = Math.min(info.paginas, info.pagina + 2);
+  if(ini > 1) paginas.push(bt(1, "1", false, false), ini > 2 ? `<span class="pgsep">…</span>` : "");
+  for(let i = ini; i <= fim; i++) paginas.push(bt(i, String(i), i === info.pagina, false));
+  if(fim < info.paginas) paginas.push(fim < info.paginas - 1 ? `<span class="pgsep">…</span>` : "", bt(info.paginas, String(info.paginas), false, false));
+
+  el.innerHTML = `
+    <label class="pglbl">Mostrar</label>
+    <select class="pgsel" onchange="mudarTamanhoPagina('${chave}',this.value)">
+      ${TAMANHOS_PAGINA.map((num)=>`<option value="${num}"${num===p.tam?" selected":""}>${num}</option>`).join("")}
+    </select>
+    <span class="pginfo">${de}–${ate} de ${info.total}</span>
+    ${info.paginas > 1 ? `<span class="pgnav">
+      ${bt(info.pagina-1, "‹", false, info.pagina<=1)}
+      ${paginas.join("")}
+      ${bt(info.pagina+1, "›", false, info.pagina>=info.paginas)}
+    </span>` : ""}`;
+}
+function repintarPagina(chave){
+  if(chave === "relpac") return pintarRelpacTabela();
+  return MOD === "atendimentos" ? pintarAtendimentos() : renderTabela();
+}
+function mudarTamanhoPagina(chave, valor){
+  const p = pagDe(chave);
+  p.tam = Number(valor) || 15;
+  p.pag = 1;
+  repintarPagina(chave);
+}
+function irParaPagina(chave, num){
+  const p = pagDe(chave);
+  p.pag = Math.max(1, Number(num) || 1);
+  repintarPagina(chave);
+  // volta ao topo da lista: mudar de página e continuar no rodapé desorienta
+  const cx = $("#pane-mod.on") || $("#pane-relpac.on");
+  if(cx) cx.scrollIntoView({ block: "start" });
+}
+/* Filtro, busca ou troca de módulo recomeçam da primeira página. */
+function reiniciarPagina(chave){ pagDe(chave).pag = 1; }
+/* Digitar na busca recomeça da primeira página: filtrar e continuar na página 7
+   quase sempre mostra "nenhum registro" mesmo havendo resultado. */
+function buscarNaLista(){ reiniciarPagina(MOD); carregarLista(); }
+
+/* ==========================================================================
+   SITUAÇÃO DO USUÁRIO — ativo, inativo ou todos
+
+   Começa em ATIVOS: é a lista com que a equipe trabalha no dia a dia. Quem foi
+   inativado continua no sistema inteiro, a um clique de distância — inativar
+   não é excluir, e a tela precisa deixar isso evidente.
+   ========================================================================== */
+let filtroSituacao = "1";                 // "1" ativos · "0" inativos · "" todos
+function montarFiltroSituacao(){
+  const alvo = $("#mod-situacao");
+  if(MOD !== "pacientes"){ alvo.innerHTML = ""; return; }
+  const bt = (v,r) => `<button class="vbtn${filtroSituacao===v?" on":""}" onclick="trocarSituacao('${v}')">${r}</button>`;
+  alvo.innerHTML = `<span class="pglbl">Mostrar:</span>
+    <span class="vista-toggle" style="margin:0">${bt("1","Ativos")}${bt("0","Inativos")}${bt("","Todos")}</span>`;
+}
+function trocarSituacao(v){ filtroSituacao = v; montarFiltroSituacao(); reiniciarPagina(MOD); renderTabela(); }
+const estaAtivo = (r) => r.ativo===null || r.ativo===undefined || Number(r.ativo)!==0;
+
+async function alternarAtivoPaciente(id, ativoAgora){
+  const r = CACHE.pacientes.find((x)=>String(x.id)===String(id));
+  const nome = r ? r.nome : "este usuário";
+  if(ativoAgora){
+    const motivo = prompt(`Inativar ${nome}?\n\nEle sai das telas de escolha (agenda, prontuário, benefícios) e da lista de ativos.\nNADA é apagado: ficha, prontuários e histórico continuam, e dá para reativar quando quiser.\n\nMotivo (opcional):`, "");
+    if(motivo===null) return;                        // cancelou
+    try{
+      const resp = await api(`pacientes/${id}/inativar`, "POST", { motivo });
+      await recarregarCache(); carregarLista();
+      toast(resp.atendimentosFuturos
+        ? `${nome} inativado — atenção: ${resp.atendimentosFuturos} atendimento(s) ainda marcado(s).`
+        : `${nome} inativado.`);
+    }catch(e){ toast(e.message, true); }
+    return;
+  }
+  if(!confirm(`Reativar ${nome}?\n\nEle volta a aparecer nas telas de escolha e na lista de ativos.`)) return;
+  try{ await api(`pacientes/${id}/reativar`, "POST", {});
+    await recarregarCache(); carregarLista(); toast(`${nome} reativado.`);
+  }catch(e){ toast(e.message, true); }
+}
+
+async function alternarBloqueio(id, ativoAgora){
+  const r = CACHE.profissionais.find((x)=>String(x.id)===String(id));
+  const nome = r ? r.nome : "este profissional";
+  const msg = ativoAgora
+    ? `Bloquear ${nome}?\n\nEle deixa de entrar no sistema — a sessão aberta cai na hora — e some das telas de agendamento.\nO histórico e os registros dele continuam guardados.`
+    : `Liberar ${nome}?\n\nEle volta a entrar no sistema e a aparecer nos agendamentos.`;
+  if(!confirm(msg)) return;
+  try{
+    const resp = await api(`profissionais/${id}/${ativoAgora?"bloquear":"liberar"}`, "POST", {});
+    await recarregarCache(); carregarLista();
+    toast(ativoAgora
+      ? (resp.tinhaLogin ? "Profissional bloqueado e sessão encerrada." : "Profissional bloqueado (ele não tinha login).")
+      : "Profissional liberado.");
+  }catch(e){ toast(e.message, true); }
+}
+
 function mostrarModulo(){
   const m=MODULOS[MOD];
   $("#mod-titulo").textContent=m.titulo;
   $("#mod-novo").textContent="+ "+(m.novo||"Novo");
   $("#mod-busca").hidden=!m.busca; $("#mod-busca").value="";
+  reiniciarPagina(MOD);
+  montarFiltroSituacao();
+  $("#mod-relacao").hidden = MOD !== "pacientes";
+  $("#mod-periodo").innerHTML = COM_PERIODO.has(MOD) ? periodoHTML(MOD) : "";
+  if(COM_PERIODO.has(MOD)) renderPeriodoInfo();
   $("#mod-thead").innerHTML="<tr>"+m.colunas.map(([,lab])=>`<th>${lab}</th>`).join("")+"<th></th></tr>";
   const ehAgenda = MOD==="atendimentos";
   $("#mod-vistas").hidden=!ehAgenda;
@@ -585,6 +1613,10 @@ function celula(row,[chave,,tipo]){
   const v=row[chave];
   if(tipo==="data") return dataBR(v);
   if(tipo==="bool") return Number(v)?'<span class="tag tag-sim">Sim</span>':'<span class="tag tag-nao">Não</span>';
+  /* Ficha sem a coluna preenchida (cadastro anterior à migration) conta como
+     ATIVA — o contrário faria o cadastro inteiro parecer desligado. */
+  if(tipo==="situacao") return (v===null||v===undefined||Number(v)!==0)
+    ? '<span class="tag tag-Ativo">Ativo</span>' : '<span class="tag tag-Inativo">Inativo</span>';
   if(tipo==="tag"&&v) return `<span class="tag tag-${escA(v)}">${escA(v)}</span>`;
   if(tipo==="pac") return escA(nomePac(v));
   if(tipo==="prof") return escA(nomeProf(v));
@@ -603,14 +1635,119 @@ async function carregarLista(){
   else renderTabela();
 }
 // na agenda, aplica o filtro vindo do relatório (serviço/situação/mês)
-function dadosVisiveis(){ return MOD==="atendimentos" ? aplicarFiltroAgenda(LISTA) : LISTA; }
+function dadosVisiveis(){
+  let base = MOD==="atendimentos" ? aplicarFiltroAgenda(LISTA) : LISTA;
+  if(MOD==="pacientes" && filtroSituacao!=="")
+    base = base.filter((r)=> estaAtivo(r) === (filtroSituacao==="1"));
+  return COM_PERIODO.has(MOD) ? base.filter((r)=>dentroDoPeriodo(r, MOD)) : base;
+}
+/* ==========================================================================
+   AÇÕES DA LINHA
+
+   Em Usuários há MAIS DE UMA ação por linha (imprimir a ficha e abrir).
+   Enfileirados, os botões empurravam a tabela para o lado. Ali as ações vão
+   para um menu de três pontos, e "Abrir" é o primeiro item.
+
+   Nos demais existe uma ação só, e um menu para um item seria um clique a mais
+   para nada: fica o ícone de lupa.
+   ========================================================================== */
+const MENU_TRES_PONTOS = new Set(["pacientes", "profissionais"]);
+
+function acoesDaLinha(m, row){
+  const itens=[];
+  if(m.imprimir) itens.push(["Imprimir ficha", `imprimirFicha(${row.id})`]);
+  if(MOD==="pacientes"){
+    const at=estaAtivo(row);
+    itens.push([at?"Inativar usuário":"Reativar usuário", `alternarAtivoPaciente(${row.id},${at?1:0})`]);
+  }
+  if(MOD==="profissionais"){
+    const at=Number(row.ativo)!==0;
+    itens.push([at?"Bloquear acesso":"Liberar acesso", `alternarBloqueio(${row.id},${at?1:0})`]);
+  }
+  const abrir=`abrirForm(${row.id})`;
+
+  if(MENU_TRES_PONTOS.has(MOD)){
+    itens.unshift(["Abrir", abrir]);
+    return `<div class="acao-menu">
+      <button type="button" class="acao-trigger" aria-haspopup="true" aria-expanded="false"
+              title="Ações" aria-label="Ações desta linha" onclick="abrirMenuLinha(this,event)">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>
+      </button>
+      <div class="acao-lista" role="menu">${
+        itens.map(([rot,fn])=>`<button type="button" role="menuitem" onclick="${escA(fn)}">${escA(rot)}</button>`).join("")
+      }</div></div>`;
+  }
+  /* Fora desse módulo, as ações extras (se houver) continuam como botões e a
+     de abrir vira a lupa. */
+  return itens.map(([rot,fn])=>`<button class="btn btn-ghost btn-sm" onclick="${escA(fn)}">${escA(rot)}</button> `).join("")
+    + `<button type="button" class="acao-lupa" title="Abrir" aria-label="Abrir" onclick="${escA(abrir)}">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+      </button>`;
+}
+
+/* Um menu aberto por vez, e fecha ao clicar fora ou apertar Esc. Sem isso,
+   percorrer a lista deixaria um rastro de menus abertos pela tela. */
+function fecharMenusLinha(){ document.querySelectorAll(".acao-menu.aberto").forEach((d)=>{
+  d.classList.remove("aberto"); d.querySelector(".acao-trigger")?.setAttribute("aria-expanded","false"); }); }
+
+function abrirMenuLinha(botao, ev){
+  ev.stopPropagation();
+  const caixa=botao.closest(".acao-menu");
+  const abrindo=!caixa.classList.contains("aberto");
+  fecharMenusLinha();
+  if(!abrindo) return;
+  caixa.classList.add("aberto");
+  botao.setAttribute("aria-expanded","true");
+  posicionarMenuLinha(botao, caixa.querySelector(".acao-lista"));
+}
+
+/* Coloca o menu ao lado do botão usando coordenadas de JANELA (o menu é
+   `position:fixed` — ver o comentário no CSS). Precisa medir DEPOIS de exibir:
+   um elemento com display:none tem largura e altura zero. */
+function posicionarMenuLinha(botao, lista){
+  const b=botao.getBoundingClientRect();
+  const m=lista.getBoundingClientRect();
+  const folga=6;
+
+  // alinhado pela direita do botão; se não couber, encosta na borda da janela
+  let esq=b.right-m.width;
+  esq=Math.min(Math.max(esq, 8), window.innerWidth-m.width-8);
+
+  /* Abaixo do botão por padrão. Sem espaço embaixo, abre para cima — é o caso
+     das últimas linhas da tabela, onde antes o menu saía da tela. */
+  let topo=b.bottom+folga;
+  if(topo+m.height > window.innerHeight-8){
+    const acima=b.top-m.height-folga;
+    topo = acima >= 8 ? acima : Math.max(8, window.innerHeight-m.height-8);
+  }
+  lista.style.left=Math.round(esq)+"px";
+  lista.style.top=Math.round(topo)+"px";
+}
+
+document.addEventListener("click", fecharMenusLinha);
+document.addEventListener("keydown", (e)=>{ if(e.key==="Escape") fecharMenusLinha(); });
+/* Fecha ao rolar ou redimensionar. Um menu `fixed` fica parado enquanto a
+   tabela rola por baixo, e em segundos estaria apontando para a linha errada —
+   num sistema onde a ação é "excluir paciente", isso é perigoso, não só feio.
+   `true` na captura porque a rolagem acontece DENTRO do cartão da tabela e
+   esse evento não sobe até o document. */
+window.addEventListener("scroll", fecharMenusLinha, true);
+window.addEventListener("resize", fecharMenusLinha);
+
 function renderTabela(){
   const m=MODULOS[MOD], tb=$("#mod-tbody"), nc=m.colunas.length+1;
-  const dados=dadosVisiveis();
+  const todos=dadosVisiveis();
   const q=m.busca?$("#mod-busca").value.trim():"";
-  if(!dados.length){ tb.innerHTML=`<tr><td colspan="${nc}" class="vazio">Nenhum registro ${q||filtroAgenda?"encontrado":"cadastrado ainda"}.</td></tr>`; return; }
-  tb.innerHTML=dados.map((row)=>`<tr>${m.colunas.map((c)=>`<td>${celula(row,c)}</td>`).join("")}
-    <td style="text-align:right;white-space:nowrap">${m.imprimir?`<button class="btn btn-ghost btn-sm" onclick="imprimirFicha(${row.id})">Imprimir</button> `:""}<button class="btn btn-ghost btn-sm" onclick="abrirForm(${row.id})">Abrir</button></td></tr>`).join("");
+  if(!todos.length){
+    tb.innerHTML=`<tr><td colspan="${nc}" class="vazio">Nenhum registro ${q||filtroAgenda||filtroData()?"encontrado":"cadastrado ainda"}.</td></tr>`;
+    barraPaginacao("mod-paginacao", MOD, { total:0 });
+    return;
+  }
+  const info=fatiar(MOD, todos);
+  barraPaginacao("mod-paginacao", MOD, info);
+  tb.innerHTML=info.itens.map((row)=>`<tr>${m.colunas.map((c)=>`<td>${celula(row,c)}</td>`).join("")}
+    <td class="col-acoes">${acoesDaLinha(m,row)}</td></tr>`).join("");
 }
 
 /* -------------------- vista Agenda (calendário do mês) ------------------ */
@@ -697,6 +1834,7 @@ function campoHTML(campo, val){
     return wrap(`<label style="display:flex;gap:.5rem;align-items:center;margin-top:1.1rem;cursor:pointer;color:var(--text)"><input type="checkbox" id="${id}" style="width:auto" ${Number(val)?"checked":""}> ${lab}</label>`,op.full);
   let ctrl;
   if(tipo==="textarea") ctrl=`<textarea id="${id}">${escA(val||"")}</textarea>`;
+  else if(tipo==="rico") ctrl=editorRico(id, val||"", false);
   else if(tipo==="password") ctrl=`<input id="${id}" type="password" autocomplete="new-password" value="">`;
   else if(tipo==="select"){
     const opts=op.bool?[["0","Não"],["1","Sim"]]:(op.opcoes||[]).map((o)=>Array.isArray(o)?o:[o,o]);
@@ -783,6 +1921,9 @@ async function abrirForm(id){
   }}
   // galerias de fotos já existentes
   for(const [k,,tipo] of m.campos) if(tipo==="fotos") desenharFotos("f-"+k);
+  // CEP preenchendo o endereço (Usuários e Associados têm os mesmos campos)
+  if($("#f-cep")) ligarBuscaCep("f-cep", { endereco:"f-endereco", numero:"f-numero",
+    bairro:"f-bairro", cidade:"f-cidade", complemento:"f-complemento" });
   // bloco do responsável: só aparece quando o usuário é menor de 18 anos
   if(MOD==="pacientes"){
     const nasc=$("#f-nascimento");
@@ -799,7 +1940,27 @@ async function abrirForm(id){
 }
 /* ------------------- combobox com busca (campo "busca") ---------------- */
 function cbxWrap(id){ const el=$("#"+id); return el?el.closest(".cbx"):null; }
-function cbxOpcoes(wrap){ return CACHE[wrap.dataset.tab]||[]; }
+/* Inativo não aparece para ser escolhido: marcar atendimento para quem saiu do
+   acompanhamento é erro silencioso — ninguém percebe até o dia da falta.
+   Continua visível na lista e nos registros antigos, que não mudam. */
+function semInativos(tab, lista){
+  return tab==="pacientes" ? lista.filter(estaAtivo)
+       : tab==="profissionais" ? lista.filter((r)=>Number(r.ativo)!==0)
+       : lista;
+}
+function cbxOpcoes(wrap){
+  const tab = wrap.dataset.tab;
+  const lista = semInativos(tab, CACHE[tab] || []);
+  /* Exceção: ao ABRIR um registro antigo, quem já está gravado nele continua
+     na lista. Sem isto, editar a data de um atendimento antigo apagaria o nome
+     do usuário do próprio formulário só porque ele foi inativado depois. */
+  const atual = ($("#" + wrap.dataset.id) || {}).value;
+  if(atual && !lista.some((r)=>String(wrap.dataset.valor==="nome"?rotuloRef(r):r.id)===String(atual))){
+    const guardado = (CACHE[tab]||[]).find((r)=>String(wrap.dataset.valor==="nome"?rotuloRef(r):r.id)===String(atual));
+    if(guardado) return [guardado, ...lista];
+  }
+  return lista;
+}
 function cbxFiltrar(id){
   const wrap=cbxWrap(id); if(!wrap) return;
   const inp=$("#"+id+"-txt"), list=$("#"+id+"-list");
@@ -891,6 +2052,52 @@ function fecharModal(){ $("#modal-host").innerHTML=""; }
 // "profissional" na agenda — é sempre ele). O servidor força isso de qualquer modo.
 function camposDoPerfil(m){ return m.campos.filter((c)=>!(c[3]&&c[3].ocultarPara===ME.perfil)); }
 
+/* ==========================================================================
+   BUSCA DE CEP — digitou os 8 dígitos, o endereço se preenche.
+
+   Passa pelo NOSSO servidor (/api/cep), e não direto na internet: a CSP desta
+   tela é `connect-src 'self'`, e afrouxá-la para chamar um terceiro
+   enfraqueceria a política inteira. De quebra, o IP de quem digita não vai
+   para fora e o resultado fica em cache num lugar só.
+
+   Só preenche campo VAZIO — nunca sobrescreve o que a equipe já digitou —,
+   exceto quando o CEP muda de verdade; aí o endereço antigo é de outro lugar e
+   manter pedaço dele seria pior do que substituir.
+   ========================================================================== */
+function ligarBuscaCep(idCep, campos){
+  const el=$("#"+idCep); if(!el) return;
+  let ultimo=soDig(el.value||"");
+  const aviso=document.createElement("span");
+  aviso.style.cssText="display:block;font-size:.75rem;margin-top:.2rem";
+  el.parentElement.appendChild(aviso);
+  const setar=(id,v,forcar)=>{ const c=id&&$("#"+id); if(c&&v&&(forcar||!c.value)) c.value=v; };
+
+  async function buscar(){
+    const cep=soDig(el.value||"");
+    if(cep.length!==8){ aviso.textContent=""; return; }
+    const mudou = cep!==ultimo; ultimo=cep;
+    aviso.style.color="var(--dim)"; aviso.textContent="Buscando endereço…";
+    try{
+      /* fetch direto, e não api(): esta rota é do site (/api/cep), não da
+         gestão (/restrito/api/…) — e digitar um CEP não é ação que deva travar
+         a tela inteira com o preloading. */
+      const r=await fetch("/api/cep/"+cep);
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok){ aviso.style.color="var(--ambar)"; aviso.textContent=j.error||"CEP não encontrado — preencha à mão."; return; }
+      setar(campos.endereco, j.logradouro, mudou);
+      setar(campos.bairro, j.bairro, mudou);
+      setar(campos.cidade, j.uf?`${j.cidade}/${j.uf}`:j.cidade, mudou);
+      setar(campos.complemento, j.complemento, false);   // o do CEP é genérico: nunca sobrescreve
+      aviso.style.color="var(--verde)";
+      aviso.textContent=`✓ ${j.cidade}${j.uf?"/"+j.uf:""}`;
+      const num=campos.numero&&$("#"+campos.numero);
+      if(num&&!num.value) num.focus();                   // já deixa o cursor no número
+    }catch(e){ aviso.style.color="var(--ambar)"; aviso.textContent="Não consegui consultar agora — preencha à mão."; }
+  }
+  el.addEventListener("blur",buscar);
+  el.addEventListener("input",()=>{ if(soDig(el.value||"").length===8) buscar(); });
+}
+
 function coletar(){
   const m=MODULOS[MOD], out={}, erros=[];
   const menor = MOD==="pacientes" && ehMenor(($("#f-nascimento")||{}).value);
@@ -899,6 +2106,10 @@ function coletar(){
     if(op.menor && !menor){ out[k]=""; continue; }  // limpa dados do responsável quando não é menor
     if(tipo==="senha_externo") continue;   // gerida só pelo botão / servidor
     if(tipo==="servicos_check"){ const g=$("#f-"+k+"-grid"); out[k]=JSON.stringify(g?[...g.querySelectorAll("input:checked")].map((c)=>c.value):[]); continue; }
+    /* O editor espelha o conteúdo no campo oculto ao sair dele. Clicar em
+       Salvar normalmente já dispara esse blur, mas não quando o salvar vem do
+       teclado — e aí o último parágrafo digitado se perderia sem aviso. */
+    if(tipo==="rico") edSincronizar("f-"+k);
     const el=$("#f-"+k); if(!el) continue;
     el.classList && el.classList.remove("erro");
     let v = tipo==="checkbox" ? (el.checked?1:0) : (el.value||"").trim();
@@ -938,11 +2149,18 @@ async function excluirReg(id){
 }
 
 /* Documento impresso com o timbre do Instituto (cabeçalho + faixa + rodapé). */
-function timbreHTML(titulo, corpo){
+/* `op` cobre o que muda de um impresso para outro:
+     · paisagem — a relação de usuários tem endereço completo, e em retrato ele
+       vira três linhas por pessoa;
+     · subtitulo — diz de que recorte o papel fala (quantos, qual filtro).
+   Sem isso a relação impressa seria só uma tabela sem contexto, e quem a
+   recebesse não teria como saber o que está olhando. */
+function timbreHTML(titulo, corpo, op){
+  op = op || {};
   const base=location.origin;
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escA(titulo)} — Instituto Kenósis</title>
   <style>
-   @page{margin:1.6cm}
+   @page{margin:1.6cm${op.paisagem?";size:landscape":""}}
    *{box-sizing:border-box}
    body{font:13px/1.55 'Segoe UI',system-ui,Arial,sans-serif;color:#232733;margin:0}
    .timbre{display:flex;align-items:center;gap:.9rem;border-bottom:3px solid #253282;padding-bottom:.7rem}
@@ -964,6 +2182,8 @@ function timbreHTML(titulo, corpo){
    .barra{display:flex;align-items:center;gap:.6rem;margin:.28rem 0;font-size:.82rem}
    .barra .lb{width:200px}.barra .b{flex:1;height:9px;background:#eef2f8;border-radius:5px;overflow:hidden}
    .barra .b i{display:block;height:100%;background:#1EA1E4}.barra .n{width:32px;text-align:right;font-weight:700;color:#253282}
+   table.m th{width:auto}
+   table.m td,table.m th{font-size:.78rem;padding:.3rem .45rem}
    .rod{margin-top:2.2rem;border-top:1px solid #eef1f6;padding-top:.6rem;color:#9aa0ad;font-size:.72rem;display:flex;justify-content:space-between}
   </style></head><body>
    <div class="timbre">
@@ -973,15 +2193,16 @@ function timbreHTML(titulo, corpo){
    </div>
    <div class="faixa"></div>
    <h1>${escA(titulo)}</h1>
+   ${op.subtitulo?`<p style="margin:-.7rem 0 1rem;color:#6b7280;font-size:.8rem">${escA(op.subtitulo)}</p>`:""}
    ${corpo}
    <div class="rod"><span>Instituto Kenósis · documento de uso interno</span><span>Emitido em ${new Date().toLocaleString("pt-BR")}</span></div>
    <scr`+`ipt>window.onload=function(){setTimeout(function(){window.print()},250)}</scr`+`ipt>
   </body></html>`;
 }
-function abrirImpressao(titulo, corpo){
+function abrirImpressao(titulo, corpo, op){
   const w=window.open("","_blank","width=860,height=940");
   if(!w) return toast("Permita pop-ups para imprimir.",true);
-  w.document.write(timbreHTML(titulo, corpo)); w.document.close();
+  w.document.write(timbreHTML(titulo, corpo, op)); w.document.close();
 }
 
 /* Ficha imprimível do usuário, com o timbre do Instituto. */
@@ -997,7 +2218,7 @@ async function imprimirFicha(id){
     ${p.resp_nome?`<div class="sec">Responsável legal</div>
     <table>${L("Nome",p.resp_nome)}${L("CPF",p.resp_cpf)}${L("RG",p.resp_rg)}${L("Data de nascimento",dataBR(p.resp_nascimento))}</table>`:""}
     <div class="sec">Contato</div>
-    <table>${L("Telefone / WhatsApp",p.telefone)}${L("E-mail",p.email)}${L("Endereço",p.endereco)}</table>
+    <table>${L("Telefone / WhatsApp",p.telefone)}${L("E-mail",p.email)}${L("Endereço",enderecoCompleto(p))}${L("CEP",p.cep)}</table>
     <div class="sec">Dados sociais</div>
     <table>${L("Escolaridade",p.escolaridade)}${L("NIS",p.nis)}${L("Cartão SUS",p.cartao_sus)}
       ${L("Projeto vinculado",proj?proj.title:"")}${L("1º atendimento",dataBR(p.primeiro_atendimento))}
@@ -1007,8 +2228,105 @@ async function imprimirFicha(id){
 }
 
 /* Relatório impresso com o timbre e os mesmos indicadores da tela. */
+/* ==========================================================================
+   RELAÇÃO DE USUÁRIOS ATIVOS / INATIVOS
+
+   Começa nos INATIVOS: é a relação que a coordenação pede para retomar
+   contato. Sai em PAISAGEM na impressão — o endereço completo não cabe em
+   retrato sem virar três linhas por pessoa.
+   ========================================================================== */
+let relpacFiltro = "0";
+let RELPAC = { pacientes: [], total: 0, ativos: 0 };
+const relpacAtivo = (x) => x.ativo===null||x.ativo===undefined||Number(x.ativo)!==0;
+
+async function carregarRelacaoPacientes(){
+  const bt=(v,r)=>`<button class="vbtn${relpacFiltro===v?" on":""}" onclick="trocarRelpac('${v}')">${r}</button>`;
+  $("#relpac-filtro").innerHTML=`<span class="pglbl">Mostrar:</span>
+    <span class="vista-toggle" style="margin:0">${bt("1","Ativos")}${bt("0","Inativos")}${bt("","Todos")}</span>
+    <span class="pd-info" id="relpac-info"></span>`;
+  $("#relpac-tabela").innerHTML='<p class="vazio">Carregando…</p>';
+  try{
+    RELPAC = await api("relatorios/pacientes"+(relpacFiltro?`?ativo=${relpacFiltro}`:""));
+  }catch(e){ $("#relpac-tabela").innerHTML='<p class="vazio">'+escA(e.message)+'</p>'; return; }
+  const d=RELPAC.pacientes||[];
+  $("#relpac-stats").innerHTML=[["Na relação",d.length],["Ativos",RELPAC.ativos],
+    ["Inativos",RELPAC.total-RELPAC.ativos],["Já atendidos",d.filter((x)=>x.atendimentos>0).length]]
+    .map(([r,num])=>`<div class="stat"><b>${num}</b><span>${r}</span></div>`).join("");
+  $("#relpac-info").textContent = d.length ? `${d.length} usuário(s)` : "";
+  reiniciarPagina("relpac");
+  pintarRelpacTabela();
+}
+/* Desenha só a tabela — a paginação repinta por aqui, sem ir ao servidor de novo. */
+function pintarRelpacTabela(){
+  const d=RELPAC.pacientes||[];
+  if(!d.length){ $("#relpac-tabela").innerHTML='<p class="vazio">Nenhum usuário nesta situação.</p>';
+    barraPaginacao("relpac-paginacao","relpac",{total:0}); return; }
+  const info=fatiar("relpac", d);
+  barraPaginacao("relpac-paginacao","relpac",info);
+  $("#relpac-tabela").innerHTML=`<table>
+    <thead><tr><th>Usuário</th><th>Endereço</th><th style="width:130px">Telefone</th>
+      <th style="width:160px">Projeto</th><th style="width:180px">Serviços</th>
+      <th style="width:160px">Profissional</th><th style="width:96px">Situação</th></tr></thead>
+    <tbody>${info.itens.map((x)=>`<tr>
+      <td><b>${escA(x.nome)}</b>${x.cpf_final?`<br><span style="color:var(--dim);font-size:.76rem">CPF •••${escA(x.cpf_final)}</span>`:""}</td>
+      <td>${escA(enderecoCompleto(x)||"—")}</td>
+      <td>${escA(x.telefone||"—")}</td>
+      <td>${escA(x.projeto_nome||"—")}</td>
+      <td>${x.servicos.length?x.servicos.map(escA).join("<br>"):"—"}</td>
+      <td>${x.profissionais.length?x.profissionais.map(escA).join("<br>"):"—"}</td>
+      <td>${relpacAtivo(x)?'<span class="tag tag-Ativo">Ativo</span>':'<span class="tag tag-Inativo">Inativo</span>'}</td>
+    </tr>`).join("")}</tbody></table>`;
+}
+function trocarRelpac(v){ relpacFiltro=v; carregarRelacaoPacientes(); }
+
+function imprimirRelPacientes(){
+  const d=RELPAC.pacientes||[];
+  if(!d.length) return toast("Nada para imprimir.",true);
+  const rot = relpacFiltro==="1" ? "Relação de usuários ativos"
+            : relpacFiltro==="0" ? "Relação de usuários inativos" : "Relação de usuários";
+  const ativos=d.filter(relpacAtivo).length;
+  const corpo=`<div class="cards">
+      <div class="kpi"><b>${d.length}</b><span>Na relação</span></div>
+      <div class="kpi"><b>${ativos}</b><span>Ativos</span></div>
+      <div class="kpi"><b>${d.length-ativos}</b><span>Inativos</span></div>
+    </div>
+    <table class="m"><tr><th>Usuário</th><th>Endereço completo</th><th style="width:105px">Telefone</th>
+      <th style="width:130px">Projeto</th><th style="width:150px">Serviços</th>
+      <th style="width:140px">Profissional</th><th style="width:66px">Situação</th></tr>`+
+    d.map((x)=>`<tr>
+      <td>${escA(x.nome)}</td>
+      <td>${escA(enderecoCompleto(x)||"—")}</td>
+      <td>${escA(x.telefone||"—")}</td>
+      <td>${escA(x.projeto_nome||"—")}</td>
+      <td>${x.servicos.length?x.servicos.map(escA).join("<br>"):"—"}</td>
+      <td>${x.profissionais.length?x.profissionais.map(escA).join("<br>"):"—"}</td>
+      <td>${relpacAtivo(x)?"Ativo":"Inativo"}</td></tr>`).join("")+`</table>`;
+  abrirImpressao(rot, corpo, { subtitulo:`${d.length} usuário(s) · emitida em ${new Date().toLocaleDateString("pt-BR")}`, paisagem:true });
+}
+
+/* Da lista de Usuários, "Imprimir relação" leva a esta mesma tela — assim
+   existe UMA relação de usuários no sistema, e não duas que podem divergir.
+   Leva junto o filtro de situação que já estava escolhido. */
+function imprimirRelacaoUsuarios(){
+  relpacFiltro = filtroSituacao;
+  const btn=document.querySelector('.navbtn[data-nav="relatorios_pacientes"]');
+  if(btn && btn.style.display!=="none") btn.click();
+  else toast("Seu perfil não tem acesso aos relatórios.",true);
+}
+
+function rotuloPeriodoRelatorio(){
+  const p = periodoDe("relatorios");
+  if(!p.de && !p.ate) return "todo o período";
+  if(p.de && p.ate) return `de ${dataBR(p.de)} a ${dataBR(p.ate)}`;
+  return p.de ? `a partir de ${dataBR(p.de)}` : `até ${dataBR(p.ate)}`;
+}
 async function imprimirRelatorio(){
-  let d; try{ d=await api("relatorios"); }catch(e){ return toast(e.message,true); }
+  /* O impresso sai do MESMO recorte que está na tela. Se ele buscasse tudo, o
+     PDF entregue à diretoria mostraria números diferentes dos que a pessoa
+     acabou de ver — e não haveria como saber qual dos dois está certo. */
+  const pr = periodoDe("relatorios");
+  const qs = [pr.de?"de="+pr.de:"", pr.ate?"ate="+pr.ate:""].filter(Boolean).join("&");
+  let d; try{ d=await api("relatorios"+(qs?"?"+qs:"")); }catch(e){ return toast(e.message,true); }
   const kpi=(r,n)=>`<div class="kpi"><b>${n}</b><span>${escA(r)}</span></div>`;
   const barras=(rows,fmt)=>{ if(!rows||!rows.length) return '<p style="color:#9aa">Sem serviços no período.</p>';
     const max=Math.max(...rows.map((x)=>x.total),1);
@@ -1021,7 +2339,7 @@ async function imprimirRelatorio(){
     <div class="sec">Atendimentos por serviço</div>${barras(d.porEspecialidade)}
     <div class="sec">Serviços por situação</div>${barras(d.porStatus)}
     <div class="sec">Serviços por mês</div>${barras(d.porMes,mesBR)}`;
-  abrirImpressao("Relatório de atividades", corpo);
+  abrirImpressao("Relatório de atividades — " + rotuloPeriodoRelatorio(), corpo);
 }
 
 /* Impressão da agenda de atendimentos, com o timbre do Instituto, agrupada por
@@ -1120,8 +2438,18 @@ function desenharFotos(id){ const inp=$("#"+id); let arr=[]; try{ arr=JSON.parse
 function removerFoto(id,i){ const inp=$("#"+id); const arr=JSON.parse(inp.value||"[]"); arr.splice(i,1); inp.value=JSON.stringify(arr); desenharFotos(id); }
 
 /* ----------------------------- relatórios ------------------------------ */
+function aplicarPeriodoRelatorio(){ lerPeriodo("relatorios"); carregarRelatorios(); }
+
 async function carregarRelatorios(){
-  try{ const d=await api("relatorios");
+  /* O filtro é montado uma vez e depois só relido: remontar a cada consulta
+     apagaria a data que o usuário acabou de digitar. */
+  if(!$("#rel-periodo").innerHTML) $("#rel-periodo").innerHTML = periodoHTML("relatorios");
+  const pr = periodoDe("relatorios");
+  const qs = [pr.de?"de="+pr.de:"", pr.ate?"ate="+pr.ate:""].filter(Boolean).join("&");
+  try{ const d=await api("relatorios"+(qs?"?"+qs:""));
+    pintarPeriodo("relatorios", (pr.de||pr.ate)
+      ? `no período ${pr.de?"de "+dataBR(pr.de):""}${pr.ate?" até "+dataBR(pr.ate):" em diante"}`
+      : "");
     $("#rel-stats").innerHTML=[["Usuários",d.totais.pacientes],["Associados",d.totais.associados],
       ["Serviços",d.totais.atendimentos],["Faltas",d.totais.faltas],["Eventos",d.totais.eventos],["Benefícios",d.totais.beneficios]]
       .map(([r,n])=>`<div class="stat"><b>${n}</b><span>${r}</span></div>`).join("");

@@ -8,9 +8,11 @@
 const http = require("node:http");
 // Sistema de gestão da ONG — módulo independente, banco próprio (data/gestao.db).
 // Só compartilha o processo e a porta; ver restrito.js.
+const { agendarBackups } = require("./backup");
 const { Q, carregarAmbiente } = require("./pg");
 carregarAmbiente(__dirname);
 const { handleRestrito, handleExterno, iniciarRestrito,
+        sessao: sessaoRestrito, auditar: auditarRestrito, registrarEncerrarPainel,
         listarProjetos, contarProjetos, importarProjetos,
         listarServicos, contarServicos, importarServicos } = require("./restrito");
 const fs = require("node:fs");
@@ -25,7 +27,57 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "2.1.0";
+const APP_VERSION = "2.3.0";
+
+/* ==========================================================================
+   CONSULTA DE CEP
+
+   Fonte: ViaCEP (base dos Correios, aberta e sem chave). Se ela falhar, tenta a
+   BrasilAPI — assim o preenchimento não morre por indisponibilidade de um
+   serviço. A API oficial dos Correios exige contrato e credencial; estas duas
+   servem os mesmos dados de endereçamento.
+
+   O resultado fica em cache por 30 dias: CEP praticamente não muda, e isso
+   evita ir à internet a cada tecla.
+   ========================================================================== */
+const cacheCep = new Map();               // cep -> { dados, ts }
+const CEP_TTL = 30 * 24 * 3600e3;         // 30 dias
+const cepPorIp = new Map();               // ip -> { n, ts }
+const CEP_MAX = 60, CEP_JANELA = 60e3;    // 60 consultas por minuto por IP
+function podeConsultarCep(ip) {
+  const t = cepPorIp.get(ip);
+  if (!t || Date.now() - t.ts > CEP_JANELA) { cepPorIp.set(ip, { n: 1, ts: Date.now() }); return true; }
+  t.n++;
+  return t.n <= CEP_MAX;
+}
+setInterval(() => { const lim = Date.now() - CEP_JANELA; for (const [k, v] of cepPorIp) if (v.ts < lim) cepPorIp.delete(k); }, 5 * 60e3).unref();
+
+async function pegarJson(url) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 4000);   // não deixa a request pendurada
+  try {
+    const r = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": "InstitutoKenosis/1.0" } });
+    if (!r.ok) return null;
+    return await r.json();
+  } finally { clearTimeout(timer); }
+}
+/* Devolve sempre o mesmo formato, venha de onde vier. */
+async function buscarCep(cep) {
+  try {
+    const v = await pegarJson(`https://viacep.com.br/ws/${cep}/json/`);
+    if (v && !v.erro && v.localidade) {
+      return { cep, logradouro: v.logradouro || "", complemento: v.complemento || "",
+        bairro: v.bairro || "", cidade: v.localidade, uf: v.uf || "" };
+    }
+    if (v && v.erro) return null;                        // CEP inexistente: não adianta tentar de novo
+  } catch (e) { /* cai para a segunda fonte */ }
+  const b = await pegarJson(`https://brasilapi.com.br/api/cep/v1/${cep}`);
+  if (b && b.city) {
+    return { cep, logradouro: b.street || "", complemento: "",
+      bairro: b.neighborhood || "", cidade: b.city, uf: b.state || "" };
+  }
+  return null;
+}
 // CSP das telas autenticadas (painel). Bloqueia script/estilo/objeto externos;
 // só libera as fontes do Google (CSS + arquivos) que o painel usa.
 const CSP_PAINEL = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; " +
@@ -593,6 +645,17 @@ const authed = (req) => {
   sessions.set(m[1], Date.now());   // renova enquanto estiver em uso
   return true;
 };
+
+/* O /restrito não enxerga este `sessions` — os dois sistemas são separados de
+   propósito. Ele só recebe daqui a função que sabe encerrar a sessão do painel,
+   e chama quando alguém sai da gestão. Ver o comentário do outro lado. */
+registrarEncerrarPainel((req) => {
+  const m = /(?:^|;\s*)sid=([a-f0-9]+)/.exec(req.headers.cookie || "");
+  if (!m || !sessions.has(m[1])) return false;
+  sessions.delete(m[1]);
+  console.log("  · /admin: sessão encerrada junto com a saída do /restrito");
+  return true;
+});
 
 /* Sem isto, dá para tentar senha à vontade: 100 mil tentativas por minuto
    quebram qualquer senha curta. O bloqueio é por IP e some sozinho. */
@@ -1383,6 +1446,39 @@ function aplicarTextos(html, S) {
 }
 function slug(s) { return String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
 
+/* ==========================================================================
+   BACKUP AUTOMÁTICO — dois bancos, duas técnicas
+
+   · data/site.db (SQLite)     → VACUUM INTO, que é cópia ONLINE e consistente
+     mesmo com escrita em curso (um "cp" não seria: o WAL fica noutro arquivo).
+   · gestão (PostgreSQL)       → pg_dump, num .sql restaurável em qualquer
+     servidor que tenha a mesma DADOS_CHAVE.
+
+   Diário, dentro do próprio processo — sem cron. A cada hora ele pergunta se
+   passaram 24h desde a última cópia; se a máquina estava desligada na hora
+   marcada, a cópia sai no próximo boot em vez de ser pulada.
+   ========================================================================== */
+const BACKUP_CFG = {
+  destino: path.join(ROOT, "backups"),
+  bancos: [path.join(ROOT, "data", "site.db")],
+  postgres: require("./pg").config(),
+  intervaloHoras: Number(process.env.BACKUP_HORAS) || 24,
+  manter: Number(process.env.BACKUP_MANTER) || 30,
+};
+
+// `node server.js --backup` força uma cópia agora, sem subir o servidor. É o
+// que o deploy.sh chama antes de mexer em qualquer coisa.
+if (process.argv.includes("--backup")) {
+  const { rodarBackup } = require("./backup");
+  const feitos = rodarBackup(BACKUP_CFG, "manual");
+  process.exit(feitos.length ? 0 : 1);
+}
+if (process.argv.includes("--backup-status")) {
+  const { statusBackup } = require("./backup");
+  console.log(JSON.stringify(statusBackup(BACKUP_CFG), null, 2));
+  process.exit(0);
+}
+
 /* ------------------------------ Servidor ---------------------------------- */
 // `node server.js --publicar` regenera as páginas sem subir o servidor: serve
 // para o deploy e para verificar uma alteração de template sem passar pelo painel
@@ -1426,6 +1522,50 @@ const servidor = http.createServer(async (req, res) => {
      503 com um recado claro — em vez de estourar uma exceção diferente a cada
      clique, deixando a equipe sem saber se o problema é a senha dela.
      O site e o /admin, que são SQLite, seguem o fluxo normal logo abaixo. */
+  /* ========================================================================
+     ENTRAR NO PAINEL DO SITE PELO ATALHO DOS 9 PONTOS
+
+     Quem já provou quem é no /restrito não precisa digitar a senha do painel de
+     novo. A validação acontece AQUI, no servidor: o navegador só navega, não
+     carrega credencial nenhuma na URL.
+
+     Precisa ficar sob /restrito — e não em /admin/entrar, como tentei primeiro.
+     O cookie `rid` da gestão tem `Path=/restrito`; o navegador simplesmente não
+     o envia para /admin, e a rota nunca via a sessão. Antes de `ERRO_GESTAO`
+     porque a sessão vive em memória e continua válida mesmo com o banco fora.
+     ======================================================================== */
+  if (p === "/restrito/painel-do-site" && req.method === "GET") {
+    const s = sessaoRestrito(req);
+    if (!s) { res.writeHead(302, { Location: "/restrito/" }); return res.end(); }
+    if (s.perfil !== "admin") {
+      auditarRestrito({ req, sessao: s, acao: "acesso", modulo: "admin",
+        resumo: `${s.nome} tentou abrir o painel do site sem ser administrador` });
+      res.writeHead(403, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      return res.end(`<!doctype html><meta charset="utf-8"><title>Sem permissão</title>
+<body style="font-family:system-ui,sans-serif;background:#FAF7F2;color:#1c2540;display:grid;place-items:center;height:100vh;margin:0">
+<div style="max-width:30rem;background:#fff;border:1px solid #e2dcd2;border-radius:16px;padding:2rem;text-align:center">
+<h1 style="font-size:1.2rem;color:#253282;margin:0 0 .7rem">Painel do site</h1>
+<p style="line-height:1.6;margin:0">O painel que edita o site do instituto é exclusivo do administrador do sistema.</p>
+<p style="line-height:1.6;margin:.8rem 0 0"><a href="/restrito/" style="color:#1EA1E4">Voltar ao sistema de gestão</a></p></div>`);
+    }
+    /* `cross-site` é o caso que interessa barrar: alguém em outro domínio
+       induzindo a navegação. `same-origin` (nosso link) e `none` (URL digitada
+       à mão) passam. */
+    if (req.headers["sec-fetch-site"] === "cross-site") {
+      res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+      return res.end("Abra o painel pelo atalho dentro do sistema de gestão.");
+    }
+    const t = crypto.randomBytes(24).toString("hex");
+    sessions.set(t, Date.now());
+    const https = req.headers["x-forwarded-proto"] === "https";
+    res.setHeader("Set-Cookie", `sid=${t}; HttpOnly; Path=/; SameSite=Lax${https ? "; Secure" : ""}`);
+    auditarRestrito({ req, sessao: s, acao: "acesso", modulo: "admin",
+      resumo: `${s.nome} abriu o painel do site pelo atalho (entrou sem digitar a senha do painel)` });
+    console.log(`  · /admin: sessão criada pelo atalho do /restrito (${s.nome})`);
+    res.writeHead(302, { Location: "/admin/" });
+    return res.end();
+  }
+
   if (ERRO_GESTAO && (p === "/restrito" || p.startsWith("/restrito/") || p === "/externo" || p.startsWith("/externo/"))) {
     const api = p.includes("/api/");
     res.writeHead(503, {
@@ -1494,6 +1634,35 @@ Consulte <code>journalctl -u kenosis -n 40</code>.</small></p></div>`);
         res.setHeader("Set-Cookie", `sid=${t}; HttpOnly; Path=/; SameSite=Lax${https ? "; Secure" : ""}`);
         return json(res, 200, { ok: true });
       }
+      /* ---------------------- Busca de CEP ------------------------------
+         Por que passar pelo NOSSO servidor em vez de o navegador chamar
+         direto:
+          · a CSP do /admin e do /restrito é `connect-src 'self'` — chamada
+            externa seria bloqueada, e afrouxá-la enfraqueceria a política;
+          · o IP de quem digita o CEP não vai para um terceiro (LGPD);
+          · dá para cachear e limitar o uso num lugar só.
+         Fica antes do login porque a mesma rota serve o /restrito, que tem
+         sessão própria (cookie `rid`) e não passa pelo `authed` daqui.    */
+      const mcep = p.match(/^\/api\/cep\/(\d{8})$/);
+      if (mcep && req.method === "GET") {
+        const cep = mcep[1];
+        const emCache = cacheCep.get(cep);
+        if (emCache && Date.now() - emCache.ts < CEP_TTL) return json(res, 200, emCache.dados);
+        if (!podeConsultarCep(clientIp(req))) return json(res, 429, { error: "Muitas consultas de CEP. Aguarde um instante." });
+        try {
+          const dados = await buscarCep(cep);
+          if (!dados) return json(res, 404, { error: "CEP não encontrado." });
+          cacheCep.set(cep, { dados, ts: Date.now() });
+          if (cacheCep.size > 5000) cacheCep.delete(cacheCep.keys().next().value);
+          return json(res, 200, dados);
+        } catch (e) {
+          console.warn("  ⚠ consulta de CEP falhou:", e.message);
+          return json(res, 503, { error: "Não consegui consultar o CEP agora. Preencha o endereço à mão." });
+        }
+      }
+      // CEP mal formatado: responde sem sair para a internet
+      if (/^\/api\/cep\//.test(p)) return json(res, 400, { error: "Informe um CEP com 8 dígitos." });
+
       if (!authed(req)) return json(res, 401, { error: "Não autenticado" });
       if (p === "/api/me") return json(res, 200, { ok: true, version: APP_VERSION });
       if (p === "/api/stats") return json(res, 200, statsAcessos());
@@ -1701,6 +1870,7 @@ let ERRO_GESTAO = null;
   console.log(`  · Site:   http://localhost:${PORT}/`);
   console.log(`  · Painel: http://localhost:${PORT}/admin/`);
   console.log(`  · Banco do site:    ${DRIVER_NOME}${DRIVER_AVISO ? " ⚠ " + DRIVER_AVISO : ""} (data/site.db)`);
+  agendarBackups(BACKUP_CFG);
   if (ERRO_GESTAO) {
     console.log(`  · Banco da gestão:  ✖ INDISPONÍVEL — /restrito fora do ar (site e /admin OK)`);
   } else {
