@@ -38,6 +38,14 @@ Environment=NODE_ENV=production
 ; A porta tem de bater com a do vhost do nginx (nginx/criar-site.sh <dominio> 5189)
 Environment=PORT=5189
 
+; Credenciais do PostgreSQL e a chave que cifra os dados dos beneficiários.
+; O arquivo NÃO vai no repositório — é criado no servidor (ver o README).
+; Sem ele o site e o /admin continuam no ar, mas o /restrito responde 503.
+; O `-` faz o systemd seguir se o arquivo não existir, em vez de recusar a
+; iniciar o serviço: derrubar o site do instituto por causa da gestão seria
+; trocar um problema por um maior.
+EnvironmentFile=-/etc/kenosis.env
+
 Restart=always
 RestartSec=3
 
