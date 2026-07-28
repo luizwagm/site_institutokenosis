@@ -8,11 +8,15 @@
 const http = require("node:http");
 // Sistema de gestão da ONG — módulo independente, banco próprio (data/gestao.db).
 // Só compartilha o processo e a porta; ver restrito.js.
-const { handleRestrito, handleExterno, listarProjetos, contarProjetos, importarProjetos, listarServicos, contarServicos, importarServicos } = require("./restrito");
+const { Q, carregarAmbiente } = require("./pg");
+carregarAmbiente(__dirname);
+const { handleRestrito, handleExterno, iniciarRestrito,
+        listarProjetos, contarProjetos, importarProjetos,
+        listarServicos, contarServicos, importarServicos } = require("./restrito");
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
-const { DatabaseSync } = require("node:sqlite");
+const { abrirBanco, DRIVER_NOME, DRIVER_AVISO } = require("./db");
 
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópia para testes
@@ -21,7 +25,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "2.0.0";
+const APP_VERSION = "2.1.0";
 // CSP das telas autenticadas (painel). Bloqueia script/estilo/objeto externos;
 // só libera as fontes do Google (CSS + arquivos) que o painel usa.
 const CSP_PAINEL = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; " +
@@ -31,7 +35,7 @@ const UPLOAD_DIR = path.join(ROOT, "assets", "img", "uploads");
 fs.mkdirSync(path.join(ROOT, "data"), { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-const db = new DatabaseSync(path.join(ROOT, "data", "site.db"));
+const db = abrirBanco(path.join(ROOT, "data", "site.db"));
 db.exec(`
   CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS services (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, text TEXT, sort INTEGER DEFAULT 0);
@@ -644,10 +648,13 @@ function tituloSeo(base, limite = 60) {
   return b.length <= limite ? b : b.slice(0, limite - 1).trimEnd() + "…";
 }
 
-function publish() {
+/* Assíncrono desde a virada para o PostgreSQL: os serviços e os projetos que
+   alimentam o site agora vêm do banco de gestão, e ler dali é assíncrono.
+   Todo mundo que chama publish() precisa aguardar. */
+async function publish() {
   const S = {}; for (const r of db.prepare("SELECT key,value FROM settings").all()) S[r.key] = r.value;
-  const servicos = listarServicos();   // fonte agora é o sistema de gestão (/restrito)
-  const projetos = listarProjetos();   // fonte agora é o sistema de gestão (/restrito)
+  const servicos = await listarServicos();   // fonte agora é o sistema de gestão (/restrito)
+  const projetos = await listarProjetos();   // fonte agora é o sistema de gestão (/restrito)
   const documentos = db.prepare("SELECT * FROM documentos ORDER BY sort,id").all();
   const parceiros = db.prepare("SELECT * FROM portfolio ORDER BY sort,id").all();
   const diretoria = db.prepare("SELECT * FROM team ORDER BY sort,id").all();
@@ -1297,22 +1304,27 @@ const KEYS = CAMPOS.flatMap((g) => g.campos.map(([k]) => k));
 // precisa vir depois de KEYS: a migração consulta a lista para saber o que é editável
 migrarTextos();
 
-/* Projetos passaram a ser cadastrados no /restrito. Se o banco de gestão ainda
-   não tem nenhum, leva os que já existiam aqui no site.db — migração única, para
-   não perder os projetos publicados. Depois disso o site.db.projetos fica ocioso. */
-try {
-  if (contarProjetos() === 0) {
-    const antigos = db.prepare("SELECT title,slug,sigla,status,resumo,publico,content,sort FROM projetos ORDER BY sort,id").all();
-    if (antigos.length) console.log(`  · projetos migrados para o sistema de gestão: ${importarProjetos(antigos)}`);
-  }
-} catch (e) { console.error("  ✖ migração de projetos:", e.message); }
-// idem para os serviços — cadastro passou para o /restrito
-try {
-  if (contarServicos() === 0) {
-    const antigos = db.prepare("SELECT title,categoria,sort FROM services ORDER BY sort,id").all();
-    if (antigos.length) console.log(`  · serviços migrados para o sistema de gestão: ${importarServicos(antigos)}`);
-  }
-} catch (e) { console.error("  ✖ migração de serviços:", e.message); }
+/* Projetos e serviços passaram a ser cadastrados no /restrito. Se o banco de
+   gestão ainda não tem nenhum, leva os que já existiam aqui no site.db —
+   migração única, para não perder o que já estava publicado.
+
+   Virou função porque o banco de gestão é PostgreSQL: ler dali é assíncrono, e
+   só pode acontecer depois que o /restrito inicializar. É chamada na subida do
+   servidor, logo após iniciarRestrito(). */
+async function migrarParaAGestao() {
+  try {
+    if ((await contarProjetos()) === 0) {
+      const antigos = db.prepare("SELECT title,slug,sigla,status,resumo,publico,content,sort FROM projetos ORDER BY sort,id").all();
+      if (antigos.length) console.log(`  · projetos migrados para o sistema de gestão: ${await importarProjetos(antigos)}`);
+    }
+  } catch (e) { console.error("  ✖ migração de projetos:", e.message); }
+  try {
+    if ((await contarServicos()) === 0) {
+      const antigos = db.prepare("SELECT title,categoria,sort FROM services ORDER BY sort,id").all();
+      if (antigos.length) console.log(`  · serviços migrados para o sistema de gestão: ${await importarServicos(antigos)}`);
+    }
+  } catch (e) { console.error("  ✖ migração de serviços:", e.message); }
+}
 
 // garante que a página de manutenção exista em disco desde o primeiro boot —
 // o nginx a serve nas quedas, e nessa hora não há app para gerá-la
@@ -1374,13 +1386,28 @@ function slug(s) { return String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toL
 /* ------------------------------ Servidor ---------------------------------- */
 // `node server.js --publicar` regenera as páginas sem subir o servidor: serve
 // para o deploy e para verificar uma alteração de template sem passar pelo painel
-if (process.argv.includes("--publicar")) {
-  const r = publish();
-  console.log(`  publicado: ${JSON.stringify(r)}`);
-  process.exit(0);
-}
+/* Dentro de uma função assíncrona, e não com await solto no topo do arquivo:
+   este arquivo é CommonJS (usa require), e um await no nível superior faz o
+   Node não saber mais se o módulo é CommonJS ou ESM — ele recusa carregar.
 
-http.createServer(async (req, res) => {
+   Também precisa inicializar o /restrito antes: publicar lê os serviços e os
+   projetos do banco de gestão. */
+if (process.argv.includes("--publicar")) {
+  (async () => {
+    try {
+      await iniciarRestrito();
+      await migrarParaAGestao();
+      const r = await publish();
+      console.log(`  publicado: ${JSON.stringify(r)}`);
+      process.exit(0);
+    } catch (e) {
+      console.error("  ✖ não consegui publicar:", e.message);
+      process.exit(1);
+    }
+  })();
+} else {
+
+const servidor = http.createServer(async (req, res) => {
   const p = new URL(req.url, `http://localhost:${PORT}`).pathname;
 
   // Cabeçalhos de segurança em toda resposta
@@ -1395,6 +1422,34 @@ http.createServer(async (req, res) => {
 
   // Área restrita (sistema de gestão): atendida por módulo à parte, antes de
   // qualquer roteamento do site. Se ele tratou, encerra aqui.
+  /* Se o banco da gestão não inicializou, o /restrito e o /externo respondem
+     503 com um recado claro — em vez de estourar uma exceção diferente a cada
+     clique, deixando a equipe sem saber se o problema é a senha dela.
+     O site e o /admin, que são SQLite, seguem o fluxo normal logo abaixo. */
+  if (ERRO_GESTAO && (p === "/restrito" || p.startsWith("/restrito/") || p === "/externo" || p.startsWith("/externo/"))) {
+    const api = p.includes("/api/");
+    res.writeHead(503, {
+      "Content-Type": api ? "application/json; charset=utf-8" : "text/html; charset=utf-8",
+      "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Retry-After": "300",
+    });
+    return res.end(api
+      ? JSON.stringify({ error: "O sistema está indisponível: o banco de dados não respondeu. Avise o suporte." })
+      : `<!doctype html><meta charset="utf-8"><title>Sistema indisponível</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#FAF7F2;color:#253282;
+display:grid;place-items:center;min-height:100vh;margin:0;padding:1.5rem}
+.c{max-width:34rem;background:#fff;border:1px solid #e4e9f5;border-radius:16px;padding:2rem;
+box-shadow:0 10px 30px rgba(30,161,228,.10)}h1{font-size:1.3rem;margin:0 0 .8rem;color:#1EA1E4}
+p{line-height:1.6;margin:.6rem 0;color:#3b4256}small{color:#8a90a3}</style>
+<div class="c"><h1>Sistema indisponível</h1>
+<p>O banco de dados do sistema não respondeu. <b>Nenhum dado foi perdido</b> — o sistema volta
+assim que a conexão for restabelecida.</p>
+<p>Se você é da equipe, avise o suporte técnico. O site do instituto continua funcionando
+normalmente.</p>
+<p><small>Para o suporte: falha ao conectar no PostgreSQL no boot.
+Consulte <code>journalctl -u kenosis -n 40</code>.</small></p></div>`);
+  }
+
   try { if (handleRestrito(req, res, p)) return; if (handleExterno(req, res, p)) return; }
   catch (e) { console.error("  ✖ /restrito|externo:", e.message); if (!res.headersSent) { res.writeHead(500); res.end("Erro interno"); } return; }
 
@@ -1476,8 +1531,8 @@ http.createServer(async (req, res) => {
         return json(res, 200, {
           settings: S,
           campos: CAMPOS,   // o painel monta a tela "Textos do site" a partir daqui
-          services: listarServicos(),   // somente leitura no painel: cadastro é no /restrito
-          projetos: listarProjetos(),   // somente leitura no painel: cadastro é no /restrito
+          services: await listarServicos(),   // somente leitura no painel: cadastro é no /restrito
+          projetos: await listarProjetos(),   // somente leitura no painel: cadastro é no /restrito
           documentos: db.prepare("SELECT * FROM documentos ORDER BY sort,id").all(),
           portfolio: db.prepare("SELECT * FROM portfolio ORDER BY sort,id").all(),
           team: db.prepare("SELECT * FROM team ORDER BY sort,id").all(),
@@ -1555,7 +1610,7 @@ http.createServer(async (req, res) => {
         fs.writeFileSync(path.join(UPLOAD_DIR, file), Buffer.from(m[2], "base64"));
         return json(res, 200, { ok: true, path: `/assets/img/uploads/${file}` });
       }
-      if (p === "/api/publish" && req.method === "POST") return json(res, 200, { ok: true, ...publish() });
+      if (p === "/api/publish" && req.method === "POST") return json(res, 200, { ok: true, ...(await publish()) });
       return json(res, 404, { error: "Rota não encontrada" });
     }
 
@@ -1605,10 +1660,57 @@ http.createServer(async (req, res) => {
 // Escuta só no localhost: quem fala com o mundo é o nginx. Sem isto, o painel
 // ficaria acessível por http://IP:5189/admin/, sem HTTPS e sem cookie Secure.
 // Para expor direto (ambiente sem proxy), rode com HOST=0.0.0.0
-}).listen(PORT, process.env.HOST || "127.0.0.1", () => {
+});
+
+/* ==========================================================================
+   SUBIDA DO SERVIDOR
+
+   A porta só abre DEPOIS que o sistema de gestão terminou de inicializar
+   (conectar no PostgreSQL, aplicar migrations, semear o admin). Conectar no
+   Postgres é assíncrono — sem este await, alguém poderia entrar no /restrito
+   durante a migração e receber "relation does not exist" numa tela.
+
+   MAS UMA FALHA NO POSTGRES NÃO DERRUBA O SITE. O site público e o /admin
+   vivem no SQLite (data/site.db) e continuam funcionais sem o banco de gestão.
+   Não há razão para o instituto perder o site — e o telefone que toca — porque
+   uma variável de ambiente do sistema interno ficou faltando. Só o /restrito e
+   o /externo saem do ar, com uma mensagem que diz o que aconteceu.
+   ========================================================================== */
+let ERRO_GESTAO = null;
+
+(async () => {
+  try {
+    await iniciarRestrito();
+    await migrarParaAGestao();     // migração única de projetos e serviços
+  } catch (e) {
+    ERRO_GESTAO = e;
+    console.error("\n  ✖ O SISTEMA DE GESTÃO (/restrito) NÃO INICIALIZOU.");
+    console.error("    " + e.message);
+    console.error("\n    O SITE E O /admin CONTINUAM NO AR (usam o SQLite, não o Postgres).");
+    console.error("    Só o /restrito e o /externo estão indisponíveis. Verifique:");
+    console.error("      · o serviço está no ar?   systemctl status postgresql");
+    console.error("      · as credenciais chegaram? (PGHOST/PGUSER/PGPASSWORD/PGDATABASE/DADOS_CHAVE)");
+    console.error("        em produção vêm de /etc/kenosis.env, via EnvironmentFile do systemd");
+    console.error("      · o banco existe e o usuário tem acesso?");
+    console.error("        psql -U kenosis -d kenosis_gestao -c '\\dt'");
+    console.error("\n    Depois de corrigir:  systemctl restart kenosis\n");
+  }
+
+  servidor.listen(PORT, process.env.HOST || "127.0.0.1", async () => {
   console.log(`\n  Instituto Kenósis — site + gerenciador v${APP_VERSION}`);
   console.log(`  · Site:   http://localhost:${PORT}/`);
   console.log(`  · Painel: http://localhost:${PORT}/admin/`);
+  console.log(`  · Banco do site:    ${DRIVER_NOME}${DRIVER_AVISO ? " ⚠ " + DRIVER_AVISO : ""} (data/site.db)`);
+  if (ERRO_GESTAO) {
+    console.log(`  · Banco da gestão:  ✖ INDISPONÍVEL — /restrito fora do ar (site e /admin OK)`);
+  } else {
+    try {
+      const v = await Q.versao();
+      console.log(`  · Banco da gestão:  PostgreSQL — ${v.d} (usuário ${v.u})`);
+    } catch (e) {
+      console.log(`  · Banco da gestão:  ✖ ${String(e.message).split("\n")[0]}`);
+    }
+  }
 
   // Testa a escrita no boot. Sem isto, um banco somente-leitura só aparece
   // quando o cliente tenta salvar algo e nada acontece — e o log fica mudo.
@@ -1625,4 +1727,7 @@ http.createServer(async (req, res) => {
   if (confereSenha("kenosis-admin", getS("admin_password_hash")))
     console.log(`  ⚠ A senha do painel ainda é a padrão. Troque em Painel → Senha antes de publicar.\n`);
   else console.log("");
-});
+  });
+})();
+
+}

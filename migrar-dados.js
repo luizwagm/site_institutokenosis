@@ -307,7 +307,13 @@ async function conferirConteudo(sq) {
     for (let i = 0; i < doSqlite.length; i++) {
       for (const c of cols.split(",").map((x) => x.trim())) {
         const x = doSqlite[i][c], y = doPg[i] ? doPg[i][c] : undefined;
-        const igual = (x === null || x === undefined) ? (y === null || y === undefined) : String(x) === String(y);
+        /* "", null e undefined são a MESMA coisa aqui: campo não preenchido.
+           Sem isso, a conversão de "" para NULL numa coluna numérica — que o
+           próprio script faz de propósito e já relata em VALORES AJUSTADOS —
+           voltaria como divergência, acusando de erro o que é o comportamento
+           desejado. Diferença de CONTEÚDO continua sendo pega. */
+        const vazio = (v) => v === null || v === undefined || String(v).trim() === "";
+        const igual = vazio(x) ? vazio(y) : String(x) === String(y);
         if (!igual) erros.push(`${t} id=${doSqlite[i].id} coluna ${c}: "${x}" × "${y}"`);
       }
     }

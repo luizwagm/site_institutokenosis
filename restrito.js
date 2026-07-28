@@ -19,13 +19,12 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
-const { DatabaseSync } = require("node:sqlite");
 
 const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.10.0";
+const SISTEMA_VERSION = "1.11.0";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -34,101 +33,21 @@ const SISTEMA_VERSION = "1.10.0";
 const CSP_GESTAO = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; " +
   "form-action 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
   "font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self'";
-const db = new DatabaseSync(path.join(ROOT, "data", "gestao.db"));
+const { Q } = require("./pg");
+const { migrar: migrarEsquema } = require("./migrar");
+const { cifrar, chaveConfigurada, erroChave, digitos: soDigitos } = require("./cripto");
 
-db.exec(`
-  PRAGMA journal_mode = WAL;
+/* ==========================================================================
+   O ESQUEMA NÃO MORA MAIS AQUI.
 
-  -- operadores do sistema (login). perfil: admin | profissional | secretaria.
-  -- profissional_id liga um usuário-profissional ao seu registro na tabela
-  -- profissionais — é assim que ele enxerga "a SUA agenda".
-  CREATE TABLE IF NOT EXISTS g_usuarios (id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nome TEXT NOT NULL, email TEXT UNIQUE, senha_hash TEXT NOT NULL,
-    perfil TEXT NOT NULL DEFAULT 'admin', ativo INTEGER DEFAULT 1,
-    profissional_id INTEGER, criado TEXT);
+   Até a v2.0.0 este arquivo abria o SQLite e, a cada boot, executava um
+   CREATE TABLE IF NOT EXISTS seguido de uma lista de ALTER TABLE dentro de
+   try/catch vazios. Funcionava, mas escondia erro: um ALTER escrito errado era
+   engolido junto com o "coluna já existe", e ninguém ficava sabendo.
 
-  -- configurações internas do sistema (chave/valor)
-  CREATE TABLE IF NOT EXISTS g_config (key TEXT PRIMARY KEY, value TEXT);
-
-  -- 3.1 pacientes (chamados "usuários" na interface — usuário do serviço social)
-  CREATE TABLE IF NOT EXISTS pacientes (id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nome TEXT NOT NULL, foto TEXT, nascimento TEXT, cpf TEXT, rg TEXT,
-    pai TEXT, mae TEXT, endereco TEXT, telefone TEXT, email TEXT, nis TEXT, cartao_sus TEXT,
-    escolaridade TEXT, vulneravel INTEGER DEFAULT 0, vulnerabilidade TEXT,
-    primeiro_atendimento TEXT, consentimento INTEGER DEFAULT 0,
-    projeto_id INTEGER, observacoes TEXT,
-    resp_nome TEXT, resp_cpf TEXT, resp_rg TEXT, resp_nascimento TEXT, criado TEXT);
-
-  -- Projetos socioassistenciais — cadastrados AQUI (no sistema de gestão); o
-  -- painel do site apenas lê e publica. Campos iguais aos que o site espera.
-  CREATE TABLE IF NOT EXISTS projetos (id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL, slug TEXT, sigla TEXT, status TEXT, resumo TEXT,
-    publico TEXT, content TEXT, sort INTEGER DEFAULT 0, criado TEXT);
-
-  -- Serviços/especialidades oferecidos — também cadastrados AQUI; o site lê e
-  -- publica (agrupados por categoria). Alimentam também o seletor da agenda.
-  CREATE TABLE IF NOT EXISTS servicos (id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL, categoria TEXT, sort INTEGER DEFAULT 0, criado TEXT);
-
-  -- 3.2 associados (não pacientes). senha_externo = código de 8 dígitos com que
-  -- o associado entra no portal /externo para ver a própria ficha.
-  CREATE TABLE IF NOT EXISTS associados (id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nome TEXT NOT NULL, cpf TEXT, contato TEXT, endereco TEXT, foto TEXT,
-    vinculo TEXT, adesao TEXT, mensalidade TEXT, status TEXT DEFAULT 'Ativo',
-    senha_externo TEXT, criado TEXT);
-
-  -- profissionais e especialidades atendidas
-  CREATE TABLE IF NOT EXISTS profissionais (id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nome TEXT NOT NULL, especialidade TEXT, registro TEXT, contato TEXT, ativo INTEGER DEFAULT 1);
-
-  -- 3.3 agenda de atendimentos
-  CREATE TABLE IF NOT EXISTS atendimentos (id INTEGER PRIMARY KEY AUTOINCREMENT,
-    paciente_id INTEGER, profissional_id INTEGER, especialidade TEXT,
-    data TEXT, hora TEXT, local TEXT, sala TEXT, valor TEXT, status TEXT DEFAULT 'Agendado',
-    observacoes TEXT, criado TEXT);
-
-  -- 3.4 prontuário eletrônico (evolução por sessão). usuario_id = operador que
-  -- criou o registro; o perfil "profissional" só enxerga os seus.
-  CREATE TABLE IF NOT EXISTS prontuario (id INTEGER PRIMARY KEY AUTOINCREMENT,
-    paciente_id INTEGER, atendimento_id INTEGER, profissional TEXT, especialidade TEXT,
-    data TEXT, avaliacao TEXT, evolucao TEXT, plano TEXT, encaminhamentos TEXT,
-    anexos TEXT, responsavel TEXT, usuario_id INTEGER, criado TEXT);
-
-  -- 3.6 distribuição de benefícios
-  CREATE TABLE IF NOT EXISTS beneficios (id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nome TEXT NOT NULL, cpf TEXT, item TEXT, data TEXT, foto TEXT, local TEXT, responsavel TEXT, criado TEXT);
-
-  -- 3.7 eventos comunitários
-  CREATE TABLE IF NOT EXISTS eventos (id INTEGER PRIMARY KEY AUTOINCREMENT,
-    tipo TEXT, titulo TEXT NOT NULL, tema TEXT, local TEXT, data TEXT, hora TEXT,
-    publico_alvo TEXT, participantes INTEGER, responsavel TEXT, avaliacao TEXT,
-    fotos TEXT, criado TEXT);
-
-  -- 3.8 documentos por paciente
-  CREATE TABLE IF NOT EXISTS documentos_gestao (id INTEGER PRIMARY KEY AUTOINCREMENT,
-    paciente_id INTEGER, tipo TEXT, titulo TEXT, arquivo TEXT, data TEXT, criado TEXT);
-
-  CREATE INDEX IF NOT EXISTS idx_atend_data ON atendimentos(data);
-  CREATE INDEX IF NOT EXISTS idx_atend_pac ON atendimentos(paciente_id);
-  CREATE INDEX IF NOT EXISTS idx_pront_pac ON prontuario(paciente_id);
-`);
-
-// Migração leve para bancos criados antes destas colunas (o CREATE IF NOT EXISTS
-// não altera tabela existente). Ignora o erro se a coluna já existir.
-for (const alt of [
-  "ALTER TABLE associados ADD COLUMN senha_externo TEXT",
-  "ALTER TABLE prontuario ADD COLUMN usuario_id INTEGER",
-  "ALTER TABLE g_usuarios ADD COLUMN profissional_id INTEGER",
-  "ALTER TABLE pacientes ADD COLUMN pai TEXT",
-  "ALTER TABLE pacientes ADD COLUMN mae TEXT",
-  "ALTER TABLE pacientes ADD COLUMN projeto_id INTEGER",
-  "ALTER TABLE pacientes ADD COLUMN resp_nome TEXT",
-  "ALTER TABLE pacientes ADD COLUMN resp_cpf TEXT",
-  "ALTER TABLE pacientes ADD COLUMN resp_rg TEXT",
-  "ALTER TABLE pacientes ADD COLUMN resp_nascimento TEXT",
-  "ALTER TABLE atendimentos ADD COLUMN sala TEXT",
-  "ALTER TABLE atendimentos ADD COLUMN valor TEXT",
-]) { try { db.exec(alt); } catch { /* já existe */ } }
+   Agora o esquema vive em migrations/*.sql, aplicadas uma vez cada e
+   registradas em schema_migrations. Mudança de estrutura = arquivo novo.
+   ========================================================================== */
 
 /* ------------------------- senha (scrypt) e config ------------------------ */
 const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 32 };
@@ -144,16 +63,11 @@ function confereSenha(senha, guardado) {
   const dk = crypto.scryptSync(String(senha), Buffer.from(saltHex, "hex"), dkHex.length / 2, { N: +N, r: +r, p: +p });
   return iguais(Buffer.from(dkHex, "hex"), dk);
 }
-const getC = (k) => db.prepare("SELECT value FROM g_config WHERE key=?").get(k)?.value;
-const setC = (k, v) => db.prepare("INSERT INTO g_config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(k, String(v));
-
-/* Semente: um usuário admin inicial. Senha padrão trocável na primeira entrada.
-   Sem data/hora reais no seed (usa marcador fixo) — o importante é existir. */
-if (db.prepare("SELECT COUNT(*) c FROM g_usuarios").get().c === 0) {
-  db.prepare("INSERT INTO g_usuarios(nome,email,senha_hash,perfil,ativo,criado) VALUES(?,?,?,?,1,?)")
-    .run("Administrador", "admin", hashSenha("kenosis-gestao"), "admin", new Date().toISOString());
-  console.log("  · /restrito: sistema de gestão criado. Login: admin · senha: kenosis-gestao");
-}
+/* Os parênteses em volta do await NÃO são enfeite: sem eles, o `?.value`
+   seria aplicado à Promise (que não tem .value) antes de esperar, e o
+   resultado viria undefined em silêncio. */
+const getC = async (k) => (await Q.get("SELECT value FROM g_config WHERE key=?", k))?.value;
+const setC = (k, v) => Q.run("INSERT INTO g_config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", k, String(v));
 
 /* ------------------------------- sessões --------------------------------- */
 const SESSAO_HORAS = 8;
@@ -198,7 +112,7 @@ const slugify = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").
 /* Regras de agenda: expediente 07h–12h e 14h–18h (intervalo 12h–14h), cada
    atendimento ocupa um bloco de 40 min, e o mesmo profissional não pode ter
    dois blocos que se sobreponham. Devolve a mensagem de erro ou null se ok. */
-function validarAgenda(profissionalId, data, hora, excluirId) {
+async function validarAgenda(profissionalId, data, hora, excluirId) {
   if (!hora) return null;                        // sem horário definido, sem regra a aplicar
   const [h, mm] = String(hora).split(":").map(Number);
   if (Number.isNaN(h) || Number.isNaN(mm)) return "Horário inválido.";
@@ -209,8 +123,8 @@ function validarAgenda(profissionalId, data, hora, excluirId) {
     return "Horário fora do expediente. Os atendimentos vão das 07h às 12h e das 14h às 18h, em blocos de 40 minutos (o último começa 11h20 pela manhã e 17h20 à tarde).";
   if (!data || !profissionalId) return null;     // sem data e profissional não há como conferir choque
   const outros = excluirId
-    ? db.prepare("SELECT hora FROM atendimentos WHERE profissional_id=? AND data=? AND hora<>'' AND id<>?").all(profissionalId, data, excluirId)
-    : db.prepare("SELECT hora FROM atendimentos WHERE profissional_id=? AND data=? AND hora<>''").all(profissionalId, data);
+    ? await Q.all("SELECT hora FROM atendimentos WHERE profissional_id=? AND data=? AND hora<>'' AND id<>?", profissionalId, data, excluirId)
+    : await Q.all("SELECT hora FROM atendimentos WHERE profissional_id=? AND data=? AND hora<>''", profissionalId, data);
   for (const o of outros) {
     const [oh, om] = String(o.hora).split(":").map(Number);
     if (Number.isNaN(oh)) continue;
@@ -268,12 +182,59 @@ const PERM = {
 const PERM_LEITURA = { profissional: new Set(["pacientes", "profissionais", "servicos"]) };
 const pode = (perfil, modulo) => perfil === "admin" || (PERM[perfil] ? PERM[perfil].has(modulo) : false);
 const podeLer = (perfil, modulo) => pode(perfil, modulo) || (PERM_LEITURA[perfil] && PERM_LEITURA[perfil].has(modulo));
-const adminsAtivos = () => db.prepare("SELECT COUNT(*) c FROM g_usuarios WHERE perfil='admin' AND ativo=1").get().c;
+const adminsAtivos = async () => Number((await Q.get("SELECT COUNT(*) c FROM g_usuarios WHERE perfil='admin' AND ativo=1")).c);
 
-// Colunas reais de cada tabela (do próprio banco). Serve para o CRUD só gravar
-// o que existe — e para saber se a tabela tem "criado" antes de carimbá-lo.
+/* Colunas reais de cada tabela. Serve para o CRUD só gravar o que existe — e
+   para saber se a tabela tem "criado" antes de carimbá-lo. Preenchido em
+   iniciarRestrito(), lendo o information_schema (o equivalente do Postgres ao
+   PRAGMA table_info do SQLite). */
 const COLS = {};
-for (const t of Object.keys(TAB)) COLS[t] = new Set(db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name));
+
+/* ==========================================================================
+   INICIALIZAÇÃO — o que antes rodava solto no topo do arquivo
+
+   Com o SQLite, abrir o banco era síncrono: dava para criar tabela e semear
+   dado durante o `require`. Com o PostgreSQL, conectar é assíncrono — não
+   existe "banco pronto" no meio de um require.
+
+   Então o boot virou esta função, que o server.js AGUARDA antes de abrir a
+   porta. É melhor assim: enquanto isto não terminar, ninguém entra num sistema
+   meio inicializado. Se falhar, o /restrito não sobe — mas o site continua.
+
+   É seguro rodar a cada boot: cada passo ou é idempotente (só semeia tabela
+   vazia) ou tem trava em g_config.
+   ========================================================================== */
+async function iniciarRestrito() {
+  /* 0. a chave dos dados sensíveis. Sem ela o sistema NÃO sobe: a alternativa
+     seria gravar CPF, endereço e prontuário em texto puro com o instituto
+     trabalhando normal e ninguém percebendo que a proteção parou de existir. */
+  if (!chaveConfigurada()) {
+    throw new Error([
+      "chave dos dados sensíveis ausente ou inválida — " + erroChave(),
+      "    Gere com: openssl rand -base64 32",
+      "    E grave como DADOS_CHAVE em /etc/kenosis.env",
+      "    ATENÇÃO: perder essa chave torna os dados já gravados ilegíveis.",
+    ].join("\n"));
+  }
+
+  /* 1. esquema em dia, antes de qualquer consulta */
+  await migrarEsquema({ silencioso: true });
+
+  /* 2. quais colunas cada tabela tem de verdade */
+  for (const t of Object.keys(TAB)) {
+    const cols = await Q.all(
+      "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=?", t);
+    COLS[t] = new Set(cols.map((c) => c.column_name));
+    if (!COLS[t].size) console.error(`  ✖ /restrito: a tabela "${t}" não existe no banco — migration faltando?`);
+  }
+
+  /* 3. semente: um usuário admin inicial, trocável na primeira entrada */
+  if ((await Q.get("SELECT COUNT(*) c FROM g_usuarios")).c === 0) {
+    await Q.run("INSERT INTO g_usuarios(nome,email,senha_hash,perfil,ativo,criado) VALUES(?,?,?,?,1,?)",
+      "Administrador", "admin", hashSenha("kenosis-gestao"), "admin", new Date().toISOString());
+    console.log("  · /restrito: sistema de gestão criado. Login: admin · senha: kenosis-gestao");
+  }
+}
 
 /* ==========================================================================
    Handler — o server.js chama isto para tudo que casa /restrito
@@ -327,7 +288,7 @@ async function rotaApi(req, res, p) {
   if (p === "login" && req.method === "POST") {
     if (bloqueado(ip)) return json(res, 429, { error: "Muitas tentativas. Aguarde 15 minutos." });
     const { usuario, senha } = await readBody(req);
-    const u = db.prepare("SELECT * FROM g_usuarios WHERE email=? AND ativo=1").get(String(usuario || "").trim());
+    const u = await Q.get("SELECT * FROM g_usuarios WHERE email=? AND ativo=1", String(usuario || "").trim());
     if (!u || !confereSenha(senha, u.senha_hash)) { erroLogin(ip); return json(res, 401, { error: "Usuário ou senha incorretos." }); }
     tentativas.delete(ip);
     const rid = novaSessao(u);
@@ -349,10 +310,10 @@ async function rotaApi(req, res, p) {
 
   if (p === "senha" && req.method === "POST") {
     const { atual, nova } = await readBody(req);
-    const u = db.prepare("SELECT * FROM g_usuarios WHERE id=?").get(s.userId);
+    const u = await Q.get("SELECT * FROM g_usuarios WHERE id=?", s.userId);
     if (!confereSenha(atual, u.senha_hash)) return json(res, 400, { error: "Senha atual incorreta." });
     if (String(nova || "").length < 8) return json(res, 400, { error: "A nova senha precisa de ao menos 8 caracteres." });
-    db.prepare("UPDATE g_usuarios SET senha_hash=? WHERE id=?").run(hashSenha(nova), s.userId);
+    await Q.run("UPDATE g_usuarios SET senha_hash=? WHERE id=?", hashSenha(nova), s.userId);
     for (const [k, v] of sessoes) if (v.userId === s.userId && k !== s.rid) sessoes.delete(k);
     return json(res, 200, { ok: true });
   }
@@ -360,42 +321,34 @@ async function rotaApi(req, res, p) {
   // painel: números para a home do sistema. O profissional não vê números
   // globais (só a sua agenda e prontuários) — devolve os dele.
   if (p === "painel") {
-    const n = (sql) => db.prepare(sql).get().c;
+    const n = async (sql, ...a) => (await Q.get(sql, ...a)).c;
     const hoje = new Date().toISOString().slice(0, 10);
     if (s.perfil === "profissional") {
       return json(res, 200, { profissional: true,
-        agendaHoje: db.prepare("SELECT COUNT(*) c FROM atendimentos WHERE profissional_id=? AND data=?").get(s.profissionalId, hoje).c,
-        agendaTotal: db.prepare("SELECT COUNT(*) c FROM atendimentos WHERE profissional_id=?").get(s.profissionalId).c,
-        prontuarios: db.prepare("SELECT COUNT(*) c FROM prontuario WHERE usuario_id=?").get(s.userId).c });
+        agendaHoje: await n("SELECT COUNT(*) c FROM atendimentos WHERE profissional_id=? AND data=?", s.profissionalId, hoje),
+        agendaTotal: await n("SELECT COUNT(*) c FROM atendimentos WHERE profissional_id=?", s.profissionalId),
+        prontuarios: await n("SELECT COUNT(*) c FROM prontuario WHERE usuario_id=?", s.userId) });
     }
     return json(res, 200, {
-      pacientes: n("SELECT COUNT(*) c FROM pacientes"),
-      associados: n("SELECT COUNT(*) c FROM associados"),
-      atendimentosHoje: db.prepare("SELECT COUNT(*) c FROM atendimentos WHERE data=?").get(hoje).c,
-      eventos: n("SELECT COUNT(*) c FROM eventos"),
-      beneficios: n("SELECT COUNT(*) c FROM beneficios"),
+      pacientes: await n("SELECT COUNT(*) c FROM pacientes"),
+      associados: await n("SELECT COUNT(*) c FROM associados"),
+      atendimentosHoje: await n("SELECT COUNT(*) c FROM atendimentos WHERE data=?", hoje),
+      eventos: await n("SELECT COUNT(*) c FROM eventos"),
+      beneficios: await n("SELECT COUNT(*) c FROM beneficios"),
     });
   }
 
   // relatórios (3.5): agregações para a tela de indicadores
   if (p === "relatorios") {
     if (!pode(s.perfil, "relatorios")) return json(res, 403, { error: "Sem permissão." });
-    const grupo = (sql) => db.prepare(sql).all();
-    const n = (sql) => db.prepare(sql).get().c;
-    return json(res, 200, {
-      totais: {
-        pacientes: n("SELECT COUNT(*) c FROM pacientes"),
-        associados: n("SELECT COUNT(*) c FROM associados"),
-        atendimentos: n("SELECT COUNT(*) c FROM atendimentos"),
-        faltas: n("SELECT COUNT(*) c FROM atendimentos WHERE status='Faltou'"),
-        eventos: n("SELECT COUNT(*) c FROM eventos"),
-        beneficios: n("SELECT COUNT(*) c FROM beneficios"),
-      },
-      // Um atendimento pode ter VÁRIOS serviços (guardados como lista JSON),
-      // então a contagem é feita aqui, quebrando cada lista em serviços.
-      porEspecialidade: (() => {
+    const grupo = (sql) => Q.all(sql);
+    const n = async (sql) => (await Q.get(sql)).c;
+    /* A contagem por serviço não sai numa consulta SQL: um atendimento guarda
+       VÁRIOS serviços numa lista JSON, e é preciso quebrar cada lista. Feito
+       antes do json() porque agora depende de await. */
+    const porEspecialidade = await (async () => {
         const conta = {};
-        for (const a of db.prepare("SELECT especialidade FROM atendimentos").all()) {
+        for (const a of await Q.all("SELECT especialidade FROM atendimentos")) {
           let itens = [];
           try { itens = JSON.parse(a.especialidade || "[]"); if (!Array.isArray(itens)) itens = []; }
           catch { itens = a.especialidade ? [a.especialidade] : []; }   // compat: valor antigo era texto
@@ -403,9 +356,19 @@ async function rotaApi(req, res, p) {
           for (const it of itens) conta[it] = (conta[it] || 0) + 1;
         }
         return Object.entries(conta).map(([rotulo, total]) => ({ rotulo, total })).sort((x, y) => y.total - x.total);
-      })(),
-      porStatus: grupo("SELECT COALESCE(NULLIF(status,''),'(sem status)') rotulo, COUNT(*) total FROM atendimentos GROUP BY rotulo ORDER BY total DESC"),
-      porMes: grupo("SELECT substr(data,1,7) rotulo, COUNT(*) total FROM atendimentos WHERE data<>'' GROUP BY rotulo ORDER BY rotulo DESC LIMIT 12"),
+    })();
+    return json(res, 200, {
+      totais: {
+        pacientes: await n("SELECT COUNT(*) c FROM pacientes"),
+        associados: await n("SELECT COUNT(*) c FROM associados"),
+        atendimentos: await n("SELECT COUNT(*) c FROM atendimentos"),
+        faltas: await n("SELECT COUNT(*) c FROM atendimentos WHERE status='Faltou'"),
+        eventos: await n("SELECT COUNT(*) c FROM eventos"),
+        beneficios: await n("SELECT COUNT(*) c FROM beneficios"),
+      },
+      porEspecialidade,
+      porStatus: await grupo("SELECT COALESCE(NULLIF(status,''),'(sem status)') rotulo, COUNT(*) total FROM atendimentos GROUP BY rotulo ORDER BY total DESC"),
+      porMes: await grupo("SELECT substr(data,1,7) rotulo, COUNT(*) total FROM atendimentos WHERE data<>'' GROUP BY rotulo ORDER BY rotulo DESC LIMIT 12"),
     });
   }
 
@@ -427,8 +390,8 @@ async function rotaApi(req, res, p) {
     const idm = p.match(/^usuarios\/(\d+)$/);
     const id = idm ? idm[1] : null;
     // nunca devolvemos o hash da senha
-    if (req.method === "GET" && !id) return json(res, 200, db.prepare("SELECT id,nome,email,perfil,ativo,profissional_id FROM g_usuarios ORDER BY id").all());
-    if (req.method === "GET" && id) return json(res, 200, db.prepare("SELECT id,nome,email,perfil,ativo,profissional_id FROM g_usuarios WHERE id=?").get(id) || {});
+    if (req.method === "GET" && !id) return json(res, 200, await Q.all("SELECT id,nome,email,perfil,ativo,profissional_id FROM g_usuarios ORDER BY id"));
+    if (req.method === "GET" && id) return json(res, 200, await Q.get("SELECT id,nome,email,perfil,ativo,profissional_id FROM g_usuarios WHERE id=?", id) || {});
     if (req.method === "POST" && !id) {
       const b = await readBody(req);
       const nome = String(b.nome || "").trim(), email = String(b.email || "").trim(), perfil = String(b.perfil || "secretaria").trim();
@@ -437,19 +400,18 @@ async function rotaApi(req, res, p) {
       if (String(b.senha || "").length < 8) return json(res, 400, { error: "A senha precisa de ao menos 8 caracteres." });
       const profId = perfil === "profissional" && b.profissional_id ? Number(b.profissional_id) : null;
       try {
-        db.prepare("INSERT INTO g_usuarios(nome,email,senha_hash,perfil,ativo,profissional_id,criado) VALUES(?,?,?,?,?,?,?)")
-          .run(nome, email, hashSenha(b.senha), perfil, b.ativo === undefined ? 1 : (Number(b.ativo) ? 1 : 0), profId, agora());
+        await Q.run("INSERT INTO g_usuarios(nome,email,senha_hash,perfil,ativo,profissional_id,criado) VALUES(?,?,?,?,?,?,?)", nome, email, hashSenha(b.senha), perfil, b.ativo === undefined ? 1 : (Number(b.ativo) ? 1 : 0), profId, agora());
       } catch (e) { return json(res, 400, { error: /UNIQUE/.test(e.message) ? "Já existe um usuário com esse login." : "Erro ao criar usuário." }); }
       return json(res, 200, { ok: true });
     }
     if (req.method === "PUT" && id) {
       const b = await readBody(req);
-      const alvo = db.prepare("SELECT perfil,ativo FROM g_usuarios WHERE id=?").get(id);
+      const alvo = await Q.get("SELECT perfil,ativo FROM g_usuarios WHERE id=?", id);
       if (!alvo) return json(res, 404, { error: "Usuário não encontrado." });
       // não deixar o único admin ativo se rebaixar a si mesmo ou desativar
       const viraNaoAdmin = b.perfil !== undefined && b.perfil !== "admin";
       const viraInativo = b.ativo !== undefined && !Number(b.ativo);
-      if (alvo.perfil === "admin" && alvo.ativo && (viraNaoAdmin || viraInativo) && adminsAtivos() <= 1)
+      if (alvo.perfil === "admin" && alvo.ativo && (viraNaoAdmin || viraInativo) && (await adminsAtivos()) <= 1)
         return json(res, 400, { error: "Não é possível rebaixar ou desativar o único administrador." });
       const sets = [], args = [];
       if (b.nome !== undefined) { sets.push("nome=?"); args.push(String(b.nome).trim()); }
@@ -459,16 +421,16 @@ async function rotaApi(req, res, p) {
       if (b.profissional_id !== undefined) { sets.push("profissional_id=?"); args.push(b.profissional_id ? Number(b.profissional_id) : null); }
       if (b.senha) { if (String(b.senha).length < 8) return json(res, 400, { error: "A senha precisa de ao menos 8 caracteres." }); sets.push("senha_hash=?"); args.push(hashSenha(b.senha)); }
       if (sets.length) {
-        try { db.prepare(`UPDATE g_usuarios SET ${sets.join(",")} WHERE id=?`).run(...args, id); }
+        try { await Q.run(`UPDATE g_usuarios SET ${sets.join(",")} WHERE id=?`, ...args, id); }
         catch (e) { return json(res, 400, { error: /UNIQUE/.test(e.message) ? "Já existe um usuário com esse login." : "Erro ao salvar." }); }
       }
       return json(res, 200, { ok: true });
     }
     if (req.method === "DELETE" && id) {
       if (Number(id) === s.userId) return json(res, 400, { error: "Você não pode excluir o próprio usuário." });
-      const alvo = db.prepare("SELECT perfil,ativo FROM g_usuarios WHERE id=?").get(id);
-      if (alvo && alvo.perfil === "admin" && alvo.ativo && adminsAtivos() <= 1) return json(res, 400, { error: "Não é possível excluir o único administrador." });
-      db.prepare("DELETE FROM g_usuarios WHERE id=?").run(id);
+      const alvo = await Q.get("SELECT perfil,ativo FROM g_usuarios WHERE id=?", id);
+      if (alvo && alvo.perfil === "admin" && alvo.ativo && (await adminsAtivos()) <= 1) return json(res, 400, { error: "Não é possível excluir o único administrador." });
+      await Q.run("DELETE FROM g_usuarios WHERE id=?", id);
       return json(res, 200, { ok: true });
     }
   }
@@ -478,7 +440,7 @@ async function rotaApi(req, res, p) {
   if (sm && req.method === "POST") {
     if (!["admin", "secretaria"].includes(s.perfil)) return json(res, 403, { error: "Sem permissão." });
     const nova = String(crypto.randomInt(10000000, 100000000));   // 8 dígitos
-    db.prepare("UPDATE associados SET senha_externo=? WHERE id=?").run(hashSenha(nova), sm[1]);   // guarda o hash
+    await Q.run("UPDATE associados SET senha_externo=? WHERE id=?", hashSenha(nova), sm[1]);   // guarda o hash
     return json(res, 200, { ok: true, senha: nova });                                           // devolve o texto uma vez
   }
 
@@ -509,10 +471,10 @@ async function rotaApi(req, res, p) {
       if (donoCol) { cond.push(donoCol + "=?"); args.push(donoVal); }
       if (cond.length) sql += " WHERE " + cond.join(" AND ");
       sql += ` ORDER BY id DESC`;
-      return json(res, 200, db.prepare(sql).all(...args));
+      return json(res, 200, await Q.all(sql, ...args));
     }
     if (req.method === "GET" && id) {
-      const row = db.prepare(`SELECT * FROM ${tabela} WHERE id=?`).get(id);
+      const row = await Q.get(`SELECT * FROM ${tabela} WHERE id=?`, id);
       if (!row) return json(res, 404, { error: "Registro não encontrado." });
       if (donoCol && String(row[donoCol]) !== String(donoVal)) return json(res, 403, { error: "Registro de outro profissional." });
       return json(res, 200, row);
@@ -525,37 +487,40 @@ async function rotaApi(req, res, p) {
       // UMA vez para a secretaria repassar, e nunca mais fica recuperável.
       let senhaGerada = null;
       if (tabela === "associados") { senhaGerada = String(crypto.randomInt(10000000, 100000000)); b.senha_externo = hashSenha(senhaGerada); }
-      if (tabela === "atendimentos") { const e = validarAgenda(b.profissional_id, b.data, b.hora, null); if (e) return json(res, 400, { error: e }); }
-      if (tabela === "projetos") { b.slug = slugify(b.slug || b.title); if (b.slug && db.prepare("SELECT id FROM projetos WHERE slug=?").get(b.slug)) b.slug = `${b.slug}-${Date.now().toString(36)}`; }
+      if (tabela === "atendimentos") { const e = await validarAgenda(b.profissional_id, b.data, b.hora, null); if (e) return json(res, 400, { error: e }); }
+      if (tabela === "projetos") { b.slug = slugify(b.slug || b.title); if (b.slug && await Q.get("SELECT id FROM projetos WHERE slug=?", b.slug)) b.slug = `${b.slug}-${Date.now().toString(36)}`; }
       const use = cols.filter((c) => c in b && COLS[tabela].has(c));
       const temCriado = COLS[tabela].has("criado");
       const campos = temCriado ? use.concat("criado") : use;
       const valores = temCriado ? use.map((c) => b[c]).concat(agora()) : use.map((c) => b[c]);
-      const info = db.prepare(`INSERT INTO ${tabela}(${campos.join(",")}) VALUES(${campos.map(() => "?").join(",")})`).run(...valores);
-      return json(res, 200, { ok: true, id: Number(info.lastInsertRowid), senha: senhaGerada || undefined });
+      /* Q.inserir e não Q.run: o id novo é preciso na resposta (a tela usa para
+         abrir o registro recém-criado). No SQLite ele vinha de lastInsertRowid;
+         no PostgreSQL só existe com RETURNING, que o Q.inserir acrescenta. */
+      const novoId = await Q.inserir(`INSERT INTO ${tabela}(${campos.join(",")}) VALUES(${campos.map(() => "?").join(",")})`, ...valores);
+      return json(res, 200, { ok: true, id: novoId, senha: senhaGerada || undefined });
     }
     if (req.method === "PUT" && id) {
-      if (donoCol) { const dono = db.prepare(`SELECT ${donoCol} d FROM ${tabela} WHERE id=?`).get(id); if (dono && String(dono.d) !== String(donoVal)) return json(res, 403, { error: "Registro de outro profissional." }); }
+      if (donoCol) { const dono = await Q.get(`SELECT ${donoCol} d FROM ${tabela} WHERE id=?`, id); if (dono && String(dono.d) !== String(donoVal)) return json(res, 403, { error: "Registro de outro profissional." }); }
       const b = await readBody(req);
       delete b.usuario_id; delete b.senha_externo;    // não se troca dono nem senha por aqui
       if (donoCol === "profissional_id") delete b.profissional_id;   // o profissional não reatribui o atendimento
       if (tabela === "atendimentos") {
-        const at = db.prepare("SELECT profissional_id,data,hora FROM atendimentos WHERE id=?").get(id) || {};
-        const e = validarAgenda(b.profissional_id ?? at.profissional_id, b.data ?? at.data, b.hora ?? at.hora, id);
+        const at = await Q.get("SELECT profissional_id,data,hora FROM atendimentos WHERE id=?", id) || {};
+        const e = await validarAgenda(b.profissional_id ?? at.profissional_id, b.data ?? at.data, b.hora ?? at.hora, id);
         if (e) return json(res, 400, { error: e });
       }
       if (tabela === "projetos" && (b.slug !== undefined || b.title !== undefined)) {
         b.slug = slugify(b.slug || b.title);
-        const clash = b.slug && db.prepare("SELECT id FROM projetos WHERE slug=?").get(b.slug);
+        const clash = b.slug && await Q.get("SELECT id FROM projetos WHERE slug=?", b.slug);
         if (clash && String(clash.id) !== String(id)) b.slug = `${b.slug}-${Date.now().toString(36)}`;
       }
       const use = cols.filter((c) => c in b && COLS[tabela].has(c));
-      if (use.length) db.prepare(`UPDATE ${tabela} SET ${use.map((c) => c + "=?").join(",")} WHERE id=?`).run(...use.map((c) => b[c]), id);
+      if (use.length) await Q.run(`UPDATE ${tabela} SET ${use.map((c) => c + "=?").join(",")} WHERE id=?`, ...use.map((c) => b[c]), id);
       return json(res, 200, { ok: true });
     }
     if (req.method === "DELETE" && id) {
-      if (donoCol) { const dono = db.prepare(`SELECT ${donoCol} d FROM ${tabela} WHERE id=?`).get(id); if (dono && String(dono.d) !== String(donoVal)) return json(res, 403, { error: "Registro de outro profissional." }); }
-      db.prepare(`DELETE FROM ${tabela} WHERE id=?`).run(id);
+      if (donoCol) { const dono = await Q.get(`SELECT ${donoCol} d FROM ${tabela} WHERE id=?`, id); if (dono && String(dono.d) !== String(donoVal)) return json(res, 403, { error: "Registro de outro profissional." }); }
+      await Q.run(`DELETE FROM ${tabela} WHERE id=?`, id);
       return json(res, 200, { ok: true });
     }
   }
@@ -582,6 +547,38 @@ function sessaoExt(req) {
 }
 setInterval(() => { const lim = Date.now() - SESSAO_EXT_HORAS * 3600_000; for (const [k, v] of sessoesExt) if (v.ts < lim) sessoesExt.delete(k); }, 30 * 60_000).unref();
 
+/* A foto do associado, servida só para ele mesmo. Fica fora do handleExterno
+   porque precisa consultar o banco (assíncrono) e o handler tem de continuar
+   síncrono — ver o comentário logo abaixo. */
+async function fotoDoAssociado(req, res) {
+  try {
+    const s = sessaoExt(req);
+    const a = s && await Q.get("SELECT foto FROM associados WHERE id=?", s.associadoId);
+    const arq = a && a.foto ? path.join(UPLOAD_DIR, path.basename(a.foto)) : null;
+    if (!arq || !arq.startsWith(UPLOAD_DIR) || !fs.existsSync(arq)) { res.writeHead(404); res.end("404"); return; }
+    const ext = path.extname(arq).toLowerCase();
+    res.writeHead(200, {
+      "Content-Type": { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" }[ext] || "application/octet-stream",
+      "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex",
+    });
+    fs.createReadStream(arq).pipe(res);
+  } catch (e) {
+    console.error("  ✖ /externo/foto:", e.message);
+    if (!res.headersSent) { res.writeHead(500); res.end("500"); }
+  }
+}
+
+/* ==========================================================================
+   handleExterno CONTINUA SÍNCRONO — de propósito.
+
+   O server.js decide o roteamento com `if (handleExterno(req,res,p)) return;`.
+   Se esta função fosse assíncrona, ela devolveria uma Promise — que é SEMPRE
+   verdadeira. O `if` passaria para TODAS as requisições, e o site inteiro
+   pararia de responder porque o servidor acharia que o portal já tratou tudo.
+
+   O único trecho que precisa do banco (a foto do associado) foi isolado numa
+   função assíncrona própria, disparada como o `rotaExt` logo acima já era.
+   ========================================================================== */
 function handleExterno(req, res, pathname) {
   if (pathname !== "/externo" && !pathname.startsWith("/externo/")) return false;
   if (pathname === "/externo") { res.writeHead(302, { Location: "/externo/" }); res.end(); return true; }
@@ -592,15 +589,7 @@ function handleExterno(req, res, pathname) {
   }); return true; }
 
   // foto da ficha, servida só para o próprio associado logado
-  if (rota === "/foto") {
-    const s = sessaoExt(req);
-    const a = s && db.prepare("SELECT foto FROM associados WHERE id=?").get(s.associadoId);
-    const arq = a && a.foto ? path.join(UPLOAD_DIR, path.basename(a.foto)) : null;
-    if (!arq || !arq.startsWith(UPLOAD_DIR) || !fs.existsSync(arq)) { res.writeHead(404); res.end("404"); return true; }
-    const ext = path.extname(arq).toLowerCase();
-    res.writeHead(200, { "Content-Type": { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" }[ext] || "application/octet-stream", "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex" });
-    fs.createReadStream(arq).pipe(res); return true;
-  }
+  if (rota === "/foto") { fotoDoAssociado(req, res); return true; }
 
   if (rota === "/" || rota === "/index.html") {
     const html = fs.readFileSync(path.join(APP_DIR, "externo.html"), "utf8").replace(/\{\{VERSAO\}\}/g, SISTEMA_VERSION);
@@ -617,7 +606,7 @@ async function rotaExt(req, res, p) {
     const { cpf, senha } = await readBody(req);
     const dig = String(cpf || "").replace(/\D/g, "");
     // acha o associado pelo CPF e confere o HASH da senha (nunca comparamos texto puro)
-    const cand = dig ? db.prepare("SELECT id,nome,cpf,senha_externo FROM associados WHERE senha_externo IS NOT NULL AND senha_externo<>''").all() : [];
+    const cand = dig ? await Q.all("SELECT id,nome,cpf,senha_externo FROM associados WHERE senha_externo IS NOT NULL AND senha_externo<>''") : [];
     const a = cand.find((x) => String(x.cpf || "").replace(/\D/g, "") === dig && confereSenha(String(senha || "").trim(), x.senha_externo));
     if (!a) { erroLogin(ip); return json(res, 401, { error: "CPF ou senha incorretos." }); }
     tentativas.delete(ip);
@@ -630,31 +619,41 @@ async function rotaExt(req, res, p) {
   if (!s) return json(res, 401, { error: "Não autenticado" });
   if (p === "logout" && req.method === "POST") { sessoesExt.delete(s.eid); res.setHeader("Set-Cookie", "eid=; HttpOnly; Path=/externo; Max-Age=0"); return json(res, 200, { ok: true }); }
   if (p === "ficha") {
-    const a = db.prepare("SELECT nome,cpf,contato,endereco,vinculo,adesao,mensalidade,status,foto FROM associados WHERE id=?").get(s.associadoId) || {};
-    const eventos = db.prepare("SELECT tipo,titulo,tema,local,data FROM eventos WHERE data<>'' ORDER BY data DESC LIMIT 8").all();
+    const a = await Q.get("SELECT nome,cpf,contato,endereco,vinculo,adesao,mensalidade,status,foto FROM associados WHERE id=?", s.associadoId) || {};
+    const eventos = await Q.all("SELECT tipo,titulo,tema,local,data FROM eventos WHERE data<>'' ORDER BY data DESC LIMIT 8");
     return json(res, 200, { ficha: a, temFoto: !!a.foto, novidades: eventos });
   }
   return json(res, 404, { error: "Rota não encontrada" });
 }
 
-/* ------- Ponte com o site: o painel (/admin) só LÊ os projetos daqui ------ */
-const listarProjetos = () => db.prepare("SELECT * FROM projetos ORDER BY sort, id").all();
-const contarProjetos = () => db.prepare("SELECT COUNT(*) c FROM projetos").get().c;
+/* ------- Ponte com o site: o painel (/admin) só LÊ os projetos daqui ------
+   Estas quatro funções são chamadas pelo server.js na hora de publicar o site.
+   Todas viraram ASSÍNCRONAS na passagem para o PostgreSQL — quem as chama
+   precisa aguardar. */
+const listarProjetos = () => Q.all("SELECT * FROM projetos ORDER BY sort, id");
+const contarProjetos = async () => Number((await Q.get("SELECT COUNT(*) c FROM projetos")).c);
 // Semeia os projetos que já existiam no site.db na primeira vez (migração única).
-function importarProjetos(rows) {
-  const ins = db.prepare("INSERT INTO projetos(title,slug,sigla,status,resumo,publico,content,sort,criado) VALUES(?,?,?,?,?,?,?,?,?)");
+async function importarProjetos(rows) {
   let n = 0;
-  for (const p of rows || []) { ins.run(p.title, p.slug || slugify(p.title), p.sigla || "", p.status || "", p.resumo || "", p.publico || "", p.content || "", p.sort || 0, agora()); n++; }
+  for (const p of rows || []) {
+    await Q.run("INSERT INTO projetos(title,slug,sigla,status,resumo,publico,content,sort,criado) VALUES(?,?,?,?,?,?,?,?,?)",
+      p.title, p.slug || slugify(p.title), p.sigla || "", p.status || "", p.resumo || "", p.publico || "", p.content || "", p.sort || 0, agora());
+    n++;
+  }
   return n;
 }
 
-const listarServicos = () => db.prepare("SELECT * FROM servicos ORDER BY sort, id").all();
-const contarServicos = () => db.prepare("SELECT COUNT(*) c FROM servicos").get().c;
-function importarServicos(rows) {
-  const ins = db.prepare("INSERT INTO servicos(title,categoria,sort,criado) VALUES(?,?,?,?)");
+const listarServicos = () => Q.all("SELECT * FROM servicos ORDER BY sort, id");
+const contarServicos = async () => Number((await Q.get("SELECT COUNT(*) c FROM servicos")).c);
+async function importarServicos(rows) {
   let n = 0;
-  for (const s of rows || []) { ins.run(s.title, s.categoria || "", s.sort || 0, agora()); n++; }
+  for (const s of rows || []) {
+    await Q.run("INSERT INTO servicos(title,categoria,sort,criado) VALUES(?,?,?,?)",
+      s.title, s.categoria || "", s.sort || 0, agora());
+    n++;
+  }
   return n;
 }
 
-module.exports = { handleRestrito, handleExterno, listarProjetos, contarProjetos, importarProjetos, listarServicos, contarServicos, importarServicos };
+module.exports = { handleRestrito, handleExterno, iniciarRestrito, sessao, SISTEMA_VERSION,
+  listarProjetos, contarProjetos, importarProjetos, listarServicos, contarServicos, importarServicos };
