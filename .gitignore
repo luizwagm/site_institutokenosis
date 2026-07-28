@@ -15,6 +15,15 @@ data/
 # Imagens enviadas pelo painel em produção — pertencem ao servidor, não ao repo.
 assets/img/uploads/
 
+# Credenciais do PostgreSQL e a chave que cifra os dados dos beneficiários.
+# Em produção quem entrega isto é o systemd (EnvironmentFile=/etc/kenosis.env);
+# este .env é só de desenvolvimento — e mesmo assim nunca entra no repositório.
+# PERDER A DADOS_CHAVE torna CPF, endereço e prontuário ilegíveis para sempre.
+.env
+
+# Dumps SQL gerados pelo botão "Backup do banco" do painel.
+dumps/
+
 # Sistema / editor
 Thumbs.db
 .DS_Store
