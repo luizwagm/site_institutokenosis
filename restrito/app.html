@@ -361,6 +361,43 @@
     .filtro-data input[type=date]{width:auto;padding:.35rem .5rem;font-size:.85rem}
     .pd-info{font-size:.8rem;color:var(--dim)}
     @media print{.filtro-data{display:none}}
+    /* ---------------------- Pasta de prontuário ----------------------- */
+    /* O título da pasta usa a barra do topo do painel: com o nome da pessoa e
+       o serviço ali, quem escreve a evolução nunca perde de vista em qual
+       pasta está. */
+    #pront-titulo{display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap;min-width:0}
+    .pront-sub{font-size:.85rem;font-weight:500;color:var(--muted)}
+    .pront-acoes{display:flex;gap:.5rem;flex-wrap:wrap}
+    .pasta-topo{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;
+      background:#eef4fb;border:1px solid var(--line);border-radius:var(--r);padding:.8rem 1rem;margin-bottom:1rem}
+    .pasta-topo.alta{background:#fdf4e6;border-color:#f0dcc0}
+    .pasta-meta{display:block;font-size:.82rem;color:var(--muted);margin-top:.3rem}
+    .areas-cab{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin:1.6rem 0 .6rem}
+    .areas-cab h3{font-size:1rem}
+    .area{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:.8rem 1rem;margin-bottom:.8rem}
+    .area-cab{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:.5rem}
+    .area-cab b{color:var(--marinho)}
+    .lanc-m{width:100%;border-collapse:collapse;font-size:.87rem}
+    .lanc-m th{text-align:left;padding:.35rem .5rem;border-bottom:1px solid var(--line);color:var(--muted);font-size:.76rem;font-weight:600}
+    .lanc-m td{padding:.45rem .5rem;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:break-word}
+    .lanc-m tr.arquivado{opacity:.55}
+    .marca-edicao{font-size:.72rem;color:var(--dim)}
+    .aviso-hist{background:#fdf4e6;border:1px solid #f0dcc0;border-radius:9px;padding:.6rem .8rem;
+      font-size:.85rem;color:#7a5a24;margin-bottom:.9rem}
+    .erros{background:#fdecef;border:1px solid #f4c9d5;border-radius:9px;padding:.6rem .8rem;
+      font-size:.85rem;color:var(--red);margin-top:.7rem}
+    /* chips das pastas de uma pessoa */
+    .chips{display:flex;gap:.4rem;flex-wrap:wrap;margin:.5rem 0}
+    .chip-pasta{display:inline-flex;align-items:center;gap:.4rem;border:1px solid var(--line2);border-radius:999px;
+      padding:.25rem .7rem;font-size:.8rem;background:#fff;color:var(--text);cursor:pointer}
+    .chip-pasta:hover{border-color:var(--celeste);color:var(--celeste)}
+    .chip-pasta.alta{opacity:.6}
+    .chip-pasta small{color:var(--dim);font-size:.72rem}
+    /* linha do tempo */
+    .tl{width:100%;border-collapse:collapse;font-size:.86rem}
+    .tl th{text-align:left;padding:.35rem .5rem;border-bottom:1px solid var(--line);color:var(--muted);font-size:.76rem}
+    .tl td{padding:.45rem .5rem;border-bottom:1px solid var(--line);vertical-align:top}
+    .tl .quando{white-space:nowrap;color:var(--muted);font-variant-numeric:tabular-nums}
   </style>
 </head>
 <body>
@@ -389,15 +426,23 @@
         <button class="navbtn" data-nav="profissionais">Profissionais</button>
         <button class="navbtn" data-nav="servicos">Serviços</button>
         <button class="navbtn" data-nav="projetos">Projetos</button>
-        <button class="navbtn" data-nav="prontuario">Prontuário</button>
         <button class="navbtn" data-nav="beneficios">Benefícios</button>
         <button class="navbtn" data-nav="eventos">Eventos</button>
       </div>
     </div>
     <button class="navbtn" data-nav="atendimentos">Agendamento</button>
+    <!-- Prontuário fica no menu principal, fora de Cadastros: não é cadastro, é
+         o acompanhamento do atendimento — e é para onde a equipe técnica vai o
+         dia inteiro. Enterrá-lo num accordion custa dois cliques por consulta. -->
+    <button class="navbtn" data-nav="prontuario">Prontuário</button>
     <button class="navbtn" data-nav="documentos_gestao">Documentos</button>
-    <button class="navbtn" data-nav="relatorios">Relatórios</button>
-    <button class="navbtn" data-nav="relatorios_pacientes">Usuários ativos / inativos</button>
+    <div class="side-sec">
+      <button class="side-head" type="button">Relatórios <span class="tn-caret">▼</span></button>
+      <div class="side-sub">
+        <button class="navbtn" data-nav="relatorios">Movimento do instituto</button>
+        <button class="navbtn" data-nav="relatorios_pacientes">Usuários ativos / inativos</button>
+      </div>
+    </div>
     <div class="side-credito">Produzido por<br>LA Software House.</div>
   </aside>
 
@@ -497,6 +542,22 @@
         <div class="card"><h3 style="margin-bottom:.6rem">Serviços por situação</h3><div id="rel-status"></div></div>
       </div>
       <div class="card"><h3 style="margin-bottom:.6rem">Serviços por mês</h3><div id="rel-mes"></div></div>
+    </section>
+
+    <!-- A pasta do prontuário é TELA do sistema, não modal: com menu lateral e
+         barra do topo no lugar, cabem ali a ficha da pessoa, os vínculos e
+         quatro áreas de lançamento com anos de acompanhamento. Criar continua
+         em modal, que é um formulário curto. -->
+    <section class="panel" id="pane-pront">
+      <div class="topbar">
+        <h1 id="pront-titulo"></h1>
+        <div class="pront-acoes">
+          <button class="btn btn-ghost btn-sm" onclick="fecharPront()">← Voltar</button>
+          <button class="btn btn-ghost btn-sm" id="pront-imprimir">🖨 Imprimir prontuário</button>
+          <button class="btn btn-navy btn-sm" id="pront-salvar">Salvar</button>
+        </div>
+      </div>
+      <div id="pront-corpo"></div>
     </section>
 
     <!-- Relação para retomar contato: quem está ativo, quem saiu, onde mora. -->
@@ -645,7 +706,13 @@ async function apiCrua(url, method = "GET", body) {
        diante de um erro sem sentido. */
     if (r.status === 404 && /rota não encontrada/i.test(j.error || ""))
       throw new Error("Esta função não existe no servidor que está rodando. O sistema foi atualizado, mas o serviço não foi reiniciado — peça para reiniciar (systemctl restart kenosis) e tente de novo.");
-    throw new Error(j.error || r.statusText);
+    /* O erro leva junto o resto do corpo da resposta. Alguns recados vêm com
+       dados que a tela usa para oferecer a saída — a recusa de abrir uma pasta
+       repetida, por exemplo, diz QUAL é a que já existe. Sem isto, só a frase
+       chegaria e o atalho seria impossível. */
+    const erro = new Error(j.error || r.statusText);
+    for (const [k, v] of Object.entries(j)) if (k !== "error") erro[k] = v;
+    throw erro;
   }
   return j;
 }
@@ -772,25 +839,28 @@ const MODULOS = {
       ["status","Situação","select",{opcoes:["Agendado","Confirmado","Faltou","Remarcado","Atendido"]}],
       ["observacoes","Observações","textarea",{full:1}],
     ]},
-  prontuario: { titulo:"Prontuário eletrônico", novo:"Novo registro",
-    colunas:[["data","Data","data"],["paciente_id","Usuário","pac"],["especialidade","Serviço","servicos"],["profissional","Profissional"]],
+  /* prontuarioPasta: abrir vira TELA, não modal, e ganha as áreas de
+     lançamento. historico: o botão "prontuário completo". */
+  prontuario: { titulo:"Prontuário eletrônico", novo:"Abrir prontuário", busca:false,
+    prontuarioPasta:true, historico:true,
+    colunas:[["numero","Nº"],["paciente_id","Usuário","pac"],["especialidade","Serviço"],["profissional","Profissional"],["status","Situação","tag"]],
     campos:[
-      ["paciente_id","Usuário","busca",{tabela:"pacientes",req:1}],
+      /* Usuário e serviço definem a IDENTIDADE da pasta: depois de aberta não
+         mudam, senão o número passaria a apontar para outro acompanhamento. */
+      ["paciente_id","Usuário","busca",{tabela:"pacientes",req:1,travaSeSalvo:1}],
       /* Oculto para o próprio profissional: o registro é sempre dele (o
          servidor carimba o dono), e deixar o campo à mostra só permitiria
          escrever ali o nome de um colega — o prontuário continuaria sendo dele,
          mas exibiria outro responsável. */
       ["profissional","Profissional responsável","busca",{tabela:"profissionais",valor:"nome",filtraServicos:1,ocultarPara:"profissional"}],
-      ["data","Data do atendimento","date",{req:1}],
-      ["especialidade","Serviço","servicos_check",{full:1}],
-      /* "rico" e não "textarea": registro de atendimento não é texto corrido —
-         tem lista de encaminhamentos, item em negrito, parágrafo separando
-         sessões. São os únicos campos do sistema que aceitam formatação; o
-         servidor higieniza o HTML na gravação (ver htmlLimpo). */
-      ["avaliacao","Avaliação inicial","rico",{full:1}],
-      ["evolucao","Evolução da sessão","rico",{full:1}],
-      ["plano","Plano terapêutico","rico",{full:1}],
-      ["encaminhamentos","Encaminhamentos","rico",{full:1}],
+      /* UM serviço por pasta, e por isso um select — não a lista de caixas de
+         seleção da agenda. A alta é DA PASTA: se ela cobrisse vários serviços,
+         encerrar um obrigaria a encerrar todos. */
+      ["especialidade","Serviço","servico_um",{req:1,travaSeSalvo:1}],
+      /* "rico" e não "textarea": a observação da pasta não é texto corrido —
+         tem lista, item em negrito, parágrafo. O servidor higieniza o HTML na
+         gravação (ver htmlLimpo). */
+      ["observacao","Observações da pasta","rico",{full:1}],
       ["anexos","Anexo (foto/PDF)","arquivo",{full:1}],
       ["responsavel","Assinatura / responsável técnico","text"],
     ]},
@@ -1302,6 +1372,8 @@ document.querySelectorAll(".navbtn[data-nav]").forEach((b)=>b.addEventListener("
   document.querySelectorAll(".navbtn[data-nav]").forEach((x)=>x.classList.remove("on"));
   b.classList.add("on");
   const nav=b.dataset.nav;
+  // sair pelo menu também encerra a tela da pasta
+  if(PRONT_ABERTO){ PRONT_ABERTO=0; PASTA=null; FORM_ID=0; $("#pront-corpo").innerHTML=""; $("#pront-titulo").innerHTML=""; }
   document.querySelectorAll(".panel").forEach((x)=>x.classList.remove("on"));
   if(nav==="painel"){ $("#pane-painel").classList.add("on"); carregarPainel(); }
   else if(nav==="conta"){ $("#pane-conta").classList.add("on"); }
@@ -1642,6 +1714,263 @@ function dadosVisiveis(){
   return COM_PERIODO.has(MOD) ? base.filter((r)=>dentroDoPeriodo(r, MOD)) : base;
 }
 /* ==========================================================================
+   PASTA DE PRONTUÁRIO
+
+   Quatro áreas (avaliação, evolução, plano, encaminhamento). Cada uma lista os
+   lançamentos daquele tipo, com data própria, e permite acrescentar mais.
+   Nada é excluído: o que sai de uso é ARQUIVADO e volta com um clique.
+   ========================================================================== */
+let PRONT_ABERTO = 0, PASTA = null, MOSTRAR_ARQUIVADOS = false;
+const TIPOS_PRONT = [
+  ["avaliacao","Avaliação","Avaliações registradas"],
+  ["evolucao","Evolução","Evoluções dos atendimentos"],
+  ["plano","Plano de acompanhamento","Planos registrados"],
+  ["encaminhamento","Encaminhamento","Encaminhamentos"],
+];
+const dataHoraBR = (iso) => { const d=new Date(iso); return isNaN(d)?String(iso||"—"):d.toLocaleString("pt-BR"); };
+/* A data de HOJE em AAAA-MM-DD, no fuso de quem está usando. `toISOString()`
+   converte para UTC — em Caruaru, das 21h em diante ele já devolveria o dia
+   seguinte, e o lançamento nasceria datado de amanhã. */
+function hojeISO(){
+  const d=new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
+/* Entra na tela da pasta: some a lista, aparece o painel. */
+function abrirPainelPront(){
+  document.querySelectorAll(".panel").forEach((x)=>x.classList.remove("on"));
+  $("#pane-pront").classList.add("on");
+  window.scrollTo({ top:0 });
+}
+function fecharPront(){
+  PRONT_ABERTO = 0; FORM_ID = 0; PASTA = null;
+  $("#pront-corpo").innerHTML=""; $("#pront-titulo").innerHTML="";
+  document.querySelectorAll(".panel").forEach((x)=>x.classList.remove("on"));
+  $("#pane-mod").classList.add("on");
+  carregarLista();
+}
+
+/* Faixa superior: situação da pasta e os botões de alta / reabertura. */
+function pintarTopoPasta(){
+  const box=$("#pasta-topo"); if(!box||!PASTA) return;
+  const alta = PASTA.status==="Alta";
+  box.innerHTML=`<div class="pasta-topo ${alta?"alta":""}">
+    <div>
+      <span class="tag ${alta?"tag-nao":"tag-Ativo"}">${alta?"Alta (encerrado)":"Em acompanhamento"}</span>
+      <span class="pasta-meta">Aberto em ${escA(dataBR(PASTA.aberto_em))}${
+        alta&&PASTA.alta_em?` · alta em ${escA(dataBR(PASTA.alta_em))}`:""}${
+        PASTA.alta_motivo?` — ${escA(PASTA.alta_motivo)}`:""}${
+        PASTA.reativado_em?` · reaberto em ${escA(dataHoraBR(PASTA.reativado_em))}`:""}</span>
+    </div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <button type="button" class="btn btn-ghost btn-sm" onclick="verHistoricoPasta()">Histórico</button>
+      ${alta
+        ? `<button type="button" class="btn btn-navy btn-sm" onclick="reabrirPasta()">Reabrir prontuário</button>`
+        : `<button type="button" class="btn btn-ghost btn-sm" onclick="darAlta()">Dar alta</button>`}
+    </div></div>`;
+}
+
+/* Monta as quatro áreas e carrega os lançamentos. */
+async function montarAreasProntuario(prontId){
+  const box=$("#pasta-areas"); if(!box) return;
+  box.innerHTML=`<div id="pasta-vinculos"></div>
+    <div class="areas-cab">
+      <h3>Lançamentos do prontuário</h3>
+      <label class="chk" style="font-size:.82rem"><input type="checkbox" ${MOSTRAR_ARQUIVADOS?"checked":""}
+        onchange="MOSTRAR_ARQUIVADOS=this.checked;montarAreasProntuario(${prontId})"> mostrar arquivados</label>
+    </div>` +
+    TIPOS_PRONT.map(([tipo,rot,titulo])=>`
+      <div class="area" data-area="${tipo}">
+        <div class="area-cab">
+          <b>${escA(titulo)}</b>
+          <button type="button" class="btn btn-navy btn-sm" onclick="novoLancamento('${tipo}',${prontId})">+ ${escA(rot)}</button>
+        </div>
+        <div id="area-${tipo}"><p class="hint" style="color:var(--dim)">Carregando…</p></div>
+      </div>`).join("");
+  pintarVinculosPasta(prontId);
+  let regs=[];
+  try{ regs=await api(`prontuario_registros?prontuario_id=${prontId}${MOSTRAR_ARQUIVADOS?"&arquivados=1":""}`); }
+  catch(e){ return toast(e.message,true); }
+  for(const [tipo] of TIPOS_PRONT) pintarArea(tipo, regs.filter((r)=>r.tipo===tipo), prontId);
+}
+
+function pintarArea(tipo, itens, prontId){
+  const el=$("#area-"+tipo); if(!el) return;
+  if(!itens.length){ el.innerHTML='<p class="hint" style="color:var(--dim);margin:.2rem 0 .4rem">Nenhum lançamento ainda.</p>'; return; }
+  el.innerHTML=`<table class="lanc-m"><tr><th style="width:104px">Data</th><th>Registro</th><th style="width:150px">Profissional</th><th style="width:190px"></th></tr>`+
+    itens.map((r)=>`<tr${Number(r.arquivado)?' class="arquivado"':""}>
+      <td>${escA(dataBR(r.data))}${Number(r.arquivado)?'<br><span class="tag tag-nao" style="font-size:.66rem">arquivado</span>':""}</td>
+      <td>${escA(semHtml(r.texto).slice(0,110))}${semHtml(r.texto).length>110?"…":""}
+        ${r.atualizado?`<br><span class="marca-edicao" title="O que mudou fica no Histórico da pasta">editado em ${escA(dataHoraBR(r.atualizado))}</span>`:""}</td>
+      <td>${escA(r.profissional||"—")}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="abrirLancamento(${r.id},${prontId})">Acessar</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="arquivarLancamento(${r.id},${Number(r.arquivado)?0:1},${prontId})">${Number(r.arquivado)?"Restaurar":"Arquivar"}</button>
+      </td></tr>`).join("")+`</table>`;
+}
+
+/* Os agendamentos pendurados na pasta. */
+async function pintarVinculosPasta(prontId){
+  const box=$("#pasta-vinculos"); if(!box) return;
+  let v; try{ v=await api(`prontuario/${prontId}/vinculos`); }catch(e){ box.innerHTML=""; return; }
+  const atend=v.atendimentos||[];
+  const linhas = atend.length
+    ? `<table class="lanc-m"><tr><th style="width:104px">Data</th><th style="width:80px">Hora</th><th>Serviços</th><th style="width:150px">Profissional</th><th style="width:110px">Situação</th><th style="width:120px"></th></tr>`+
+      atend.map((a)=>`<tr>
+        <td>${escA(dataBR(a.data))}</td>
+        <td>${escA(a.hora||"")}</td>
+        <td>${escA(servicosTexto(a.especialidade))}</td>
+        <td>${escA(a.profissional_nome||"—")}</td>
+        <td>${a.status?`<span class="tag tag-${escA(a.status)}">${escA(a.status)}</span>`:"—"}</td>
+        <td style="text-align:right"><button type="button" class="btn btn-ghost btn-sm" onclick="desvincularAtendimento(${prontId},${a.id})">Desvincular</button></td>
+      </tr>`).join("")+`</table>`
+    : '<p class="hint" style="color:var(--dim);margin:.2rem 0 .4rem">Nenhum agendamento vinculado ainda.</p>';
+  box.innerHTML=`<div class="areas-cab"><h3>Agendamentos deste prontuário</h3></div>
+    <div class="area">
+      <div class="area-cab"><b>${atend.length} vinculado(s)</b>
+        <button type="button" class="btn btn-navy btn-sm" onclick="escolherAtendimentoParaVincular(${prontId})">+ Vincular agendamento</button>
+      </div>${linhas}</div>`;
+}
+async function desvincularAtendimento(prontId, atendId){
+  if(!confirm("Desvincular este agendamento do prontuário? O agendamento continua na agenda.")) return;
+  try{ await api(`prontuario/${prontId}/atendimentos/${atendId}`,"DELETE"); pintarVinculosPasta(prontId); toast("Agendamento desvinculado."); }
+  catch(e){ toast(e.message,true); }
+}
+/* Lista os agendamentos da pessoa que não estão em pasta nenhuma — o caminho
+   para o primeiro, marcado antes de a pasta existir, e para os que têm mais de
+   um serviço (que o sistema não liga sozinho). */
+async function escolherAtendimentoParaVincular(prontId){
+  let livres=[]; try{ livres=await api(`prontuario/${prontId}/disponiveis`); }catch(e){ return toast(e.message,true); }
+  const host=segundoModal();
+  const corpo = livres.length
+    ? `<table class="lanc-m"><tr><th style="width:104px">Data</th><th style="width:80px">Hora</th><th>Serviços</th><th style="width:150px">Profissional</th><th style="width:110px"></th></tr>`+
+      livres.map((a)=>`<tr>
+        <td>${escA(dataBR(a.data))}</td><td>${escA(a.hora||"")}</td>
+        <td>${escA(servicosTexto(a.especialidade))}</td><td>${escA(a.profissional_nome||"—")}</td>
+        <td style="text-align:right"><button type="button" class="btn btn-navy btn-sm" onclick="vincularAtendimento(${prontId},${a.id})">Vincular</button></td>
+      </tr>`).join("")+`</table>`
+    : '<p class="hint" style="color:var(--dim)">Este usuário não tem agendamento fora de prontuário.</p>';
+  host.innerHTML=`<div class="modal-bg" style="z-index:70"><div class="modal" style="width:min(820px,96vw)">
+    <h2>Vincular agendamento</h2>
+    <div class="modal-corpo">
+      <p class="hint" style="color:var(--dim);margin:0 0 .6rem">Agendamentos deste usuário que ainda não estão em nenhum prontuário.</p>
+      ${corpo}
+    </div>
+    <div class="acoes"><button class="btn btn-ghost" onclick="fecharLancamento()">Fechar</button></div>
+  </div></div>`;
+}
+async function vincularAtendimento(prontId, atendId){
+  try{
+    await api(`prontuario/${prontId}/atendimentos/${atendId}`,"POST",{});
+    fecharLancamento(); pintarVinculosPasta(prontId); toast("Agendamento vinculado ao prontuário.");
+  }catch(e){ toast(e.message,true); }
+}
+
+/* A pasta abre em TELA; o lançamento e o histórico abrem por CIMA dela, num
+   segundo modal. Se usassem o mesmo #modal-host, fechar o lançamento apagaria
+   a pasta inteira que está por baixo. */
+const segundoModal = () => $("#modal-host2") ||
+  (()=>{ const d=document.createElement("div"); d.id="modal-host2"; document.body.appendChild(d); return d; })();
+const fecharLancamento = () => { const h=$("#modal-host2"); if(h) h.innerHTML=""; };
+
+function editorLancamento({ id, tipo, prontId, reg }){
+  const rot=(TIPOS_PRONT.find((t)=>t[0]===tipo)||["","Lançamento"])[1];
+  const arquivado=reg&&Number(reg.arquivado);
+  segundoModal().innerHTML=`<div class="modal-bg" style="z-index:70"><div class="modal" style="width:min(860px,96vw)">
+    <h2>${id?"":"Novo "}${escA(rot)}${PASTA?` · ${escA(PASTA.numero||"")}`:""}</h2>
+    <div class="modal-corpo">
+      ${arquivado?'<p class="aviso-hist">Este lançamento está arquivado. Restaure-o para voltar a editá-lo.</p>':""}
+      <div class="formgrid">
+        <div><label>Data do registro</label><input type="date" id="lc-data" value="${escA((reg&&reg.data)||hojeISO())}"${arquivado?" disabled":""}></div>
+        <div><label>Profissional</label>
+          <div class="cbx" data-cbx data-tab="profissionais" data-valor="nome" data-id="lc-prof">
+            <input type="text" id="lc-prof-txt" class="cbx-inp" autocomplete="off" placeholder="Digite para buscar…"
+              value="${escA((reg&&reg.profissional)||(PASTA&&PASTA.profissional)||"")}"${arquivado?" disabled":""}
+              oninput="cbxFiltrar('lc-prof')" onfocus="cbxFiltrar('lc-prof')" onkeydown="cbxTecla(event,'lc-prof')" onblur="cbxBlur('lc-prof')">
+            <input type="hidden" id="lc-prof" value="${escA((reg&&reg.profissional)||(PASTA&&PASTA.profissional)||"")}">
+            <div class="cbx-list" id="lc-prof-list" hidden></div>
+          </div></div>
+      </div>
+      <label>${escA(rot)}</label>
+      ${editorRico("lc-texto", (reg&&reg.texto)||"", arquivado)}
+      ${reg&&reg.criado?`<p class="hint" style="color:var(--dim)">Registrado em ${escA(dataHoraBR(reg.criado))}${reg.arquivado_em?` · arquivado em ${escA(dataHoraBR(reg.arquivado_em))}`:""}</p>`:""}
+      <div id="lc-erro"></div>
+    </div>
+    <div class="acoes">
+      ${id&&!arquivado?`<button class="btn btn-ghost" onclick="arquivarLancamento(${id},1,${prontId},true)">Arquivar</button>`:""}
+      ${id&&arquivado?`<button class="btn btn-navy" onclick="arquivarLancamento(${id},0,${prontId},true)">Restaurar</button>`:""}
+      <button class="btn btn-ghost" onclick="fecharLancamento()">Fechar</button>
+      ${arquivado?"":`<button class="btn btn-navy" onclick="salvarLancamento(${id||0},'${tipo}',${prontId})">Salvar</button>`}
+    </div></div></div>`;
+}
+function novoLancamento(tipo, prontId){ editorLancamento({ id:0, tipo, prontId, reg:null }); }
+async function abrirLancamento(id, prontId){
+  try{ const reg=await api("prontuario_registros/"+id); editorLancamento({ id, tipo:reg.tipo, prontId, reg }); }
+  catch(e){ toast(e.message,true); }
+}
+async function salvarLancamento(id, tipo, prontId){
+  edSincronizar("lc-texto");                       // pega o que está na tela agora
+  const texto=($("#lc-texto").value||"").trim();
+  /* Valida pelo TEXTO, não pelo HTML: "<p><br></p>" tem 11 caracteres e nenhum
+     conteúdo — passaria numa checagem de string vazia e gravaria um lançamento
+     em branco no prontuário. */
+  if(!semHtml(texto)){ $("#lc-erro").innerHTML='<div class="erros">Escreva o conteúdo do lançamento.</div>'; return; }
+  const body={ prontuario_id:prontId, tipo, texto, data:$("#lc-data").value, profissional:$("#lc-prof").value };
+  try{
+    if(id) await api("prontuario_registros/"+id,"PUT",body); else await api("prontuario_registros","POST",body);
+    fecharLancamento(); toast("Lançamento salvo."); montarAreasProntuario(prontId);
+  }catch(e){ $("#lc-erro").innerHTML=`<div class="erros">${escA(e.message)}</div>`; }
+}
+async function arquivarLancamento(id, arquivar, prontId, fechar){
+  if(arquivar && !confirm("Arquivar este lançamento?\n\nEle sai da lista, mas NÃO é excluído — continua no prontuário e pode ser restaurado a qualquer momento.")) return;
+  try{
+    await api(`prontuario_registros/${id}/${arquivar?"arquivar":"restaurar"}`,"POST",{});
+    if(fechar) fecharLancamento();
+    toast(arquivar?"Lançamento arquivado.":"Lançamento restaurado.");
+    montarAreasProntuario(prontId);
+  }catch(e){ toast(e.message,true); }
+}
+
+/* Alta e reabertura da pasta. */
+async function darAlta(){
+  if(!PASTA) return;
+  const motivo=prompt(`Dar alta em ${PASTA.especialidade}?\n\nO acompanhamento NESTE serviço é encerrado — os outros prontuários da pessoa seguem normais.\nNada é apagado.\n\nMotivo da alta (opcional):`,"");
+  if(motivo===null) return;
+  try{
+    await api(`prontuario/${PASTA.id}/alta`,"POST",{motivo});
+    PASTA=await api("prontuario/"+PASTA.id);
+    pintarTopoPasta(); toast("Alta registrada.");
+  }catch(e){ toast(e.message,true); }
+}
+async function reabrirPasta(){
+  if(!PASTA) return;
+  if(!confirm(`Reabrir o prontuário de ${PASTA.especialidade}?\n\nA pessoa volta ao acompanhamento neste serviço. Todo o histórico anterior é mantido.`)) return;
+  try{
+    await api(`prontuario/${PASTA.id}/reabrir`,"POST",{});
+    PASTA=await api("prontuario/"+PASTA.id);
+    pintarTopoPasta(); toast("Prontuário reaberto.");
+  }catch(e){ toast(e.message,true); }
+}
+
+/* Linha do tempo da pasta (ou da pessoa). */
+async function verHistorico(entidade, id, titulo){
+  let h=[]; try{ h=await api(`historico/${entidade}/${id}`); }catch(e){ return toast(e.message,true); }
+  segundoModal().innerHTML=`<div class="modal-bg" style="z-index:70"><div class="modal" style="width:min(820px,96vw)">
+    <h2>Histórico${titulo?" · "+escA(titulo):""}</h2>
+    <div class="modal-corpo">${h.length
+      ? `<table class="tl"><tr><th style="width:150px">Quando</th><th>O que aconteceu</th><th style="width:150px">Quem</th></tr>`+
+        h.map((x)=>`<tr>
+          <td class="quando">${escA(dataHoraBR(x.criado))}</td>
+          <td><b>${escA(x.evento)}</b>${x.detalhe?`<br><span style="color:var(--muted);font-size:.85em">${escA(x.detalhe)}</span>`:""}</td>
+          <td>${escA(x.usuario_nome||"—")}</td></tr>`).join("")+`</table>`
+      : '<p class="vazio">Nenhum evento registrado ainda.</p>'}
+    </div>
+    <div class="acoes"><button class="btn btn-ghost" onclick="fecharLancamento()">Fechar</button></div>
+  </div></div>`;
+}
+const verHistoricoPasta = () => PASTA && verHistorico("prontuario", PASTA.id, `${PASTA.numero||""} · ${PASTA.especialidade}`);
+
+/* ==========================================================================
    AÇÕES DA LINHA
 
    Em Usuários há MAIS DE UMA ação por linha (imprimir a ficha e abrir).
@@ -1651,11 +1980,13 @@ function dadosVisiveis(){
    Nos demais existe uma ação só, e um menu para um item seria um clique a mais
    para nada: fica o ícone de lupa.
    ========================================================================== */
-const MENU_TRES_PONTOS = new Set(["pacientes", "profissionais"]);
+const MENU_TRES_PONTOS = new Set(["pacientes", "profissionais", "prontuario"]);
 
 function acoesDaLinha(m, row){
   const itens=[];
   if(m.imprimir) itens.push(["Imprimir ficha", `imprimirFicha(${row.id})`]);
+  if(m.prontuarioPasta) itens.push(["Imprimir prontuário", `imprimirPasta(${row.id})`]);
+  if(m.historico) itens.push(["Prontuário completo do usuário", `imprimirHistorico(${row.paciente_id})`]);
   if(MOD==="pacientes"){
     const at=estaAtivo(row);
     itens.push([at?"Inativar usuário":"Reativar usuário", `alternarAtivoPaciente(${row.id},${at?1:0})`]);
@@ -1762,7 +2093,7 @@ function renderAgenda(){
   const cont=$("#mod-agenda");
   const comData=dadosVisiveis().filter((a)=>a.data);
   const meses=[...new Set(comData.map((a)=>a.data.slice(0,7)))].sort();
-  const hojeISO=new Date().toISOString().slice(0,10), hojeYM=hojeISO.slice(0,7);
+  const hojeStr=hojeISO(), hojeYM=hojeStr.slice(0,7);
   const minYM=meses.length?meses[0]:hojeYM, maxYM=meses.length?meses[meses.length-1]:hojeYM;
   if(!agendaYM) agendaYM=clampYM(hojeYM,minYM,maxYM); else agendaYM=clampYM(agendaYM,minYM,maxYM);
   const [ano,mes]=agendaYM.split("-").map(Number);
@@ -1777,7 +2108,7 @@ function renderAgenda(){
   for(let d=1;d<=diasNoMes;d++){
     const iso=`${ano}-${String(mes).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
     const evs=(porDia[iso]||[]).map((a)=>`<span class="ev ev-${escA(a.status||"Agendado")}" title="${escA((a.hora||"")+" "+nomePac(a.paciente_id))}" onclick="event.stopPropagation();abrirForm(${a.id})">${escA(a.hora||"")} ${escA(nomePac(a.paciente_id))}</span>`).join("");
-    cel+=`<div class="dia${iso===hojeISO?" hoje":""}" onclick="novoNaData('${iso}')"><span class="num">${d}</span>${evs}</div>`;
+    cel+=`<div class="dia${iso===hojeStr?" hoje":""}" onclick="novoNaData('${iso}')"><span class="num">${d}</span>${evs}</div>`;
   }
   cont.innerHTML=`
     <div class="cal-cab">
@@ -1835,6 +2166,16 @@ function campoHTML(campo, val){
   let ctrl;
   if(tipo==="textarea") ctrl=`<textarea id="${id}">${escA(val||"")}</textarea>`;
   else if(tipo==="rico") ctrl=editorRico(id, val||"", false);
+  else if(tipo==="servico_um"){
+    const lista=CACHE.servicos||[];
+    ctrl=`<select id="${id}"><option value="">Selecione…</option>`+
+      lista.map((x)=>`<option value="${escA(x.title)}"${String(val)===String(x.title)?" selected":""}>${escA(x.title)}</option>`).join("")+
+      /* Serviço que saiu do cadastro depois de a pasta existir continua na
+         lista: sem isto, abrir uma pasta antiga apagaria o serviço dela na
+         primeira vez que alguém clicasse em Salvar. */
+      (val && !lista.some((x)=>String(x.title)===String(val)) ? `<option value="${escA(val)}" selected>${escA(val)} (fora do cadastro)</option>` : "")+
+      `</select>`;
+  }
   else if(tipo==="password") ctrl=`<input id="${id}" type="password" autocomplete="new-password" value="">`;
   else if(tipo==="select"){
     const opts=op.bool?[["0","Não"],["1","Sim"]]:(op.opcoes||[]).map((o)=>Array.isArray(o)?o:[o,o]);
@@ -1898,20 +2239,43 @@ async function abrirForm(id){
   FORM_ID=id||0;
   let dados={};
   if(id){ try{ dados=await api(MOD+"/"+id); }catch(e){ return toast(e.message,true); } }
-  const host=$("#modal-host");
   const campos=camposDoPerfil(m);
-  host.innerHTML=`<div class="modal-bg" onclick="if(event.target===this)fecharModal()"><div class="modal">
-    <h2>${id?"Editar":m.novo||"Novo"}</h2>
-    <div class="formgrid">${campos.map((c)=>campoHTML(c,dados[c[0]])).join("")}</div>
-    <div id="form-erros"></div>
-    <div class="acoes">
-      ${m.imprimir&&id?`<button class="btn btn-ghost" onclick="imprimirFicha(${id})">Imprimir ficha</button>`:""}
-      ${id?`<button class="btn btn-danger" onclick="excluirReg(${id})">Excluir</button>`:""}
-      <button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button>
-      <button class="btn btn-navy" onclick="salvarReg(${id||0})">Salvar</button>
-    </div></div></div>`;
-  // máscaras ao digitar
-  host.querySelector(".modal").addEventListener("input",(e)=>{ const mk=e.target.dataset.mask;
+  /* ABRIR uma pasta que já existe vira TELA do sistema (#pane-pront), com menu
+     lateral e barra do topo no lugar. Criar continua em modal, que é um
+     formulário curto. Nos dois casos os campos, os ids (#f-…) e o salvarReg
+     são os mesmos: só muda ONDE o HTML é escrito. */
+  const ehTelaPront = !!(m.prontuarioPasta && id);
+  const host = ehTelaPront ? $("#pront-corpo") : $("#modal-host");
+
+  const corpo = `
+      ${m.prontuarioPasta&&id?`<div id="pasta-topo"></div>`:""}
+      <div class="formgrid">${campos.map((c)=>campoHTML(c,dados[c[0]])).join("")}</div>
+      ${m.prontuarioPasta&&id?`<div id="pasta-areas"></div>`:""}
+      <div id="form-erros"></div>`;
+
+  if(ehTelaPront){
+    $("#pront-titulo").innerHTML = `Prontuário ${escA(dados.numero||"")}`
+      + `<span class="pront-sub">${escA(nomePac(dados.paciente_id))}${dados.especialidade?" · "+escA(dados.especialidade):""}</span>`;
+    $("#pront-imprimir").onclick = () => imprimirPasta(id);
+    $("#pront-salvar").onclick   = () => salvarReg(id);
+    host.innerHTML = corpo;
+    PRONT_ABERTO = Number(id);
+    abrirPainelPront();
+  } else {
+    host.innerHTML=`<div class="modal-bg" onclick="if(event.target===this)fecharModal()"><div class="modal">
+      <h2>${id?"Editar":m.novo||"Novo"}</h2>
+      <div class="modal-corpo">${corpo}</div>
+      <div class="acoes">
+        ${m.imprimir&&id?`<button class="btn btn-ghost" onclick="imprimirFicha(${id})">Imprimir ficha</button>`:""}
+        ${m.historico&&id?`<button class="btn btn-ghost" onclick="imprimirHistorico(${id})">Prontuário completo</button>`:""}
+        ${id?`<button class="btn btn-danger" onclick="excluirReg(${id})">Excluir</button>`:""}
+        <button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button>
+        <button class="btn btn-navy" onclick="salvarReg(${id||0})">Salvar</button>
+      </div></div></div>`;
+  }
+  // máscaras ao digitar — no contêiner do formulário, seja modal ou tela
+  const caixa = host.querySelector(".modal") || host;
+  caixa.addEventListener("input",(e)=>{ const mk=e.target.dataset.mask;
     if(mk){ e.target.value=aplicarMascara(mk,e.target.value); } });
   // campos que dependem de outro (habilita/desabilita)
   for(const [k,,,op={}] of m.campos){ if(op.dependeDe){
@@ -1929,6 +2293,14 @@ async function abrirForm(id){
     const nasc=$("#f-nascimento");
     if(nasc){ nasc.addEventListener("change",sincMenor); nasc.addEventListener("input",sincMenor); }
     sincMenor();
+  }
+  /* A identidade da pasta (usuário + serviço) não muda depois de salva. */
+  if(m.prontuarioPasta && id){
+    for(const [k,,,op={}] of m.campos) if(op.travaSeSalvo){
+      const el=$("#f-"+k); if(el) el.disabled=true;
+      const txt=$("#f-"+k+"-txt"); if(txt) txt.disabled=true;
+    }
+    PASTA=dados; pintarTopoPasta(); montarAreasProntuario(id);
   }
   // serviços restritos ao profissional escolhido (agenda e prontuário)
   const campoProf=m.campos.find((c)=>c[3]&&c[3].filtraServicos);
@@ -2136,9 +2508,29 @@ async function salvarReg(id){
     let r;
     if(id) r=await api(MOD+"/"+id,"PUT",out); else r=await api(MOD,"POST",out);
     if(["pacientes","profissionais","projetos"].includes(MOD)) await recarregarCache();
-    fecharModal(); toast("Registro salvo."); carregarLista();
+    /* Salvar a pasta ABERTA não pode fechá-la: o profissional ajusta a
+       observação no meio do atendimento e continua de onde estava. Fechar aqui
+       o devolveria à lista, com os lançamentos que ele estava lendo fora da
+       tela. */
+    if(PRONT_ABERTO && Number(id) === PRONT_ABERTO){ toast("Prontuário salvo."); return; }
+    fecharModal(); toast("Registro salvo.");
+    /* Pasta recém-aberta abre direto como tela — é onde o trabalho acontece, e
+       obrigar a procurá-la na lista logo depois de criá-la seria um passo a
+       mais sem razão. */
+    if(MOD==="prontuario" && !id && r && r.id){
+      if(r.recolhidos) toast(`Prontuário ${r.numero} aberto — ${r.recolhidos} agendamento(s) vinculado(s).`);
+      return abrirForm(r.id);
+    }
+    carregarLista();
     if(MOD==="associados" && r && r.senha) mostrarSenhaGerada(r.senha);   // senha do portal, exibida uma vez
-  }catch(e){ box.innerHTML=`<div class="erros">${escA(e.message)}</div>`; }
+  }catch(e){
+    box.innerHTML=`<div class="erros">${escA(e.message)}</div>`;
+    /* O servidor recusa a segunda pasta do mesmo par e diz QUAL é a existente.
+       Sem este atalho, a pessoa leria "já existe" e teria de sair, procurar na
+       lista e abrir à mão. */
+    if(MOD==="prontuario" && e.id) box.innerHTML +=
+      `<div style="margin-top:.5rem"><button class="btn btn-navy btn-sm" onclick="fecharModal();abrirForm(${e.id})">Abrir o prontuário existente</button></div>`;
+  }
 }
 async function excluirReg(id){
   if(!confirm("Excluir este registro? Esta ação não pode ser desfeita.")) return;
@@ -2182,6 +2574,18 @@ function timbreHTML(titulo, corpo, op){
    .barra{display:flex;align-items:center;gap:.6rem;margin:.28rem 0;font-size:.82rem}
    .barra .lb{width:200px}.barra .b{flex:1;height:9px;background:#eef2f8;border-radius:5px;overflow:hidden}
    .barra .b i{display:block;height:100%;background:#1EA1E4}.barra .n{width:32px;text-align:right;font-weight:700;color:#253282}
+   .evo{border-left:3px solid #1EA1E4;padding:.1rem 0 .1rem .8rem;margin:.7rem 0}
+   .evo .cab{font-weight:700;color:#253282;font-size:.9rem}
+   .evo .met{color:#8a90a0;font-size:.74rem;margin-bottom:.25rem}
+   .selo-num{float:right;border:1px solid #e7ecf4;border-radius:8px;padding:.35rem .7rem;font-size:.8rem;color:#5a6172}
+   /* Como o texto formatado sai no papel. Sem isto o <ul> herdaria o reset
+      *{margin:0} e a lista sairia colada na margem, sem recuo nenhum. */
+   .texto-rico{line-height:1.6;overflow-wrap:break-word}
+   .texto-rico p{margin:0 0 .5rem}
+   .texto-rico p:last-child{margin-bottom:0}
+   .texto-rico ul,.texto-rico ol{margin:.3rem 0 .6rem;padding-left:1.4rem}
+   .texto-rico li{margin:.12rem 0}
+   .texto-rico b,.texto-rico strong{font-weight:700}
    table.m th{width:auto}
    table.m td,table.m th{font-size:.78rem;padding:.3rem .45rem}
    .rod{margin-top:2.2rem;border-top:1px solid #eef1f6;padding-top:.6rem;color:#9aa0ad;font-size:.72rem;display:flex;justify-content:space-between}
@@ -2312,6 +2716,108 @@ function imprimirRelacaoUsuarios(){
   const btn=document.querySelector('.navbtn[data-nav="relatorios_pacientes"]');
   if(btn && btn.style.display!=="none") btn.click();
   else toast("Seu perfil não tem acesso aos relatórios.",true);
+}
+
+/* ==========================================================================
+   IMPRESSÕES DO PRONTUÁRIO
+
+   Duas, e não uma: a PASTA (um serviço, do começo ao fim) e o PRONTUÁRIO
+   COMPLETO (tudo da pessoa, todas as pastas em sequência). A segunda é a que
+   acompanha um encaminhamento externo ou responde a uma prestação de contas.
+   ========================================================================== */
+function blocoLancamentos(registros, incluirArquivados){
+  let html="";
+  for(const [tipo,,titulo] of TIPOS_PRONT){
+    const itens=registros.filter((r)=>r.tipo===tipo && (incluirArquivados || !Number(r.arquivado)));
+    if(!itens.length) continue;
+    html+=`<div class="sec">${escA(titulo)} (${itens.length})</div>`;
+    itens.forEach((r,i)=>{
+      html+=`<div class="evo">
+        <div class="cab">${i+1}. ${escA(dataBR(r.data))}${Number(r.arquivado)?' <span style="color:#9aa0ad;font-weight:400">(arquivado)</span>':""}</div>
+        <div class="met">${escA(r.profissional||"—")}${r.criado?` · registrado em ${escA(dataHoraBR(r.criado))}`:""}</div>
+        <div class="texto-rico">${r.texto||""}</div>
+      </div>`;
+    });
+  }
+  return html || '<p style="color:#9aa">Sem lançamentos registrados.</p>';
+}
+/* Os agendamentos da pasta — é o que dá contexto a quem lê o prontuário depois. */
+function blocoVinculosImpresso(atend){
+  if(!atend || !atend.length) return "";
+  return `<div class="sec">Agendamentos vinculados (${atend.length})</div>
+    <table class="d m"><tr><th>Data</th><th>Hora</th><th>Serviços</th><th>Profissional</th><th>Situação</th></tr>`+
+    atend.map((a)=>`<tr><td>${escA(dataBR(a.data))}</td><td>${escA(a.hora||"")}</td>
+      <td>${escA(servicosTexto(a.especialidade))}</td><td>${escA(a.profissional_nome||"—")}</td>
+      <td>${escA(a.status||"—")}</td></tr>`).join("")+`</table>`;
+}
+function assinaturaImpressa(nome){
+  return `<div style="margin-top:2.6rem;text-align:center">
+    <div style="border-top:1px solid #b9c0cf;width:min(320px,70%);margin:0 auto"></div>
+    <div style="font-size:.8rem;color:#5a6172;margin-top:.3rem">${escA(nome||"Responsável técnico")}</div></div>`;
+}
+
+async function imprimirPasta(id, incluirArquivados){
+  let pr; try{ pr=await api("prontuario/"+id); }catch(e){ return toast(e.message,true); }
+  let p={}; try{ p=await api("pacientes/"+pr.paciente_id); }catch{}
+  let regs=[]; try{ regs=await api(`prontuario_registros?prontuario_id=${id}&arquivados=1`); }catch{}
+  let vinc=null; try{ vinc=await api(`prontuario/${id}/vinculos`); }catch{}
+  // no papel a leitura é cronológica CRESCENTE: é uma história, não uma lista
+  regs.sort((a,b)=>String(a.data||"").localeCompare(String(b.data||"")) || a.id-b.id);
+  const L=(r,v)=> v?`<tr><th>${escA(r)}</th><td>${escA(v)}</td></tr>`:"";
+  const corpo = `<div class="selo-num">Prontuário nº <b>${escA(pr.numero||"")}</b></div>
+    <div class="sec">Usuário</div>
+    <table>${L("Nome",p.nome)}${L("Nascimento",dataBR(p.nascimento))}${L("Telefone",p.telefone)}
+      ${L("Endereço",enderecoCompleto(p))}</table>
+    <div class="sec">Prontuário</div>
+    <table>${L("Número",pr.numero)}${L("Serviço",pr.especialidade)}
+      ${L("Profissional responsável",pr.profissional)}${L("Aberto em",dataBR(pr.aberto_em))}
+      ${L("Situação",pr.status==="Alta"?"Alta (encerrado)":"Em acompanhamento")}
+      ${pr.alta_em?L("Alta em",dataBR(pr.alta_em)):""}${pr.alta_motivo?L("Motivo da alta",pr.alta_motivo):""}
+      ${pr.reativado_em?L("Reaberto em",dataHoraBR(pr.reativado_em)):""}</table>
+    ${pr.observacao?`<div class="sec">Observações da pasta</div><div class="texto-rico">${pr.observacao}</div>`:""}
+    ${blocoVinculosImpresso(vinc&&vinc.atendimentos)}
+    ${blocoLancamentos(regs, incluirArquivados)}
+    ${assinaturaImpressa(pr.profissional)}`;
+  abrirImpressao("Prontuário", corpo,
+    { subtitulo: `${pr.numero||""} · ${p.nome||""} · ${pr.especialidade||""}` });
+}
+
+/* Tudo da pessoa, em sequência: quem acompanha há anos precisa poder imprimir
+   o percurso inteiro de uma vez, e não pasta por pasta. */
+async function imprimirHistorico(pacienteId){
+  let h; try{ h=await api("historico/"+pacienteId); }catch(e){ return toast(e.message,true); }
+  const p=h.paciente, pastas=h.prontuarios||[];
+  const nLanc=pastas.reduce((acc,x)=>acc+((x.registros||[]).length),0);
+  const nAt=pastas.reduce((acc,x)=>acc+((x.atendimentos||[]).length),0);
+  const datas=[...pastas.flatMap((x)=>(x.registros||[]).map((r)=>r.data)),
+               ...pastas.flatMap((x)=>(x.atendimentos||[]).map((a)=>a.data))].filter(Boolean).sort();
+  const periodo = datas.length ? `${dataBR(datas[0])} a ${dataBR(datas[datas.length-1])}` : "—";
+  const L=(r,v)=> v?`<tr><th>${escA(r)}</th><td>${escA(v)}</td></tr>`:"";
+
+  let corpo = `<div class="sec">Usuário</div>
+    <table>${L("Nome",p.nome)}${L("Nascimento",dataBR(p.nascimento))}${L("CPF",p.cpf)}
+      ${L("Telefone",p.telefone)}${L("Endereço",enderecoCompleto(p))}
+      ${L("Projeto vinculado",p.projeto_nome)}
+      ${L("Situação",(p.ativo===null||p.ativo===undefined||Number(p.ativo)!==0)?"Ativo":"Inativo")}</table>
+    <div class="cards">
+      <div class="kpi"><b>${pastas.length}</b><span>Prontuários</span></div>
+      <div class="kpi"><b>${nLanc}</b><span>Lançamentos</span></div>
+      <div class="kpi"><b>${nAt}</b><span>Agendamentos</span></div>
+    </div>`;
+
+  for(const pasta of pastas){
+    corpo += `<div class="sec">Prontuário ${escA(pasta.numero||"")} · ${escA(pasta.especialidade||"")}</div>
+      <table>${L("Profissional responsável",pasta.profissional)}${L("Aberto em",dataBR(pasta.aberto_em))}
+        ${L("Situação",pasta.status==="Alta"?"Alta (encerrado)":"Em acompanhamento")}
+        ${pasta.alta_em?L("Alta em",dataBR(pasta.alta_em)):""}${pasta.alta_motivo?L("Motivo",pasta.alta_motivo):""}</table>
+      ${pasta.observacao?`<div class="texto-rico" style="margin:.5rem 0">${pasta.observacao}</div>`:""}
+      ${blocoVinculosImpresso(pasta.atendimentos)}
+      ${blocoLancamentos(pasta.registros||[], false)}`;
+  }
+  if(!pastas.length) corpo += '<p style="color:#9aa">Esta pessoa ainda não tem prontuário aberto.</p>';
+
+  abrirImpressao("Prontuário completo", corpo,
+    { subtitulo: `${p.nome||""} · período: ${periodo}` });
 }
 
 function rotuloPeriodoRelatorio(){

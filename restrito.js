@@ -24,7 +24,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.15.0";
+const SISTEMA_VERSION = "1.16.0";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -134,8 +134,15 @@ function htmlLimpo(valor) {
 /* Onde o HTML é aceito. Só o registro clínico — em nome, CPF ou endereço,
    marcação não tem função nenhuma e só serviria para esconder conteúdo. */
 const CAMPOS_HTML = {
-  prontuario: ["avaliacao", "evolucao", "plano", "encaminhamentos"],
+  prontuario_registros: ["texto"],
 };
+
+/* O texto sem marcação nenhuma, para onde só cabe uma linha (linha do tempo,
+   resumo da auditoria). Guardar HTML ali sujaria a leitura com `<p>` no meio
+   da frase. */
+function semMarcacao(html) {
+  return String(html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
 
 function limparHtmlDoRegistro(tabela, obj) {
   const campos = CAMPOS_HTML[tabela];
@@ -149,8 +156,11 @@ const CAMPOS_PROTEGIDOS = {
     "cartao_sus", "escolaridade", "vulnerabilidade", "observacoes", "foto",
     "pai", "mae", "resp_nome", "resp_cpf", "resp_rg", "resp_nascimento"],
   associados: ["cpf", "contato", "endereco", "cep", "numero", "bairro", "complemento", "foto"],
-  // o registro clínico em si
-  prontuario: ["avaliacao", "evolucao", "plano", "encaminhamentos", "anexos", "responsavel"],
+  // o registro em si: a observação da pasta e o texto de cada lançamento
+  prontuario: ["observacao", "alta_motivo", "anexos", "responsavel"],
+  prontuario_registros: ["texto", "anexo"],
+  // o histórico guarda TRECHOS do que foi escrito nos lançamentos
+  historico: ["detalhe"],
   atendimentos: ["observacoes"],
   beneficios: ["cpf", "foto"],
   documentos_gestao: ["titulo", "arquivo"],
@@ -178,6 +188,16 @@ function proteger(tabela, obj) {
    que as entregou.
    ========================================================================== */
 const HISTORICO_VERSOES = [
+  { versao: "1.16.0", data: "2026-07-28", titulo: "Prontuário em pasta", mudancas: [
+    "Prontuário passa a ser uma PASTA por usuário + serviço, com número próprio",
+    "Dentro da pasta, lançamentos datados: avaliação, evolução, plano e encaminhamento",
+    "Alta é da pasta: encerrar um serviço não encerra os outros da mesma pessoa",
+    "Lançamento nunca é excluído — é arquivado, e volta com um clique",
+    "Agendamentos se penduram na pasta do serviço, e podem ser vinculados à mão",
+    "Linha do tempo de cada pasta e de cada usuário",
+    "Impressão da pasta e do prontuário completo, com o acompanhamento em sequência",
+    "Prontuário saiu de Cadastros para o menu principal; Relatórios virou seção",
+  ] },
   { versao: "1.15.0", data: "2026-07-28", titulo: "Paridade com o sistema da clínica", mudancas: [
     "Prontuário: o profissional vê apenas os registros pelos quais responde",
     "Listas paginadas, com escolha de quantos itens por página",
@@ -283,7 +303,7 @@ const ACOES_ROTULO = {
    instituto aquilo é "Usuários", e `especialidade` são os "Serviços". */
 const MODULO_ROTULO = {
   pacientes: "Usuários", associados: "Associados", profissionais: "Profissionais",
-  atendimentos: "Agendamento", prontuario: "Prontuário", beneficios: "Benefícios",
+  atendimentos: "Agendamento", prontuario: "Prontuário", prontuario_registros: "Lançamentos do prontuário", beneficios: "Benefícios",
   eventos: "Eventos", documentos_gestao: "Documentos", projetos: "Projetos",
   servicos: "Serviços", usuarios: "Usuários do Sistema", relatorios: "Relatórios",
   painel: "Painel", auditoria: "Auditoria", sobre: "Sobre o sistema", conta: "Minha conta",
@@ -292,7 +312,8 @@ const rotuloModulo = (t) => MODULO_ROTULO[t] || t;
 const rotuloRegistro = (tabela, r) => {
   if (!r) return "";
   if (tabela === "atendimentos") return [r.data, r.hora].filter(Boolean).join(" ");
-  if (tabela === "prontuario") return [r.especialidade, r.data].filter(Boolean).join(" · ");
+  if (tabela === "prontuario") return [r.numero, r.especialidade].filter(Boolean).join(" · ");
+  if (tabela === "prontuario_registros") return rotuloTipo(r.tipo) + (r.data ? ` de ${r.data}` : "");
   return r.nome || r.title || r.titulo || `#${r.id || ""}`;
 };
 
@@ -452,8 +473,9 @@ const TAB = {
   servicos:   ["title", "categoria", "sort"],
   associados: ["nome", "cpf", "contato", "endereco", "cep", "numero", "bairro", "cidade", "complemento", "foto", "vinculo", "adesao", "mensalidade", "status", "senha_externo"],
   profissionais: ["nome", "especialidade", "registro", "contato", "ativo"],
-  atendimentos: ["paciente_id", "profissional_id", "especialidade", "data", "hora", "local", "sala", "valor", "status", "observacoes"],
-  prontuario: ["paciente_id", "atendimento_id", "profissional", "profissional_id", "especialidade", "data", "avaliacao", "evolucao", "plano", "encaminhamentos", "anexos", "responsavel", "usuario_id"],
+  atendimentos: ["paciente_id", "profissional_id", "especialidade", "data", "hora", "local", "sala", "valor", "status", "observacoes", "prontuario_id"],
+  prontuario: ["paciente_id", "profissional", "profissional_id", "especialidade", "status", "aberto_em", "observacao", "anexos", "responsavel", "usuario_id"],
+  prontuario_registros: ["prontuario_id", "tipo", "texto", "data", "profissional", "anexo", "usuario_id"],
   beneficios: ["nome", "cpf", "item", "data", "foto", "local", "responsavel"],
   eventos: ["tipo", "titulo", "tema", "local", "data", "hora", "publico_alvo", "participantes", "responsavel", "avaliacao", "fotos"],
   documentos_gestao: ["paciente_id", "tipo", "titulo", "arquivo", "data"],
@@ -475,7 +497,7 @@ const PERM = {
   // profissional vê SOMENTE a sua agenda e os seus prontuários. Nada mais.
   // Lê pacientes/profissionais só como apoio (nomes nas telas e seletores),
   // sem menu próprio — ver PERM_LEITURA.
-  profissional: new Set(["atendimentos", "prontuario"]),
+  profissional: new Set(["atendimentos", "prontuario", "prontuario_registros", "historico"]),
 };
 const PERM_LEITURA = { profissional: new Set(["pacientes", "profissionais", "servicos"]) };
 
@@ -486,6 +508,132 @@ const PERM_LEITURA = { profissional: new Set(["pacientes", "profissionais", "ser
    Sem correspondência o dono fica NULL, e NULL não é de ninguém: nenhum
    profissional vê. Esconder demais se conserta escolhendo o profissional certo;
    mostrar de menos entregaria prontuário a quem não é o responsável. */
+/* ==========================================================================
+   NUMERAÇÃO DA PASTA — PR-AAAA-00001
+
+   Sequencial por ANO, único e NUNCA reaproveitado: é por esse número que a
+   equipe localiza a pasta no papel e no encaminhamento.
+
+   Por que um contador em g_config e não "o maior número da tabela": se a
+   última pasta for excluída, o maior da tabela cai — e a próxima herdaria um
+   número que já circulou impresso. O contador só sobe, e ainda é comparado com
+   o maior do banco a cada emissão, então se recupera sozinho se o g_config for
+   perdido.
+   ========================================================================== */
+async function proximoSequencial(prefixo, chave, tabela, coluna, ano) {
+  const y = ano || new Date().getFullYear();
+  const inicio = `${prefixo}-${y}-`;
+  const chaveAno = `${chave}_${y}`;
+  const guardado = Number((await getC(chaveAno)) || 0);
+  const r = await Q.get(`SELECT MAX(CAST(substr(${coluna}, ?) AS INTEGER)) m FROM ${tabela} WHERE ${coluna} LIKE ?`,
+    inicio.length + 1, inicio + "%");
+  const noBanco = (r && r.m) ? Number(r.m) : 0;
+  const seq = Math.max(guardado, noBanco) + 1;
+  await setC(chaveAno, seq);               // marca como usado, mesmo se falhar depois
+  return inicio + String(seq).padStart(5, "0");
+}
+/* Grava o número, tentando de novo se colidir (backup restaurado por cima).
+   Colisão é a ÚNICA falha que se repete: o Postgres a devolve com o código
+   23505. Testar pelo CÓDIGO e não pela mensagem — mensagem muda com a versão e
+   com o idioma do servidor, e um teste frouxo engoliria um erro real 20 vezes
+   antes de desistir. */
+async function emitirSequencial(prefixo, chave, tabela, coluna, id, ano) {
+  for (let i = 0; i < 20; i++) {
+    const num = await proximoSequencial(prefixo, chave, tabela, coluna, ano);
+    try { await Q.run(`UPDATE ${tabela} SET ${coluna}=? WHERE id=?`, num, id); return num; }
+    catch (e) { if (e.code !== "23505") throw e; }
+  }
+  throw new Error(`Não consegui gerar o número em ${tabela}.`);
+}
+const emitirNumeroProntuario = (id, ano) => emitirSequencial("PR", "pront_seq", "prontuario", "numero", id, ano);
+
+/* Os quatro tipos de lançamento que compõem a pasta. Cada um vira uma área
+   própria na tela, com a sua lista de registros datados. */
+const TIPOS_REGISTRO = ["avaliacao", "evolucao", "plano", "encaminhamento"];
+const ROTULO_TIPO = { avaliacao: "Avaliação", evolucao: "Evolução", plano: "Plano de acompanhamento", encaminhamento: "Encaminhamento" };
+const rotuloTipo = (t) => ROTULO_TIPO[t] || t;
+
+/* ==========================================================================
+   LINHA DO TEMPO — o que sobrevive quando a pessoa sai e volta.
+
+   `detalhe` é cifrado: ele carrega TRECHOS do que foi escrito no prontuário.
+   Sem isso o histórico viraria a porta dos fundos do registro — o texto estaria
+   protegido no lançamento e em claro aqui do lado. O `evento` fica legível:
+   são rótulos fixos ("Alta", "Pasta aberta"), sem conteúdo de ninguém, e é por
+   ele que a tela agrupa a linha do tempo.
+   ========================================================================== */
+async function anotar(entidade, entidadeId, evento, detalhe, sessao) {
+  if (!entidadeId) return;
+  await Q.run(
+    "INSERT INTO historico(entidade,entidade_id,evento,detalhe,usuario_id,usuario_nome,criado) VALUES(?,?,?,?,?,?,?)",
+    entidade, entidadeId, evento, cifrar(detalhe || ""),
+    sessao ? sessao.userId : null, sessao ? sessao.nome : "", agora());
+}
+
+/* A pasta daquele par pessoa + serviço, se existir. */
+const pastaDoPar = (pacienteId, servico) =>
+  Q.get("SELECT * FROM prontuario WHERE paciente_id=? AND especialidade=?", pacienteId, servico);
+
+/* Os serviços de um agendamento — a coluna guarda lista JSON. */
+function servicosDoAtendimento(a) {
+  try { const x = JSON.parse(a.especialidade || "[]"); return Array.isArray(x) ? x : (a.especialidade ? [a.especialidade] : []); }
+  catch { return a.especialidade ? [String(a.especialidade)] : []; }
+}
+
+/* Pendura o agendamento na pasta correspondente, SE não houver dúvida.
+
+   Só liga sozinho quando o agendamento tem UM serviço e existe pasta daquele
+   par. Com dois ou mais serviços não há resposta certa — o atendimento não
+   pertence a uma pasta específica —, e escolher uma no chute colocaria o
+   registro na pasta errada em silêncio. Nesse caso fica solto, e a tela da
+   pasta oferece o botão de vincular à mão. */
+async function ligarAtendimentoNaPasta(id) {
+  const a = await Q.get("SELECT id,paciente_id,especialidade,prontuario_id FROM atendimentos WHERE id=?", id);
+  if (!a || a.prontuario_id) return null;
+  const servicos = servicosDoAtendimento(a);
+  if (servicos.length !== 1) return null;
+  const pasta = await pastaDoPar(a.paciente_id, servicos[0]);
+  if (!pasta) return null;
+  await Q.run("UPDATE atendimentos SET prontuario_id=? WHERE id=?", pasta.id, id);
+  return pasta;
+}
+
+/* Recolhe para a pasta recém-aberta os agendamentos daquele par que estavam
+   sem vínculo — na prática, os marcados antes de a pasta existir. */
+async function recolherAtendimentosSoltos(prontuarioId, pacienteId, servico) {
+  const soltos = await Q.all(
+    "SELECT id,especialidade FROM atendimentos WHERE paciente_id=? AND prontuario_id IS NULL", pacienteId);
+  let n = 0;
+  for (const a of soltos) {
+    const servicos = servicosDoAtendimento(a);
+    if (servicos.length === 1 && servicos[0] === servico) {
+      await Q.run("UPDATE atendimentos SET prontuario_id=? WHERE id=?", prontuarioId, a.id);
+      n++;
+    }
+  }
+  return n;
+}
+
+/* Condição SQL do recorte por dono, para as consultas que não passam pelo CRUD
+   genérico. Sem profissional vinculado devolve algo que não casa com nada: sem
+   vínculo não há como dizer o que é dele, e o lado seguro do erro é não mostrar
+   nada. */
+const soDoProfissional = (sess) => sess && sess.perfil === "profissional";
+function filtroDono(sess, coluna = "profissional_id") {
+  if (!soDoProfissional(sess)) return { sql: "", args: [] };
+  if (!sess.profissionalId) return { sql: " AND 1=0", args: [] };
+  return { sql: ` AND ${coluna}=?`, args: [sess.profissionalId] };
+}
+/* Guarda de UM registro já lido. Devolve a mensagem de recusa ou null. */
+function recusaPorDono(sess, registro) {
+  if (!soDoProfissional(sess)) return null;
+  if (!registro) return null;                    // quem trata "não existe" é o chamador
+  if (!sess.profissionalId) return "Seu acesso não está vinculado a um profissional. Fale com o administrador.";
+  if (String(registro.profissional_id || "") !== String(sess.profissionalId))
+    return "Este registro pertence a outro profissional.";
+  return null;
+}
+
 async function idDoProfissional(nome) {
   if (!nome) return null;
   const r = await Q.get("SELECT id FROM profissionais WHERE LOWER(TRIM(nome))=LOWER(TRIM(?))", String(nome));
@@ -1019,6 +1167,190 @@ async function rotaApi(req, res, p) {
   }
 
   /* ========================================================================
+     PRONTUÁRIO COMPLETO DE UMA PESSOA — a linha do tempo inteira
+
+     Alimenta a impressão do acompanhamento: todas as pastas, cada uma com os
+     seus lançamentos em ordem e os agendamentos que a compõem.
+     ======================================================================== */
+  const hm = p.match(/^historico\/(\d+)$/);
+  if (hm && req.method === "GET") {
+    if (!podeLer(s.perfil, "prontuario")) return json(res, 403, { error: "Sem permissão." });
+    const pac = await Q.get("SELECT * FROM pacientes WHERE id=?", hm[1]);
+    if (!pac) return json(res, 404, { error: "Usuário não encontrado." });
+    const proj = pac.projeto_id ? await Q.get("SELECT title FROM projetos WHERE id=?", pac.projeto_id) : null;
+    /* O recorte por dono entra AQUI também. Este é o caminho mais perigoso dos
+       que servem prontuário: se falhasse, o profissional imprimiria o
+       acompanhamento inteiro da pessoa, incluindo o conduzido por colegas. */
+    const dono = filtroDono(s);
+    const pastas = await Q.all(
+      `SELECT * FROM prontuario WHERE paciente_id=?${dono.sql} ORDER BY status, especialidade, id`,
+      hm[1], ...dono.args);
+    for (const pasta of pastas) {
+      pasta.registros = await Q.all(
+        "SELECT * FROM prontuario_registros WHERE prontuario_id=? AND arquivado=0 ORDER BY COALESCE(NULLIF(data,''),criado), id",
+        pasta.id);
+      pasta.atendimentos = await Q.all(
+        `SELECT a.*, pf.nome profissional_nome FROM atendimentos a
+           LEFT JOIN profissionais pf ON pf.id=a.profissional_id
+          WHERE a.prontuario_id=? ORDER BY a.data, a.hora, a.id`, pasta.id);
+    }
+    return json(res, 200, {
+      paciente: { ...pac, projeto_nome: proj ? proj.title : "" },
+      prontuarios: pastas,
+      /* A linha do tempo da PESSOA reúne o que aconteceu em todas as pastas, de
+         todos os profissionais — para o profissional ela fica fora por inteiro,
+         senão seria a porta dos fundos do recorte que acabamos de aplicar. */
+      historico: soDoProfissional(s) ? []
+        : await Q.all("SELECT * FROM historico WHERE entidade='paciente' AND entidade_id=? ORDER BY criado, id", hm[1]),
+    });
+  }
+
+  /* ---------------- Alta e reabertura da pasta -------------------------
+     A alta é DA PASTA: a pessoa pode concluir o acompanhamento no Serviço
+     Social e seguir na Psicologia. Nada é apagado — muda a situação e fica
+     registrado na linha do tempo. */
+  const am = p.match(/^prontuario\/(\d+)\/(alta|reabrir)$/);
+  if (am && req.method === "POST") {
+    if (!pode(s.perfil, "prontuario")) return json(res, 403, { error: "Sem permissão." });
+    const pr = await Q.get("SELECT * FROM prontuario WHERE id=?", am[1]);
+    if (!pr) return json(res, 404, { error: "Prontuário não encontrado." });
+    /* Dar alta ou reabrir é MEXER no acompanhamento de alguém. Sem esta guarda
+       um profissional encerraria o que outro conduz. */
+    const recusa = recusaPorDono(s, pr);
+    if (recusa) return json(res, 403, { error: recusa });
+    const b = await readBody(req);
+    if (am[2] === "alta") {
+      const quando = b.data || new Date().toISOString().slice(0, 10);
+      await Q.run("UPDATE prontuario SET status='Alta', alta_em=?, alta_motivo=? WHERE id=?",
+        quando, cifrar(b.motivo || ""), am[1]);
+      await anotar("prontuario", am[1], "Alta", `${pr.especialidade}${b.motivo ? " — " + b.motivo : ""}`, s);
+      await anotar("paciente", pr.paciente_id, "Alta em " + pr.especialidade, pr.numero || "", s);
+      auditar({ req, sessao: s, acao: "alta", modulo: "prontuario", entidadeId: Number(am[1]),
+        resumo: `Deu alta no prontuário ${pr.numero || ""} · ${pr.especialidade}`,
+        detalhe: { numero: pr.numero, servico: pr.especialidade, motivo: b.motivo || "" } });
+    } else {
+      const quando = agora();
+      await Q.run("UPDATE prontuario SET status='Ativo', alta_em=NULL, alta_motivo=NULL, reativado_em=? WHERE id=?", quando, am[1]);
+      await anotar("prontuario", am[1], "Prontuário reaberto", `${pr.especialidade}${b.motivo ? " — " + b.motivo : ""}`, s);
+      await anotar("paciente", pr.paciente_id, "Retornou ao acompanhamento", pr.especialidade, s);
+      auditar({ req, sessao: s, acao: "reabrir", modulo: "prontuario", entidadeId: Number(am[1]),
+        resumo: `Reabriu o prontuário ${pr.numero || ""} · ${pr.especialidade}`,
+        detalhe: { numero: pr.numero, servico: pr.especialidade, motivo: b.motivo || "" } });
+    }
+    return json(res, 200, { ok: true });
+  }
+
+  /* ---- Vincular / desvincular um agendamento à pasta, pela tela da pasta.
+     É o caminho para o primeiro agendamento, marcado antes de a pasta existir,
+     e para os que têm mais de um serviço (que o sistema não liga sozinho). */
+  const vm = p.match(/^prontuario\/(\d+)\/atendimentos\/(\d+)$/);
+  if (vm && (req.method === "POST" || req.method === "DELETE")) {
+    if (!pode(s.perfil, "prontuario")) return json(res, 403, { error: "Sem permissão." });
+    const pr = await Q.get("SELECT * FROM prontuario WHERE id=?", vm[1]);
+    const at = await Q.get("SELECT * FROM atendimentos WHERE id=?", vm[2]);
+    if (!pr || !at) return json(res, 404, { error: "Prontuário ou agendamento não encontrado." });
+    const recusa = recusaPorDono(s, pr);
+    if (recusa) return json(res, 403, { error: recusa });
+    if (req.method === "POST") {
+      // a pasta é da pessoa: não se pendura nela o agendamento de outra
+      if (String(at.paciente_id) !== String(pr.paciente_id))
+        return json(res, 400, { error: "Este agendamento é de outro usuário." });
+      await Q.run("UPDATE atendimentos SET prontuario_id=? WHERE id=?", pr.id, at.id);
+      await anotar("prontuario", pr.id, "Agendamento vinculado", `${at.data || ""} ${at.hora || ""}`.trim(), s);
+    } else {
+      await Q.run("UPDATE atendimentos SET prontuario_id=NULL WHERE id=?", at.id);
+      await anotar("prontuario", pr.id, "Agendamento desvinculado", `${at.data || ""} ${at.hora || ""}`.trim(), s);
+    }
+    return json(res, 200, { ok: true });
+  }
+
+  /* Agendamentos da pessoa que ainda não estão em pasta nenhuma — a lista que
+     a tela oferece para vincular. */
+  const dm = p.match(/^prontuario\/(\d+)\/disponiveis$/);
+  if (dm && req.method === "GET") {
+    if (!podeLer(s.perfil, "prontuario")) return json(res, 403, { error: "Sem permissão." });
+    const pr = await Q.get("SELECT * FROM prontuario WHERE id=?", dm[1]);
+    if (!pr) return json(res, 404, { error: "Prontuário não encontrado." });
+    const recusa = recusaPorDono(s, pr);
+    if (recusa) return json(res, 403, { error: recusa });
+    return json(res, 200, await Q.all(
+      `SELECT a.*, pf.nome profissional_nome FROM atendimentos a
+         LEFT JOIN profissionais pf ON pf.id=a.profissional_id
+        WHERE a.paciente_id=? AND a.prontuario_id IS NULL
+        ORDER BY a.data DESC, a.hora DESC, a.id DESC`, pr.paciente_id));
+  }
+
+  /* -------- Arquivar / restaurar lançamento (NUNCA excluir) -------------
+     Registro de acompanhamento não se apaga: some das telas e volta com um
+     clique. Quem escreveu erra e corrige; quem audita precisa poder ver. */
+  const rm = p.match(/^prontuario_registros\/(\d+)\/(arquivar|restaurar)$/);
+  if (rm && req.method === "POST") {
+    if (!pode(s.perfil, "prontuario")) return json(res, 403, { error: "Sem permissão." });
+    const arq = rm[2] === "arquivar";
+    const reg = await Q.get("SELECT * FROM prontuario_registros WHERE id=?", rm[1]);
+    if (!reg) return json(res, 404, { error: "Lançamento não encontrado." });
+    if (s.perfil === "profissional" && String(reg.usuario_id) !== String(s.userId))
+      return json(res, 403, { error: "Lançamento de outro profissional." });
+    await Q.run("UPDATE prontuario_registros SET arquivado=?, arquivado_em=? WHERE id=?",
+      arq ? 1 : 0, arq ? agora() : null, rm[1]);
+    await anotar("prontuario", reg.prontuario_id,
+      (arq ? "Lançamento arquivado: " : "Lançamento restaurado: ") + rotuloTipo(reg.tipo), "", s);
+    return json(res, 200, { ok: true });
+  }
+
+  /* --------- Linha do tempo de uma pessoa ou de uma pasta --------------- */
+  const hm2 = p.match(/^historico\/(paciente|prontuario)\/(\d+)$/);
+  if (hm2 && req.method === "GET") {
+    if (!podeLer(s.perfil, "prontuario")) return json(res, 403, { error: "Sem permissão." });
+    /* O histórico guarda trechos do que foi escrito. Para o profissional, só o
+       da pasta DELE — e o da pessoa fica fora por inteiro, porque reúne o que
+       aconteceu em todas as pastas. Sem isto bastaria pedir o histórico para
+       ler o que a tela escondeu. */
+    if (soDoProfissional(s)) {
+      if (hm2[1] === "paciente") return json(res, 200, []);
+      const pr = await Q.get("SELECT profissional_id FROM prontuario WHERE id=?", hm2[2]);
+      if (!pr) return json(res, 404, { error: "Prontuário não encontrado." });
+      const recusa = recusaPorDono(s, pr);
+      if (recusa) return json(res, 403, { error: recusa });
+    }
+    return json(res, 200, await Q.all(
+      "SELECT * FROM historico WHERE entidade=? AND entidade_id=? ORDER BY criado DESC, id DESC", hm2[1], hm2[2]));
+  }
+
+  /* ------- Pastas de uma pessoa, com a contagem do que há dentro -------
+     Alimenta os "chips" que aparecem no agendamento e na tela da pessoa. */
+  const pm2 = p.match(/^pacientes\/(\d+)\/prontuarios$/);
+  if (pm2 && req.method === "GET") {
+    if (!podeLer(s.perfil, "prontuario")) return json(res, 403, { error: "Sem permissão." });
+    const dono = filtroDono(s, "pr.profissional_id");
+    return json(res, 200, await Q.all(
+      `SELECT pr.*,
+          (SELECT COUNT(*) FROM prontuario_registros r WHERE r.prontuario_id=pr.id AND r.arquivado=0) lancamentos,
+          (SELECT COUNT(*) FROM atendimentos at WHERE at.prontuario_id=pr.id) atendimentos
+         FROM prontuario pr WHERE pr.paciente_id=?${dono.sql} ORDER BY pr.status, pr.especialidade`,
+      pm2[1], ...dono.args));
+  }
+
+  /* ------- O que está pendurado numa pasta (tela do prontuário) --------- */
+  const vlm = p.match(/^prontuario\/(\d+)\/vinculos$/);
+  if (vlm && req.method === "GET") {
+    if (!podeLer(s.perfil, "prontuario")) return json(res, 403, { error: "Sem permissão." });
+    const pr = await Q.get("SELECT * FROM prontuario WHERE id=?", vlm[1]);
+    if (!pr) return json(res, 404, { error: "Prontuário não encontrado." });
+    const recusa = recusaPorDono(s, pr);
+    if (recusa) return json(res, 403, { error: recusa });
+    const pac = await Q.get("SELECT id,nome,nascimento,telefone,projeto_id,ativo FROM pacientes WHERE id=?", pr.paciente_id);
+    return json(res, 200, {
+      prontuario: pr,
+      paciente: pac || null,
+      atendimentos: await Q.all(
+        `SELECT a.*, pf.nome profissional_nome FROM atendimentos a
+           LEFT JOIN profissionais pf ON pf.id=a.profissional_id
+          WHERE a.prontuario_id=? ORDER BY a.data DESC, a.hora DESC, a.id DESC`, pr.id),
+    });
+  }
+
+  /* ========================================================================
      INATIVAR / REATIVAR O USUÁRIO ATENDIDO
 
      Inativar é o "arquivar" da ficha: a pessoa some das telas de escolha
@@ -1128,6 +1460,18 @@ async function rotaApi(req, res, p) {
       if (!donoVal) return json(res, 403, {
         error: "Seu acesso não está vinculado a um profissional. Fale com o administrador." });
     }
+    /* No LANÇAMENTO o dono é quem escreveu. É diferente da pasta de propósito:
+       dentro de uma pasta compartilhada, cada profissional responde pelo que
+       ele próprio registrou, e ninguém reescreve o texto de outro. */
+    if (s.perfil === "profissional" && tabela === "prontuario_registros") {
+      donoCol = "usuario_id"; donoVal = s.userId;
+    }
+
+    /* Lançamento não se EXCLUI — arquiva-se (POST .../arquivar). Registro de
+       acompanhamento é documento: some da tela, continua no banco. Sem esta
+       linha o CRUD genérico ofereceria o DELETE de graça. */
+    if (tabela === "prontuario_registros" && req.method === "DELETE") return json(res, 400, {
+      error: "Lançamento não é excluído — use Arquivar. Ele sai da tela e continua guardado." });
 
     // abrir uma tela é uma listagem: registra "fulano abriu Usuários"
     if (req.method === "GET" && !id) registrarAcesso(req, s, tabela);
@@ -1154,8 +1498,26 @@ async function rotaApi(req, res, p) {
         filtrarNaMemoria = true;
       }
       if (donoCol) { cond.push(donoCol + "=?"); args.push(donoVal); }
+      /* Os lançamentos são sempre pedidos de DENTRO de uma pasta; devolver a
+         tabela inteira misturaria o acompanhamento de todo mundo numa lista só. */
+      if (tabela === "prontuario_registros") {
+        const pid = q.get("prontuario_id");
+        if (!/^\d+$/.test(String(pid || ""))) return json(res, 400, { error: "Informe o prontuário." });
+        const pasta = await Q.get("SELECT * FROM prontuario WHERE id=?", pid);
+        if (!pasta) return json(res, 404, { error: "Prontuário não encontrado." });
+        const recusaLista = recusaPorDono(s, pasta);
+        if (recusaLista) return json(res, 403, { error: recusaLista });
+        cond.push("prontuario_id=?"); args.push(Number(pid));
+        // arquivado some da tela, mas volta com ?arquivados=1
+        if (q.get("arquivados") !== "1") cond.push("arquivado=0");
+      }
       if (cond.length) sql += " WHERE " + cond.join(" AND ");
-      sql += ` ORDER BY id DESC`;
+      /* O acompanhamento se lê do mais recente para o mais antigo — mas por
+         DATA do lançamento, não por ordem de digitação: quem registra hoje uma
+         sessão da semana passada não pode aparecer como a última. */
+      sql += tabela === "prontuario_registros"
+        ? " ORDER BY COALESCE(NULLIF(data,''),criado) DESC, id DESC"
+        : " ORDER BY id DESC";
       let linhas = await Q.all(sql, ...args);
 
       /* Recorte por nome ou CPF, agora que as linhas voltaram decifradas.
@@ -1195,6 +1557,34 @@ async function rotaApi(req, res, p) {
         } else {
           b.profissional_id = await idDoProfissional(b.profissional);
         }
+        /* UMA pasta por pessoa + serviço. O índice único no banco é quem
+           garante de verdade; esta checagem existe para o recado ser útil —
+           sem ela a equipe veria "erro ao salvar" e abriria um chamado. */
+        if (!b.paciente_id) return json(res, 400, { error: "Selecione o usuário deste prontuário." });
+        if (!b.especialidade) return json(res, 400, { error: "Selecione o serviço deste prontuário." });
+        const ja = await pastaDoPar(b.paciente_id, b.especialidade);
+        if (ja) return json(res, 409, {
+          error: `Este usuário já tem prontuário de ${b.especialidade} (nº ${ja.numero || "—"}). Abra o existente — cada serviço tem um prontuário só.`,
+          id: ja.id });
+        if (!b.aberto_em) b.aberto_em = new Date().toISOString().slice(0, 10);
+        b.status = "Ativo";
+      }
+      if (tabela === "prontuario_registros") {
+        if (!b.prontuario_id) return json(res, 400, { error: "Lançamento sem prontuário." });
+        if (!TIPOS_REGISTRO.includes(b.tipo)) return json(res, 400, { error: "Tipo de lançamento inválido." });
+        if (!String(b.texto || "").trim()) return json(res, 400, { error: "Escreva o conteúdo do lançamento." });
+        if (!b.data) b.data = new Date().toISOString().slice(0, 10);
+        /* A pasta manda: quem não pode abrir a pasta não escreve dentro dela.
+           Sem esta guarda o recorte por dono teria uma porta lateral — bastaria
+           lançar direto no id da pasta do colega. */
+        const pasta = await Q.get("SELECT * FROM prontuario WHERE id=?", b.prontuario_id);
+        if (!pasta) return json(res, 404, { error: "Prontuário não encontrado." });
+        const recusaReg = recusaPorDono(s, pasta);
+        if (recusaReg) return json(res, 403, { error: recusaReg });
+        if (pasta.status === "Alta") return json(res, 400, {
+          error: "Este prontuário está com alta. Reabra antes de lançar." });
+        b.usuario_id = s.userId;
+        if (!b.profissional) b.profissional = pasta.profissional || s.nome;
       }
       if (tabela === "atendimentos" && s.perfil === "profissional") b.profissional_id = s.profissionalId; // marca na própria agenda
       // senha do portal: guarda só o HASH (scrypt); o texto puro é devolvido
@@ -1220,6 +1610,30 @@ async function rotaApi(req, res, p) {
       auditar({ req, sessao: s, acao: "criar", modulo: tabela, entidadeId: novoId,
         resumo: `Cadastrou em ${rotuloModulo(tabela)}: ${rotuloRegistro(tabela, comoVeio)}`,
         detalhe: { campos: comoVeio } });
+
+      /* A pasta nasce numerada e recolhe os agendamentos daquele par que já
+         existiam soltos — normalmente o primeiro, marcado antes de a pasta
+         existir. */
+      if (tabela === "prontuario") {
+        const numero = await emitirNumeroProntuario(novoId);
+        const recolhidos = await recolherAtendimentosSoltos(novoId, comoVeio.paciente_id, comoVeio.especialidade);
+        await anotar("prontuario", novoId, "Prontuário aberto", `${numero} · ${comoVeio.especialidade}`, s);
+        await anotar("paciente", comoVeio.paciente_id, "Prontuário aberto", `${numero} · ${comoVeio.especialidade}`, s);
+        return json(res, 200, { ok: true, id: novoId, numero, recolhidos });
+      }
+      if (tabela === "prontuario_registros") {
+        const pr = await Q.get("SELECT paciente_id,numero FROM prontuario WHERE id=?", comoVeio.prontuario_id) || {};
+        await anotar("prontuario", comoVeio.prontuario_id, "Lançamento: " + rotuloTipo(comoVeio.tipo),
+          semMarcacao(comoVeio.texto).slice(0, 160), s);
+        if (pr.paciente_id) await anotar("paciente", pr.paciente_id,
+          "Lançamento no prontuário " + (pr.numero || ""), rotuloTipo(comoVeio.tipo), s);
+      }
+      /* O agendamento se pendura sozinho na pasta do serviço, quando não há
+         dúvida de qual é (ver ligarAtendimentoNaPasta). */
+      if (tabela === "atendimentos") {
+        const pasta = await ligarAtendimentoNaPasta(novoId);
+        return json(res, 200, { ok: true, id: novoId, prontuario: pasta || null });
+      }
       return json(res, 200, { ok: true, id: novoId, senha: senhaGerada || undefined });
     }
     if (req.method === "PUT" && id) {
@@ -1251,6 +1665,15 @@ async function rotaApi(req, res, p) {
       limparHtmlDoRegistro(tabela, b);     // HTML do prontuário sai higienizado
       proteger(tabela, b);     // mesma cifragem do INSERT
       if (use.length) await Q.run(`UPDATE ${tabela} SET ${use.map((c) => c + "=?").join(",")} WHERE id=?`, ...use.map((c) => b[c]), id);
+      /* Lançamento editado guarda QUANDO foi editado e o que mudou entra na
+         linha do tempo: num registro de acompanhamento, "alguém mexeu nisto
+         depois" é informação, não detalhe. */
+      if (tabela === "prontuario_registros" && use.length) {
+        await Q.run("UPDATE prontuario_registros SET atualizado=? WHERE id=?", agora(), id);
+        if (comoVeio.texto !== undefined && comoVeio.texto !== antesTudo.texto)
+          await anotar("prontuario", antesTudo.prontuario_id,
+            "Lançamento editado: " + rotuloTipo(antesTudo.tipo), semMarcacao(comoVeio.texto).slice(0, 160), s);
+      }
       const mudou = diferencas(antesTudo, comoVeio, tabela);
       const nomes = Object.keys(mudou);
       /* Salvar sem mexer em nada não vira linha — senão a trilha encheria toda
@@ -1264,6 +1687,40 @@ async function rotaApi(req, res, p) {
     }
     if (req.method === "DELETE" && id) {
       if (donoCol) { const dono = await Q.get(`SELECT ${donoCol} d FROM ${tabela} WHERE id=?`, id); if (dono && String(dono.d) !== String(donoVal)) return json(res, 403, { error: "Registro de outro profissional." }); }
+      /* ====================================================================
+         PASTA COM LANÇAMENTO NÃO SE APAGA
+
+         Excluir a pasta apagaria o acompanhamento inteiro que está dentro
+         dela — e o banco não tem cascata, então os lançamentos ficariam
+         órfãos: invisíveis na tela, presentes em todo backup, sem pasta a que
+         pertencer. Quem encerra um acompanhamento dá ALTA; quem errou um
+         lançamento ARQUIVA.
+
+         Uma pasta recém-aberta e ainda vazia continua podendo ser excluída —
+         é o caso de quem escolheu o serviço errado e quer recomeçar.
+
+         O agendamento NÃO entra nesta conta de propósito: ele não é conteúdo
+         da pasta, está apenas arquivado nela, e continua existindo sozinho se
+         ela sair. Apagar a pasta vazia solta os agendamentos e permite
+         recomeçar; se contassem, um vínculo feito por engano prenderia a pasta
+         para sempre. */
+      /* Mesma regra, um nível acima: apagar a PESSOA levaria junto o prontuário
+         dela — e como o banco não tem cascata, as pastas e os lançamentos
+         ficariam órfãos, invisíveis na tela e presentes em todo backup. Quem
+         sai do acompanhamento é INATIVADO; a ficha continua inteira. */
+      if (tabela === "pacientes") {
+        const nPastas = (await Q.get("SELECT COUNT(*) c FROM prontuario WHERE paciente_id=?", id)).c;
+        const nAtend = (await Q.get("SELECT COUNT(*) c FROM atendimentos WHERE paciente_id=?", id)).c;
+        if (nPastas || nAtend) return json(res, 400, {
+          error: `Este usuário tem ${nPastas} prontuário(s) e ${nAtend} agendamento(s) e não pode ser excluído. Para tirá-lo do acompanhamento, use "Inativar usuário" — a ficha e o histórico continuam guardados.` });
+      }
+      if (tabela === "prontuario") {
+        const n = (await Q.get("SELECT COUNT(*) c FROM prontuario_registros WHERE prontuario_id=?", id)).c;
+        if (n) return json(res, 400, {
+          error: `Este prontuário tem ${n} lançamento(s) e não pode ser excluído. Para encerrar o acompanhamento, use "Dar alta".` });
+        await Q.run("UPDATE atendimentos SET prontuario_id=NULL WHERE prontuario_id=?", id);
+        await Q.run("DELETE FROM historico WHERE entidade='prontuario' AND entidade_id=?", id);
+      }
       /* Lê o registro INTEIRO antes de apagar: numa exclusão, a auditoria é a
          única coisa que sobra. Sem isso não há como responder depois "o que foi
          apagado?". */
