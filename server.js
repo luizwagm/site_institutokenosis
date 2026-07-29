@@ -27,7 +27,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "2.6.1";
+const APP_VERSION = "2.8.0";
 
 /* ==========================================================================
    CONSULTA DE CEP
@@ -1041,7 +1041,7 @@ async function publish() {
      O Feed escapou por acaso: passava por um embrulho de dois parâmetros, que
      descarta o terceiro. Agora as duas áreas têm o seu, e sem padrão nenhum
      ninguém volta a chamar esta função direto de um `map` sem perceber. */
-  const cartaoMateria = (p, i, area) => `<article class="materia" data-revela${i % 3 ? ` data-revela-atraso="${i % 3}"` : ""}>
+  const cartaoMateria = (p, i, area) => `<article class="materia materia--${area}" data-revela${i % 3 ? ` data-revela-atraso="${i % 3}"` : ""}>
             ${p.image ? `<a class="materia__foto" href="/${area}/${esc(p.slug)}/" tabindex="-1" aria-hidden="true"><img src="${esc(p.image)}" alt="${esc(p.title)}" loading="lazy" decoding="async"${medidasDoImg(p.image) || ' width="900" height="560"'}></a>` : ""}
             <div class="materia__corpo">
               <time class="materia__data" datetime="${esc(p.date)}">${dataBR(p.date)}</time>
