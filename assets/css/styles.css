@@ -490,14 +490,41 @@ h1, h2, h3, h4 {
 
 /* -------------------------------- Matérias -------------------------------- */
 .materia { background: var(--papel); border: 1px solid var(--linha); border-radius: var(--raio); overflow: hidden; display: flex; flex-direction: column; }
-.materia__foto img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; transition: transform .6s ease; }
+/* MINIATURA DO CARTÃO — aqui o corte é PROPOSITAL.
+
+   Na lista, o que importa é a fileira ficar alinhada: se cada foto entrasse na
+   proporção em que foi tirada, uma em pé empurraria o cartão dela para baixo e
+   a grade viraria um serrote. Por isso a miniatura tem proporção fixa e a
+   sobra é cortada — quem quiser a foto inteira abre a matéria.
+
+   O `height: auto` não é enfeite, é o conserto: o <img> passou a sair com
+   `width`/`height` reais no HTML (para o navegador reservar o espaço certo), e
+   esses atributos valem como ALTURA DECLARADA. Altura declarada vence
+   `aspect-ratio`, então uma foto de 900px de altura era desenhada com 900px de
+   altura no cartão — a miniatura saía do tamanho de meia tela. Pondo a altura
+   em `auto`, a proporção volta a mandar.
+
+   16/9 e não 16/10: a lista pedia foto menor, e o corte mais baixo também
+   deixa o título e o resumo mais perto de quem lê. */
+.materia__foto img {
+  width: 100%; height: auto;
+  aspect-ratio: 16 / 9; object-fit: cover;
+  transition: transform .6s ease;
+}
 .materia:hover .materia__foto img { transform: scale(1.05); }
 .materia__corpo { padding: 1.4rem 1.5rem; display: flex; flex-direction: column; flex: 1; }
 
 /* Capa da matéria aberta. Sobe sobre o topo azul para amarrar o cabeçalho ao
-   texto, em vez de ficar boiando no meio da página. */
+   texto, em vez de ficar boiando no meio da página.
+
+   `width: fit-content` faz a moldura ENCOLHER até a foto. Sem isso ela ocupava
+   a coluna inteira: uma foto em pé de 373px ficava no meio de uma caixa de
+   820px, com quase 450px de papel vazio dentro da borda e da sombra — parecia
+   defeito. Agora a borda abraça a imagem, seja ela em pé, deitada ou quadrada,
+   e `margin-inline: auto` centraliza a moldura na coluna. */
 .materia-capa {
-  margin: -3.5rem 0 2.2rem; border-radius: var(--raio); overflow: hidden;
+  width: fit-content; max-width: 100%;
+  margin: -3.5rem auto 2.2rem; border-radius: var(--raio); overflow: hidden;
   border: 1px solid var(--linha); box-shadow: var(--sombra); background: var(--papel);
 }
 /* A capa aparece NA PROPORÇÃO em que a foto foi feita.

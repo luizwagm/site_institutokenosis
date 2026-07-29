@@ -27,7 +27,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "2.4.1";
+const APP_VERSION = "2.6.0";
 
 /* ==========================================================================
    CONSULTA DE CEP
@@ -191,10 +191,29 @@ const VISIT_SALT = getS("visit_salt");
 
 const BOT_RE = /bot|crawler|spider|crawling|slurp|bingpreview|facebookexternalhit|whatsapp|telegram|preview|monitor|uptime|curl|wget|python-requests|axios|headless|lighthouse|pagespeed|semrush|ahrefs|mj12|dotbot|petalbot|gptbot|ccbot|claudebot|perplexity/i;
 
+/* O IP REAL de quem está pedindo.
+
+   Atrás do nginx o socket é sempre 127.0.0.1, então o IP verdadeiro precisa
+   chegar por cabeçalho. Só que cabeçalho é texto que o CLIENTE também
+   escreve. O nginx monta `X-Forwarded-For: <o que o cliente mandou>, <IP
+   real>` — ele ACRESCENTA no fim, não substitui. Ler o PRIMEIRO item da lista,
+   como estava aqui, é ler exatamente o que o visitante digitou.
+
+   Na prática isso anulava a trava de força bruta: bastava mandar um
+   X-Forwarded-For diferente a cada tentativa para nenhuma "contar" duas vezes
+   no mesmo IP, e a senha podia ser tentada infinitas vezes.
+
+   Duas correções: o cabeçalho só é aceito quando a conexão de fato veio do
+   nginx local, e usamos o X-Real-IP — que o nginx SOBRESCREVE — ou, na falta
+   dele, o ÚLTIMO item da lista, o único que o nginx escreveu. */
+const DO_PROXY = /^(?:::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/;
 function clientIp(req) {
-  // atrás do nginx o socket é sempre 127.0.0.1 — o IP real vem no X-Forwarded-For
-  const xff = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
-  return xff || req.headers["x-real-ip"] || req.socket.remoteAddress || "";
+  const direto = String(req.socket.remoteAddress || "");
+  if (!DO_PROXY.test(direto)) return direto;                      // conexão direta: só o socket vale
+  const real = String(req.headers["x-real-ip"] || "").trim();
+  if (real) return real;
+  const lista = String(req.headers["x-forwarded-for"] || "").split(",").map((s) => s.trim()).filter(Boolean);
+  return lista.length ? lista[lista.length - 1] : direto;
 }
 
 function trackVisit(req, pathname) {
@@ -499,7 +518,6 @@ function seed() {
 
     sec_feed_rotulo: "Feed",
     sec_feed_titulo: "O que está <em>acontecendo</em>",
-    sec_feed_sub: "Notícias, avisos e novidades do Instituto — o dia a dia de quem faz acontecer.",
     btn_ver_feed: "Ver todo o feed",
 
     sec_cont_rotulo: "Fale conosco",
@@ -535,6 +553,11 @@ function seed() {
     pg_editais_conteudo: "Por meio destes editais, pessoas físicas, profissionais, voluntários, parceiros e demais interessados podem acompanhar as oportunidades de participação nas ações, projetos e atividades desenvolvidas pelo Instituto, em conformidade com sua finalidade estatutária e com a legislação aplicável.\n\nEdital de Chamamento para Voluntários — tem como objetivo selecionar pessoas interessadas em contribuir, de forma espontânea, solidária e não remunerada, com as ações, projetos e atividades desenvolvidos pelo Instituto Kenósis Fonte das Graças Conceição & Menezes.",
     pg_mem_titulo: "Memória <em>institucional</em>",
     pg_mem_texto: "O registro das ações, encontros e conquistas do Instituto ao longo do tempo.",
+    /* Chaves PRÓPRIAS do Blog. A tela /feed/ nasceu como cópia da Memória e
+       ficou usando as chaves dela: mudar o título de uma trocava o da outra, e
+       no painel havia um campo só para as duas telas. */
+    pg_feed_titulo: "Notícias e Artigos do Instituto Kenósis",
+    pg_feed_texto: "Informação que fortalece direitos, inspira cidadania e transforma vidas.",
     pg_priv_titulo: "Política de <em>Privacidade</em>",
     pg_priv_texto: "Escrita para ser entendida. Aqui você encontra o que fazemos com os seus dados — e o que não fazemos.",
 
@@ -708,8 +731,15 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
    `href` é o único atributo aceito, e só em <a>, com o esquema conferido:
    `javascript:` num link é execução de código com a cara de um link comum.
    ========================================================================== */
+/* Com o botão "</>" dá para escrever marcação à mão, e uma tag que não estivesse
+   nesta lista sumiria calada — a pessoa salvaria a tabela e ela simplesmente não
+   apareceria no site. Por isso a lista cobre também o que se escreve à mão.
+   Todas as adições são INERTES: não executam nada e ficam sem atributo nenhum,
+   porque htmlLimpo só preserva o href do <a>. Continuam de fora img (sem src
+   sobra uma tag vazia — foto é pelo campo de imagem) e tudo que roda código. */
 const TAGS_SITE = new Set(["p", "br", "b", "strong", "i", "em", "u", "s", "ul", "ol", "li",
-  "h2", "h3", "h4", "blockquote", "a", "span", "div"]);
+  "h2", "h3", "h4", "blockquote", "a", "span", "div", "hr", "sub", "sup", "code", "pre",
+  "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption"]);
 const LINK_SEGURO = /^(https?:\/\/|mailto:|tel:|\/|#)/i;
 
 function htmlLimpo(valor) {
@@ -875,8 +905,17 @@ async function publish() {
   const documentos = db.prepare("SELECT * FROM documentos ORDER BY sort,id").all();
   const parceiros = db.prepare("SELECT * FROM portfolio ORDER BY sort,id").all();
   const diretoria = db.prepare("SELECT * FROM team ORDER BY sort,id").all();
-  const posts = db.prepare("SELECT * FROM posts ORDER BY date DESC, id DESC").all();
-  const feed = db.prepare("SELECT * FROM feed ORDER BY date DESC, id DESC").all();
+  /* Rascunho não vai para o ar. O painel apaga o cadastro em branco quando se
+     troca de tela, mas ninguém garante que se troque: dá para clicar em
+     "+ Nova publicação" e ir direto em Publicar. Sem esta peneira, o site
+     ganharia uma página sem título nem texto, e ela entraria no sitemap.
+
+     A conta é sobre o que se LÊ na página — título, resumo, conteúdo e foto.
+     `slug` e `date` ficam de fora: nascem preenchidos sozinhos. */
+  const temAlgo = (p) => [p.title, p.excerpt, p.content, p.image]
+    .some((v) => String(v ?? "").replace(/<[^>]*>/g, "").trim());
+  const posts = db.prepare("SELECT * FROM posts ORDER BY date DESC, id DESC").all().filter(temAlgo);
+  const feed = db.prepare("SELECT * FROM feed ORDER BY date DESC, id DESC").all().filter(temAlgo);
 
   const SITE = "https://institutokenosis.com";
   const dataBR = (iso) => { const [a, m, d] = String(iso || "").split("-"); return d ? `${d}/${m}/${a}` : iso || ""; };
@@ -1453,7 +1492,9 @@ const CAMPOS = [
   { painel: "home", grupo: "📣 Feed", campos: [
     ["sec_feed_rotulo", "Rótulo", "input"],
     ["sec_feed_titulo", "Título", "input"],
-    ["sec_feed_sub", "Subtítulo", "textarea"],
+    /* Sem "Subtítulo": a seção do Feed na home não tem mais essa linha. O
+       campo continuaria aceitando texto que não sairia em lugar nenhum — pior
+       do que não existir, porque parece que existe. */
     ["btn_ver_feed", "Botão", "input"],
   ]},
   { painel: "home", grupo: "📞 Fale conosco", campos: [
@@ -1551,6 +1592,10 @@ const CAMPOS = [
   { painel: "outras", grupo: "📄 Página Memória", campos: [
     ["pg_mem_titulo", "Título da página", "input"],
     ["pg_mem_texto", "Texto da área azul", "textarea"],
+  ]},
+  { painel: "outras", grupo: "📄 Página Blog (/feed/)", campos: [
+    ["pg_feed_titulo", "Título da página", "input"],
+    ["pg_feed_texto", "Texto da área azul", "textarea"],
   ]},
   { painel: "outras", grupo: "📄 Página Privacidade", campos: [
     ["pg_priv_titulo", "Título da página", "input"],
@@ -1951,7 +1996,13 @@ Consulte <code>journalctl -u kenosis -n 40</code>.</small></p></div>`);
         const table = tm[1], id = tm[2], cols = TABLES[table];
         if (req.method === "POST" && !id) {
           const b = await readBody(req);
-          if (["services", "posts", "feed", "projetos"].includes(table) && (b.slug || b.title)) {
+          /* A URL sai SEMPRE, mesmo sem título. O painel passou a criar a
+             matéria com o título em branco (o nome vem como sugestão apagada,
+             não como texto salvo), e a coluna `slug` é NOT NULL UNIQUE: sem
+             esta linha o INSERT quebraria. Sem título, a URL de rascunho é o
+             nome da própria tabela — que é o que `SLUG_RASCUNHO`, no painel,
+             já reconhece como "ainda não escolhida". */
+          if (["services", "posts", "feed", "projetos"].includes(table)) {
             b.slug = slug(b.slug || b.title || table) || table;
             const clash = db.prepare(`SELECT id FROM ${table} WHERE slug=?`).get(b.slug);
             if (clash) b.slug = `${b.slug}-${Date.now().toString(36)}`;

@@ -24,7 +24,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.16.0";
+const SISTEMA_VERSION = "1.16.1";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -452,7 +452,30 @@ async function validarAgenda(profissionalId, data, hora, excluirId) {
   }
   return null;
 }
-const clientIp = (req) => String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket.remoteAddress || "";
+/* O IP REAL de quem está pedindo.
+
+   Atrás do nginx o socket é sempre 127.0.0.1, então o IP verdadeiro precisa
+   chegar por cabeçalho. Só que cabeçalho é texto que o CLIENTE também
+   escreve. O nginx monta `X-Forwarded-For: <o que o cliente mandou>, <IP
+   real>` — ele ACRESCENTA no fim, não substitui. Ler o PRIMEIRO item da lista,
+   como estava aqui, é ler exatamente o que o visitante digitou.
+
+   Na prática isso anulava a trava de força bruta: bastava mandar um
+   X-Forwarded-For diferente a cada tentativa para nenhuma "contar" duas vezes
+   no mesmo IP, e a senha podia ser tentada infinitas vezes.
+
+   Duas correções: o cabeçalho só é aceito quando a conexão de fato veio do
+   nginx local, e usamos o X-Real-IP — que o nginx SOBRESCREVE — ou, na falta
+   dele, o ÚLTIMO item da lista, o único que o nginx escreveu. */
+const DO_PROXY = /^(?:::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/;
+function clientIp(req) {
+  const direto = String(req.socket.remoteAddress || "");
+  if (!DO_PROXY.test(direto)) return direto;                      // conexão direta: só o socket vale
+  const real = String(req.headers["x-real-ip"] || "").trim();
+  if (real) return real;
+  const lista = String(req.headers["x-forwarded-for"] || "").split(",").map((s) => s.trim()).filter(Boolean);
+  return lista.length ? lista[lista.length - 1] : direto;
+}
 const agora = () => new Date().toISOString();
 function readBody(req) {
   return new Promise((ok, err) => {
