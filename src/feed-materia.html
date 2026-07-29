@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Memória institucional — Instituto Kenósis</title>
-  <meta name="description" content="O registro das ações, encontros e conquistas do Instituto Kenósis ao longo do tempo.">
-  <link rel="canonical" href="https://institutokenosis.com/memoria/">
-  <meta name="robots" content="{{ROBOTS}}">
+  <title>{{TITULO}} — Instituto Kenósis</title>
+  <meta name="description" content="{{RESUMO}}">
+  <link rel="canonical" href="https://institutokenosis.com/feed/{{SLUG}}/">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
   <meta name="theme-color" content="#253282">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="pt_BR">
   <meta property="og:site_name" content="Instituto Kenósis">
-  <meta property="og:title" content="Memória institucional — Instituto Kenósis">
-  <meta property="og:description" content="O registro das ações, encontros e conquistas do Instituto Kenósis ao longo do tempo.">
-  <meta property="og:url" content="https://institutokenosis.com/memoria/">
+  <meta property="og:title" content="{{TITULO}} — Instituto Kenósis">
+  <meta property="og:description" content="{{RESUMO}}">
+  <meta property="og:url" content="https://institutokenosis.com/feed/{{SLUG}}/">
   <meta property="og:image" content="https://institutokenosis.com/assets/img/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://institutokenosis.com/assets/img/og-image.png">
@@ -57,8 +57,8 @@
         <a href="/projetos/">Projetos</a>
         <a href="/transparencia/">Transparência</a>
         <a href="/voluntariado/">Voluntariado</a>
-        <a href="/memoria/" aria-current="page">Memória</a>
-        <a href="/feed/">Feed</a>
+        <a href="/memoria/">Memória</a>
+        <a href="/feed/" aria-current="page">Feed</a>
         <a href="/#contato">Contato</a>
         <a class="btn btn--principal btn--p" href="/#ajudar">Quero ajudar</a>
       </nav>
@@ -70,29 +70,20 @@
 
 <main id="conteudo">
     <section class="pagina-topo">
-      <div class="container">
-        <nav class="migalhas" aria-label="Você está aqui"><a href="/">Início</a> <span>›</span> <b>Memória institucional</b></nav>
-        <h1 class="pagina-topo__titulo"><!--#PG_MEM_TITULO--><!--/PG_MEM_TITULO--></h1>
-        <p class="pagina-topo__texto"><!--#PG_MEM_TEXTO--><!--/PG_MEM_TEXTO--></p>
+      <div class="container container--estreito">
+        <nav class="migalhas" aria-label="Você está aqui"><a href="/">Início</a> <span>›</span> <a href="/feed/">Feed</a> <span>›</span> <b>{{TITULO}}</b></nav>
+        <time class="materia__data" datetime="{{DATA_ISO}}" style="color:var(--celeste-claro)">{{DATA_BR}}</time>
+        <h1 class="pagina-topo__titulo">{{TITULO}}</h1>
+        <p class="pagina-topo__texto">{{RESUMO}}</p>
       </div>
     </section>
     <section class="secao">
-      <div class="container">
-        <div class="grade grade--3">
-        {{LISTA}}
+      <div class="container container--estreito">
+        {{FIGURA}}
+        <div class="conteudo" data-revela>
+        {{CONTEUDO}}
         </div>
-      </div>
-    </section>
-
-    <section class="secao secao--luz">
-      <div class="container">
-        <header class="secao__cabeca" data-revela>
-          <p class="rotulo">Continue por aqui</p>
-          <h2 class="titulo-secao titulo-p">Outras páginas do <em>Instituto</em></h2>
-        </header>
-        <div class="grade grade--3">
-        {{RELACIONADOS}}
-        </div>
+        <p class="voltar"><a href="/feed/">← Voltar para o Feed</a></p>
       </div>
     </section>
 </main>

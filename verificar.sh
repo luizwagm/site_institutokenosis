@@ -77,7 +77,16 @@ fi
 echo
 
 echo "--- Banco da gestão (/restrito · PostgreSQL) ---"
-echo "  serviço postgres : $(systemctl is-active postgresql 2>/dev/null || echo '—')"
+# `systemctl is-active postgresql` NÃO serve para saber se o banco está de pé:
+# no Debian/Ubuntu essa unit é uma FACHADA que não roda nada, e responde
+# "active" com o cluster no chão. Foi ela que escondeu a queda de 29/07/2026 —
+# o status dizia "active (exited) desde maio" enquanto o app levava
+# ECONNREFUSED na 5432. Quem sabe a verdade é o pg_lsclusters.
+if command -v pg_lsclusters >/dev/null 2>&1; then
+  echo "  cluster postgres : $(pg_lsclusters -h 2>/dev/null | awk '{print $1"/"$2" porta "$3" "$4}' | paste -sd' · ' - || echo '—')"
+else
+  echo "  cluster postgres : $(systemctl is-active postgresql 2>/dev/null || echo '—') (unit de fachada — instale postgresql-common para o estado real)"
+fi
 echo "  pg_dump          : $(command -v pg_dump >/dev/null 2>&1 && pg_dump --version | head -1 || echo 'AUSENTE — instale postgresql-client, o backup depende dele')"
 node -e '
   const { Q, carregarAmbiente } = require("./pg");
@@ -98,7 +107,7 @@ node -e '
       console.log("  tamanho                " + s.t);
     } catch (e) {
       console.log("  ✖ NÃO CONECTOU: " + e.message.split("\n")[0]);
-      console.log("    confira /etc/kenosis.env e: systemctl status postgresql");
+      console.log("    confira /etc/kenosis.env e o estado REAL do cluster: pg_lsclusters");
     }
     await Q.fechar().catch(() => {});
   })();

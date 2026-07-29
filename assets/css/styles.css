@@ -500,7 +500,27 @@ h1, h2, h3, h4 {
   margin: -3.5rem 0 2.2rem; border-radius: var(--raio); overflow: hidden;
   border: 1px solid var(--linha); box-shadow: var(--sombra); background: var(--papel);
 }
-.materia-capa img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block; }
+/* A capa aparece NA PROPORÇÃO em que a foto foi feita.
+
+   Antes havia `aspect-ratio: 16/10` com `object-fit: cover`: toda capa era
+   forçada a um retângulo deitado e o resto era CORTADO. Foto em pé — que é o
+   que sai de um celular — perdia o topo e a base, justamente onde costuma
+   estar o rosto.
+
+   `width`/`height` em `auto` com os dois limites preserva a proporção: a
+   imagem entra no tamanho natural e só encolhe se passar da largura da coluna
+   OU da altura máxima; nenhum dos dois deforma, porque o navegador ajusta o
+   outro lado junto. Sem o teto de altura, uma foto 3:4 ocuparia mais que a
+   tela inteira e empurraria o texto para baixo.
+
+   `margin-inline: auto` e não `text-align: center`: a regra global põe
+   `display: block` em toda imagem, e bloco não obedece a alinhamento de texto. */
+.materia-capa img {
+  width: auto; height: auto;
+  max-width: 100%; max-height: 70vh;
+  margin-inline: auto; display: block;
+}
+@media (max-width: 640px) { .materia-capa img { max-height: 60vh; } }
 @media (max-width: 640px) { .materia-capa { margin-top: -2rem; } }
 .materia__data { font-size: .78rem; color: var(--terracota); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .materia__titulo { font-size: 1.12rem; margin: .4rem 0 .5rem; }

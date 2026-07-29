@@ -81,6 +81,27 @@
     .st-table td:last-child{text-align:right;font-weight:700;color:var(--violet);width:70px}
     .st-table tr:last-child td{border-bottom:0}
     @media(max-width:820px){.app{grid-template-columns:1fr}aside{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:.3rem}main{padding:1.2rem}}
+    /* ---------------------- Editor de texto formatado ------------------- */
+    .ed-caixa{border:1.5px solid var(--line2);border-radius:9px;overflow:hidden;background:#fff}
+    .ed-caixa:focus-within{border-color:var(--celeste);box-shadow:0 0 0 3px rgba(30,161,228,.16)}
+    .ed-barra{display:flex;flex-wrap:wrap;gap:.15rem;padding:.35rem;background:#f6fafd;border-bottom:1px solid var(--line2)}
+    .ed-bt{min-width:30px;height:28px;border:1px solid transparent;border-radius:6px;background:none;
+      cursor:pointer;font:inherit;font-size:.85rem;color:var(--muted);line-height:1}
+    .ed-bt:hover{background:#fff;border-color:var(--line2);color:var(--marinho)}
+    .ed-sep{width:1px;background:var(--line2);margin:.2rem .25rem}
+    .ed-area{min-height:120px;max-height:60vh;overflow:auto;padding:.7rem .8rem;line-height:1.65;
+      font-size:.95rem;color:var(--text);outline:none}
+    .ed-area.alto{min-height:260px}
+    .ed-area:empty::before{content:"Escreva aqui…";color:var(--muted);opacity:.7}
+    /* Como o texto formatado aparece DENTRO do editor. Sem isto o <ul> herdaria
+       o reset `*{margin:0}` lá de cima e a lista sairia colada na margem. */
+    .ed-area p{margin:0 0 .6rem}
+    .ed-area p:last-child{margin-bottom:0}
+    .ed-area ul,.ed-area ol{margin:.4rem 0 .7rem;padding-left:1.5rem}
+    .ed-area li{margin:.15rem 0}
+    .ed-area h2,.ed-area h3{margin:.8rem 0 .4rem;color:var(--marinho);font-size:1.05rem}
+    .ed-area blockquote{margin:.6rem 0;padding-left:.8rem;border-left:3px solid var(--line2);color:var(--muted)}
+    .ed-area a{color:var(--celeste)}
   </style>
 </head>
 <body>
@@ -110,6 +131,7 @@
     <button class="navbtn" data-p="voluntariado">Voluntariado</button>
     <button class="navbtn" data-p="talentos">Banco de Talentos</button>
     <button class="navbtn" data-p="posts">Memórias</button>
+    <button class="navbtn" data-p="feed">Feed</button>
     <button class="navbtn" data-p="galeria">Galeria</button>
     <button class="navbtn" data-p="outras">Outras páginas</button>
     <button class="navbtn" data-p="password">Senha</button>
@@ -254,6 +276,13 @@
       <div id="posts-list"></div>
     </section>
 
+    <section class="panel" id="p-feed">
+      <div class="topbar"><h1>Feed</h1><button class="btn btn-ghost" onclick="addRow('feed')">+ Nova publicação</button></div>
+      <p class="hint mb">Notícias, avisos e novidades. Sai na home e em <a href="/feed/" target="_blank">/feed/</a>.
+        A <b>Memória</b> é outra coisa: lá fica o registro histórico das ações. Publique para gerar as páginas.</p>
+      <div id="feed-list"></div>
+    </section>
+
     <section class="panel" id="p-galeria">
       <div class="topbar">
         <h1>Galeria</h1>
@@ -298,6 +327,116 @@ function toast(msg, err = false) {
   clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 3000);
 }
 const escA = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+
+/* ==========================================================================
+   EDITOR DE TEXTO FORMATADO
+
+   Os textos do site não são texto corrido: têm subtítulo, item em negrito,
+   lista e link. Antes, para pôr qualquer uma dessas coisas era preciso
+   escrever a marcação à mão dentro de um textarea.
+
+   POR QUE contenteditable + execCommand, e não uma biblioteca: o painel é uma
+   página só, sem framework e sem dependência de front, e a CSP daqui é
+   `script-src 'self'` — não carrega editor de terceiro. O execCommand é antigo
+   e marcado como obsoleto, mas funciona em todos os navegadores atuais e cobre
+   o que a clínica precisa.
+
+   O QUE ELE NÃO FAZ: colar formatação de fora. Texto colado do Word entra como
+   TEXTO PURO. Colar HTML de fora traria estilos inline, fontes e, no pior caso,
+   conteúdo perigoso — e o servidor descartaria quase tudo na higienização,
+   deixando quem colou sem entender por que o que ele colou "sumiu".
+
+   O valor continua saindo por `.value` de um <input type=hidden> que carrega os
+   mesmos data-* do textarea antigo — por isso o saveTexts e o saveRow não
+   precisaram mudar uma linha.
+   ========================================================================== */
+const ED_BOTOES = [
+  ["bold", "N", "Negrito (Ctrl+B)", "font-weight:800"],
+  ["italic", "I", "Itálico (Ctrl+I)", "font-style:italic"],
+  ["underline", "S", "Sublinhado (Ctrl+U)", "text-decoration:underline"],
+  ["|", "", "", ""],
+  ["formatBlock:h2", "T¹", "Subtítulo grande", "font-weight:700"],
+  ["formatBlock:h3", "T²", "Subtítulo menor", "font-weight:600;font-size:.8rem"],
+  ["formatBlock:p", "¶", "Parágrafo normal", ""],
+  ["|", "", "", ""],
+  ["insertUnorderedList", "•—", "Lista com marcadores", ""],
+  ["insertOrderedList", "1—", "Lista numerada", ""],
+  ["formatBlock:blockquote", "❝", "Citação", ""],
+  ["|", "", "", ""],
+  ["link", "🔗", "Inserir link", ""],
+  ["unlink", "⛓", "Tirar o link", ""],
+  ["|", "", "", ""],
+  ["removeFormat", "T̶", "Limpar formatação", ""],
+  ["undo", "↶", "Desfazer (Ctrl+Z)", ""],
+  ["redo", "↷", "Refazer (Ctrl+Y)", ""],
+];
+
+let edSeq = 0;
+/* `attrs` são os data-* que identificam o campo (data-k ou data-t/data-id/data-f).
+   Vão para o input oculto, que é quem o salvar lê. */
+function editorRico(attrs, valor, alto) {
+  const id = "ed" + (++edSeq);
+  const barra = ED_BOTOES.map(([cmd, rot, titulo, estilo]) =>
+    cmd === "|" ? '<span class="ed-sep"></span>'
+      : `<button type="button" class="ed-bt" title="${escA(titulo)}" aria-label="${escA(titulo)}"
+           onmousedown="event.preventDefault()" onclick="edCmd('${id}','${cmd}')" style="${estilo}">${rot}</button>`).join("");
+  return `<div class="ed-caixa">
+    <div class="ed-barra" role="toolbar" aria-label="Formatação">${barra}</div>
+    <div class="ed-area${alto ? " alto" : ""}" id="${id}-ed" contenteditable="true" role="textbox" aria-multiline="true"
+         oninput="edSync('${id}')" onblur="edSync('${id}')" onpaste="edColar(event)">${paraHTML(valor)}</div>
+    <input type="hidden" id="${id}" ${attrs} value="${escA(valor || "")}">
+  </div>`;
+}
+
+/* O conteúdo antigo é texto puro com parágrafos separados por linha em branco.
+   Jogá-lo cru no contenteditable transformaria tudo num parágrafo só — a
+   quebra de linha não é marcação. Converte na ABERTURA; ao salvar já sai HTML. */
+function paraHTML(v) {
+  const s = String(v || "").trim();
+  if (!s) return "";
+  if (/<(p|br|ul|ol|li|h2|h3|h4|blockquote|div|strong|b|em|i|a)\b/i.test(s)) return s;
+  return s.split(/\n{2,}/).map((par) => `<p>${escA(par.trim()).replace(/\n/g, "<br>")}</p>`).join("");
+}
+
+function edCmd(id, cmd) {
+  const area = document.getElementById(id + "-ed");
+  area.focus();
+  if (cmd === "link") {
+    const url = prompt("Endereço do link (https://… , /pagina/ ou mailto:…):", "https://");
+    if (url) document.execCommand("createLink", false, url);
+  } else if (cmd.startsWith("formatBlock:")) {
+    document.execCommand("formatBlock", false, cmd.split(":")[1]);
+  } else {
+    document.execCommand(cmd, false, null);
+  }
+  edSync(id);
+}
+
+/* Espelha o que está na tela no campo oculto — é ele que o salvar lê. */
+function edSync(id) {
+  const area = document.getElementById(id + "-ed"), campo = document.getElementById(id);
+  if (!area || !campo) return;
+  /* Apagar tudo raramente deixa a caixa realmente vazia: o navegador guarda um
+     "<br>" solto e, se o texto estava numa lista, guarda a lista inteira. A
+     regra é o que se ENXERGA: sem texto visível, o campo está vazio. */
+  campo.value = area.textContent.trim() === "" ? "" : area.innerHTML.trim();
+  campo.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+/* Colar sempre como texto puro (ver o comentário do bloco). */
+function edColar(ev) {
+  ev.preventDefault();
+  const texto = (ev.clipboardData || window.clipboardData).getData("text/plain");
+  document.execCommand("insertText", false, texto);
+}
+
+/* O texto sem marcação nenhuma — para gerar o resumo e medir se está vazio. */
+function semHTML(html) {
+  const d = document.createElement("div");
+  d.innerHTML = String(html || "");
+  return (d.textContent || "").replace(/\s+/g, " ").trim();
+}
+
 
 async function boot() { try { await api("/api/me"); showApp(); } catch { $("#login").hidden = false; } }
 async function login() {
@@ -403,7 +542,7 @@ async function loadAll() {
   renderTexts();
   const dl = $("#lista-categorias"); if (dl) dl.innerHTML = categoriasUsadas().map((c) => `<option value="${escA(c)}">`).join("");
   renderServicosReadonly(); renderProjetosReadonly(); renderTable("documentos");
-  renderTable("team"); renderTable("posts"); renderTable("portfolio");
+  renderTable("team"); renderTable("posts"); renderTable("feed"); renderTable("portfolio");
   renderGaleria();
 }
 
@@ -501,11 +640,14 @@ function campoHTML(chave, rotulo, tipo) {
       <button class="btn btn-ghost btn-sm" onclick="pickImg(this)">Enviar foto</button>
       ${val ? `<img class="thumb" src="${escA(val)}" alt="">` : ""}
     </div>`;
-  if (tipo === "html") return `<label>${escA(rotulo)}</label>
-    <textarea ${attrs} style="min-height:280px;font-family:ui-monospace,Menlo,monospace;font-size:.85rem">${escA(val)}</textarea>
-    <p class="hint">Aceita HTML. Linha em branco separa parágrafos. <code>## Título</code> vira subtítulo e <code>&gt; frase</code> vira destaque.</p>`;
-  if (tipo === "bigtext") return `<label>${escA(rotulo)}</label><textarea ${attrs} style="min-height:170px">${escA(val)}</textarea>`;
-  if (["textarea", "lista", "stats", "json_lista"].includes(tipo))
+  if (tipo === "html") return `<label>${escA(rotulo)}</label>${editorRico(attrs, val, true)}`;
+  /* `ajudar_cards` é um bloco de LINHA A LINHA ("Título | texto | link"): o
+     site o lê por linha, e um editor gravaria <p> — o bloco pararia de montar.
+     Fica textarea, como `numeros`, `inst_valores` e `form_assuntos`. */
+  if (tipo === "bigtext" && chave !== "ajudar_cards")
+    return `<label>${escA(rotulo)}</label>${editorRico(attrs, val, true)}`;
+  if (tipo === "textarea") return `<label>${escA(rotulo)}</label>${editorRico(attrs, val)}`;
+  if (["bigtext", "lista", "stats", "json_lista"].includes(tipo))
     return `<label>${escA(rotulo)}</label><textarea ${attrs}>${escA(val)}</textarea>`;
   return `<label>${escA(rotulo)}</label><input ${attrs} value="${escA(val)}">`;
 }
@@ -591,13 +733,21 @@ const TDEFS = {
     ["bio", "Titulação e formação", "textarea"],
     ["na_home", "Aparece também na home?", "home"],
   ],
-  posts: [
-    ["title", "Título", "input"],
-    ["slug", "URL amigável (vazio = automática)", "input"],
+  feed: [
+    ["title", "Título", "titulo"],
+    ["slug", "URL amigável", "slug"],
     ["date", "Data (AAAA-MM-DD)", "input"],
-    ["excerpt", "Resumo", "textarea"],
+    ["excerpt", "Resumo (card e Google)", "resumo"],
     ["image", "Imagem de capa", "image"],
-    ["content", "Conteúdo — aceita HTML", "bigtext"],
+    ["content", "Conteúdo", "bigtext"],
+  ],
+  posts: [
+    ["title", "Título", "titulo"],
+    ["slug", "URL amigável", "slug"],
+    ["date", "Data (AAAA-MM-DD)", "input"],
+    ["excerpt", "Resumo (card e Google)", "resumo"],
+    ["image", "Imagem de capa", "image"],
+    ["content", "Conteúdo", "bigtext"],
   ],
 };
 /* categorias já usadas — para agrupar sem depender de digitação exata */
@@ -637,8 +787,19 @@ function renderTable(t) {
   $("#" + t + "-list").innerHTML = DATA[t].map((r) => `
     <div class="card">
       ${TDEFS[t].map(([f, lab, kind]) => {
-        if (kind === "bigtext") return `<label>${lab}</label><textarea style="min-height:200px" data-t="${t}" data-id="${r.id}" data-f="${f}">${escA(r[f])}</textarea>`;
-        if (kind === "textarea") return `<label>${lab}</label><textarea data-t="${t}" data-id="${r.id}" data-f="${f}">${escA(r[f])}</textarea>`;
+        const dados = `data-t="${t}" data-id="${r.id}" data-f="${f}"`;
+        if (kind === "bigtext") return `<label>${lab}</label>${editorRico(dados, r[f], true)}`;
+        /* O RESUMO fica em texto simples de propósito: ele vira a descrição do
+           Google e o JSON-LD, onde uma tag apareceria crua no resultado de
+           busca. É também o que o sistema preenche sozinho. */
+        if (kind === "resumo") return `<label>${lab}</label><textarea ${dados}>${escA(r[f])}</textarea>
+          <p class="hint">Sai no card e no Google. Texto simples, sem formatação${f === "excerpt" ? " — preenchido sozinho quando você termina o conteúdo" : ""}.</p>`;
+        /* Título e URL andam juntos: sair do título preenche a URL vazia. */
+        if (kind === "titulo") return `<label>${lab}</label><input ${dados} value="${escA(r[f])}" onblur="gerarSlug(this)">`;
+        if (kind === "slug") return `<label>${lab}</label>
+          <input ${dados} value="${escA(r[f])}" oninput="this.dataset.tocado='1'">
+          <p class="hint">Vem sozinha do título, tudo minúsculo e separado por hífen. Só é preenchida quando está vazia — trocar a URL de uma página já publicada quebraria o link e o que o Google indexou.</p>`;
+        if (kind === "textarea") return `<label>${lab}</label>${editorRico(dados, r[f])}`;
         if (kind === "image") return `<label>${lab}</label>
           <div class="imgrow">
             <input data-t="${t}" data-id="${r.id}" data-f="${f}" value="${escA(r[f])}" style="flex:1">
@@ -663,6 +824,106 @@ function renderTable(t) {
       </div>
     </div>`).join("");
 }
+/* ==========================================================================
+   URL AMIGÁVEL A PARTIR DO TÍTULO
+
+   Mesmo algoritmo do `slug()` do servidor: sem acento, minúsculo, separado por
+   hífen. O servidor já gerava a URL quando o campo chegava vazio — o que
+   faltava era ela APARECER, para quem escreve poder conferir antes de salvar.
+
+   Só preenche o que está VAZIO. Reescrever a URL de uma página publicada porque
+   alguém ajustou uma palavra do título quebraria o link que já circula e o que
+   o Google indexou — e o site não guarda redirecionamento do endereço antigo.
+   ========================================================================== */
+const paraSlug = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "")
+  .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+/* O item nasce com um título de rascunho ("Nova memória"), e o servidor já
+   emite a URL a partir dele — então a URL nunca chegaria vazia aqui. Estas
+   contam como vazias: são o rascunho, não uma escolha de ninguém.
+
+   Quando dois itens nascem juntos o servidor acrescenta um sufixo à URL
+   ("nova-materia-m9x2k1"), então o rascunho é reconhecido pelo COMEÇO. */
+const SLUG_RASCUNHO = /^(nova-memoria|nova-publicacao|novo-projeto|posts|feed|projetos)(-[a-z0-9]+)?$/;
+
+function gerarSlug(inputTitulo) {
+  const { t, id } = inputTitulo.dataset;
+  const campo = document.querySelector(`[data-t="${t}"][data-id="${id}"][data-f="slug"]`);
+  if (!campo || campo.dataset.tocado === "1") return;   // digitou a URL à mão
+  const atual = campo.value.trim();
+  // URL de página já publicada não se mexe (ver o comentário do bloco)
+  if (atual && !SLUG_RASCUNHO.test(atual)) return;
+  const novo = paraSlug(inputTitulo.value);
+  if (!novo) return;
+  campo.value = novo;
+  campo.style.transition = "background .6s"; campo.style.background = "#eef6ee";
+  setTimeout(() => { campo.style.background = ""; }, 900);
+}
+
+/* ==========================================================================
+   RESUMO GERADO A PARTIR DO CONTEÚDO
+
+   Sai do próprio texto: as primeiras FRASES INTEIRAS até caber na descrição
+   que o Google mostra (~160 caracteres). Cortar no meio da palavra ou da frase
+   deixaria reticências no resultado de busca.
+
+   Quando sobrescreve: enquanto o resumo estiver vazio, ou enquanto for o que
+   nós mesmos geramos — aí ele acompanha as edições do texto. No instante em
+   que alguém escreve o próprio resumo, paramos de mexer: um resumo escrito à
+   mão é melhor que o automático, e apagá-lo a cada clique fora seria perder
+   trabalho de quem escreveu.
+   ========================================================================== */
+const LIMITE_RESUMO = 160;
+const resumoGerado = new Map();                       // id da memória -> último que geramos
+
+function resumirTexto(html) {
+  const txt = semHTML(html);
+  if (!txt) return "";
+  if (txt.length <= LIMITE_RESUMO) return txt;
+  /* Quebra em frases e vai somando enquanto couber — assim o resumo termina
+     num ponto final, e não numa palavra pela metade. */
+  const frases = txt.match(/[^.!?]+[.!?]+(\s|$)/g) || [];
+  let out = "";
+  for (const fr of frases) {
+    if ((out + fr).trim().length > LIMITE_RESUMO) break;
+    out += fr;
+  }
+  out = out.trim();
+  if (out) return out;
+  // frase única e longa: corta na última palavra inteira que couber
+  const corte = txt.slice(0, LIMITE_RESUMO);
+  return corte.slice(0, corte.lastIndexOf(" ")).trim() + "…";
+}
+
+/* Vale para as duas áreas que têm resumo — Memórias e Feed. */
+const COM_RESUMO = new Set(["posts", "feed"]);
+
+function gerarResumo(campoConteudo) {
+  const { t, id } = campoConteudo.dataset;
+  if (!COM_RESUMO.has(t)) return;
+  const alvo = document.querySelector(`[data-t="${t}"][data-id="${id}"][data-f="excerpt"]`);
+  if (!alvo) return;
+  const atual = alvo.value.trim();
+  /* A chave do controle leva a ÁREA junto: sem isso, a memória nº 3 e a
+     publicação nº 3 dividiriam o mesmo registro, e escrever o resumo de uma
+     travaria a geração automática da outra. */
+  const chave = t + ":" + id;
+  if (atual && atual !== resumoGerado.get(chave)) return;   // resumo escrito à mão: intocado
+  const novo = resumirTexto(campoConteudo.value);
+  if (!novo || novo === atual) return;
+  alvo.value = novo;
+  resumoGerado.set(chave, novo);
+  alvo.style.transition = "background .6s"; alvo.style.background = "#eef6ee";
+  setTimeout(() => { alvo.style.background = ""; }, 900);
+  toast("Resumo gerado a partir do conteúdo — ajuste se quiser.");
+}
+
+/* O editor avisa por `change` no campo oculto quando o usuário sai dele. */
+document.addEventListener("change", (e) => {
+  const el = e.target;
+  if (el.dataset && el.dataset.f === "content" && COM_RESUMO.has(el.dataset.t)) gerarResumo(el);
+});
+
 async function saveRow(t, id) {
   const body = {};
   document.querySelectorAll(`[data-t="${t}"][data-id="${id}"]`).forEach((el) => body[el.dataset.f] = el.value);
@@ -675,7 +936,8 @@ async function addRow(t) {
     team: { name: "Nova pessoa", role: "", bio: "", photo: "", whatsapp: "", especialidades: "", na_home: 0 },
     projetos: { title: "Novo projeto", sigla: "", status: "Em planejamento institucional", resumo: "", publico: "", content: "" },
     documentos: { title: "Novo documento", ano: "", tipo: "", url: "" },
-    posts: { title: "Nova memória", excerpt: "", content: "", image: "", date: new Date().toISOString().slice(0, 10) } }[t];
+    posts: { title: "Nova memória", excerpt: "", content: "", image: "", date: new Date().toISOString().slice(0, 10) },
+    feed: { title: "Nova publicação", excerpt: "", content: "", image: "", date: new Date().toISOString().slice(0, 10) } }[t];
   await api("/api/" + t, "POST", blank);
   DATA = await api("/api/content");
   renderTable(t);
