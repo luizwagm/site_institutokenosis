@@ -27,7 +27,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "2.6.0";
+const APP_VERSION = "2.6.1";
 
 /* ==========================================================================
    CONSULTA DE CEP
@@ -1028,8 +1028,20 @@ async function publish() {
 
   /* `area` é "memoria" ou "feed": as duas listas usam o mesmo cartão e mudam
      só o caminho. O `i` continua sendo o índice do map (é ele que escalona a
-     animação de entrada), por isso a área vem DEPOIS. */
-  const cartaoMateria = (p, i, area = "memoria") => `<article class="materia" data-revela${i % 3 ? ` data-revela-atraso="${i % 3}"` : ""}>
+     animação de entrada), por isso a área vem DEPOIS.
+
+     A ÁREA É OBRIGATÓRIA, sem valor padrão — e isso é o conserto de um defeito
+     real. Antes havia `area = "memoria"`, e a Memória chamava `.map(cartaoMateria)`
+     direto. Acontece que `map` entrega TRÊS argumentos: item, índice e o ARRAY
+     INTEIRO. O terceiro caía em `area`, o padrão nunca entrava em ação (ele só
+     vale para `undefined`), e o endereço saía assim:
+
+         /[object%20Object],[object%20Object]/projeto-vida-ativa/
+
+     O Feed escapou por acaso: passava por um embrulho de dois parâmetros, que
+     descarta o terceiro. Agora as duas áreas têm o seu, e sem padrão nenhum
+     ninguém volta a chamar esta função direto de um `map` sem perceber. */
+  const cartaoMateria = (p, i, area) => `<article class="materia" data-revela${i % 3 ? ` data-revela-atraso="${i % 3}"` : ""}>
             ${p.image ? `<a class="materia__foto" href="/${area}/${esc(p.slug)}/" tabindex="-1" aria-hidden="true"><img src="${esc(p.image)}" alt="${esc(p.title)}" loading="lazy" decoding="async"${medidasDoImg(p.image) || ' width="900" height="560"'}></a>` : ""}
             <div class="materia__corpo">
               <time class="materia__data" datetime="${esc(p.date)}">${dataBR(p.date)}</time>
@@ -1038,13 +1050,15 @@ async function publish() {
               <a class="materia__mais" href="/${area}/${esc(p.slug)}/">Ler mais →</a>
             </div>
           </article>`;
-  /* O cartão do Feed é o mesmo da Memória, só muda o caminho — por isso a
-     função recebe a área em vez de existir duas vezes. */
+  /* Um embrulho para cada área. Além de fixar o caminho, os dois parâmetros
+     BARRAM o terceiro argumento que o `map` insiste em mandar — é essa barreira
+     que impede o array inteiro de virar parte do endereço. */
+  const cartaoMemoria = (p, i) => cartaoMateria(p, i, "memoria");
   const cartaoFeed = (p, i) => cartaoMateria(p, i, "feed");
   const feedHome = feed.slice(0, 3).map(cartaoFeed).join("\n          ");
   const feedTodas = feed.map(cartaoFeed).join("\n          ") || '<p class="sub-secao">Em breve, as novidades do Instituto. 💙</p>';
-  const memoriaHome = posts.slice(0, 3).map(cartaoMateria).join("\n          ");
-  const memoriaTodas = posts.map(cartaoMateria).join("\n          ") || '<p class="sub-secao">Em breve, o registro das nossas ações. 💙</p>';
+  const memoriaHome = posts.slice(0, 3).map(cartaoMemoria).join("\n          ");
+  const memoriaTodas = posts.map(cartaoMemoria).join("\n          ") || '<p class="sub-secao">Em breve, o registro das nossas ações. 💙</p>';
 
   const canal = (icone, rotulo, valor, href, externo) => !valor ? "" :
     `<a class="canal" href="${href}"${externo ? ' target="_blank" rel="noopener"' : ""}>
