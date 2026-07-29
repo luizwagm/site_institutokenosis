@@ -27,7 +27,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "2.4.0";
+const APP_VERSION = "2.4.1";
 
 /* ==========================================================================
    CONSULTA DE CEP
@@ -1958,8 +1958,12 @@ Consulte <code>journalctl -u kenosis -n 40</code>.</small></p></div>`);
           }
           limparRicos(table, b);
           const use = cols.filter((c) => c in b);
-          db.prepare(`INSERT INTO ${table}(${use.join(",")}) VALUES(${use.map(() => "?").join(",")})`).run(...use.map((c) => b[c]));
-          return json(res, 200, { ok: true });
+          const r = db.prepare(`INSERT INTO ${table}(${use.join(",")}) VALUES(${use.map(() => "?").join(",")})`).run(...use.map((c) => b[c]));
+          /* Devolve a LINHA criada, e não só "ok". Sem ela o painel tinha de
+             pedir /api/content de novo — o conteúdo inteiro do site, com os
+             serviços e projetos que vêm do PostgreSQL — só para desenhar um
+             cadastro novo. Eram duas idas ao servidor onde uma basta. */
+          return json(res, 200, { ok: true, item: db.prepare(`SELECT * FROM ${table} WHERE id=?`).get(r.lastInsertRowid) });
         }
         if (req.method === "PUT" && id) {
           const b = await readBody(req);

@@ -131,7 +131,7 @@
     <button class="navbtn" data-p="voluntariado">Voluntariado</button>
     <button class="navbtn" data-p="talentos">Banco de Talentos</button>
     <button class="navbtn" data-p="posts">Memórias</button>
-    <button class="navbtn" data-p="feed">Feed</button>
+    <button class="navbtn" data-p="feed">Blog</button>
     <button class="navbtn" data-p="galeria">Galeria</button>
     <button class="navbtn" data-p="outras">Outras páginas</button>
     <button class="navbtn" data-p="password">Senha</button>
@@ -276,10 +276,10 @@
       <div id="posts-list"></div>
     </section>
 
+    <!-- Chama-se BLOG no painel, mas a tabela, a pasta e a URL continuam
+         `feed`: renomear isso mudaria o endereço das páginas já publicadas. -->
     <section class="panel" id="p-feed">
-      <div class="topbar"><h1>Feed</h1><button class="btn btn-ghost" onclick="addRow('feed')">+ Nova publicação</button></div>
-      <p class="hint mb">Notícias, avisos e novidades. Sai na home e em <a href="/feed/" target="_blank">/feed/</a>.
-        A <b>Memória</b> é outra coisa: lá fica o registro histórico das ações. Publique para gerar as páginas.</p>
+      <div class="topbar"><h1>Blog</h1><button class="btn btn-ghost" onclick="addRow('feed')">+ Nova publicação</button></div>
       <div id="feed-list"></div>
     </section>
 
@@ -938,9 +938,22 @@ async function addRow(t) {
     documentos: { title: "Novo documento", ano: "", tipo: "", url: "" },
     posts: { title: "Nova memória", excerpt: "", content: "", image: "", date: new Date().toISOString().slice(0, 10) },
     feed: { title: "Nova publicação", excerpt: "", content: "", image: "", date: new Date().toISOString().slice(0, 10) } }[t];
-  await api("/api/" + t, "POST", blank);
-  DATA = await api("/api/content");
+  /* O servidor devolve a LINHA criada. Antes vinha só "ok" e o painel pedia
+     /api/content inteiro em seguida — o conteúdo do site todo, com os serviços
+     e projetos que vêm do PostgreSQL. Eram ~900ms para acrescentar um cadastro
+     vazio, e quem clicava ficava olhando para uma tela parada. */
+  const r = await api("/api/" + t, "POST", blank);
+  if (r && r.item) DATA[t] = [r.item, ...(DATA[t] || [])];
+  else DATA = await api("/api/content");        // servidor antigo: caminho de antes
   renderTable(t);
+  /* Leva o cadastro novo para a vista e põe o cursor no primeiro campo: numa
+     lista longa ele nasceria fora da tela, e a sensação é de que nada
+     aconteceu. */
+  const novo = document.querySelector(`#${t}-list .card`);
+  if (novo) {
+    novo.scrollIntoView({ behavior: "smooth", block: "center" });
+    novo.querySelector("input")?.focus();
+  }
 }
 async function delRow(t, id) {
   if (!confirm("Excluir este item?")) return;
