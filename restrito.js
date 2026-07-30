@@ -24,7 +24,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.16.1";
+const SISTEMA_VERSION = "1.17.0";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -410,19 +410,22 @@ setInterval(() => {
   for (const [k, v] of sessoes) if (v.ts < lim) sessoes.delete(k);
 }, 30 * 60_000).unref();
 
-/* Trava de força bruta por IP (igual filosofia do admin) */
-const TENT_MAX = 5, BLOQ_MIN = 15;
-const tentativas = new Map();
-function bloqueado(ip) {
-  const t = tentativas.get(ip);
-  if (!t) return false;
-  if (Date.now() - t.ts > BLOQ_MIN * 60_000) { tentativas.delete(ip); return false; }
-  return t.n >= TENT_MAX;
-}
-function erroLogin(ip) {
-  const t = tentativas.get(ip) || { n: 0, ts: Date.now() };
-  t.n++; t.ts = Date.now(); tentativas.set(ip, t);
-}
+/* FREIO CONTRA ADIVINHAÇÃO DE SENHA — ver limitador.js.
+
+   Aqui o ganho é maior que no /admin, porque estes dois logins são
+   MULTIUSUÁRIO: antes, a contagem por IP deixava alguém martelar a conta de
+   UMA pessoa específica a partir de vários endereços sem disparar nada. O
+   balde por conta soma as tentativas contra CADA pessoa, separadamente — e
+   travar a conta da Maria não atrapalha o João.
+
+   Arquivo próprio, e não o do server.js: os dois módulos guardam o estado em
+   memória e gravam tudo de uma vez, então dividir o mesmo arquivo faria um
+   apagar o que o outro acabou de escrever. */
+const { criarLimitador } = require("./limitador");
+const limite = criarLimitador({ arquivo: path.join(ROOT, "data", "limites-restrito.json") });
+limite.carregar();
+process.on("exit", () => limite.gravar());
+setInterval(() => limite.limpar(), 10 * 60_000).unref();
 
 /* -------------------------------- utilidades ----------------------------- */
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -850,11 +853,15 @@ async function rotaApi(req, res, p) {
 
   // login
   if (p === "login" && req.method === "POST") {
-    if (bloqueado(ip)) return json(res, 429, { error: "Muitas tentativas. Aguarde 15 minutos." });
     const { usuario, senha } = await readBody(req);
-    const u = await Q.get("SELECT * FROM g_usuarios WHERE email=? AND ativo=1", String(usuario || "").trim());
+    /* A conta entra na conta: é o e-mail digitado, mesmo que não exista.
+       Usar só as contas reais deixaria o atacante varrer nomes de graça. */
+    const conta = String(usuario || "").trim().toLowerCase();
+    const v = limite.verificar("restrito", ip, conta);
+    if (!v.ok) { res.setHeader("Retry-After", String(v.esperar)); return json(res, 429, { error: v.mensagem }); }
+    const u = await Q.get("SELECT * FROM g_usuarios WHERE email=? AND ativo=1", conta);
     if (!u || !confereSenha(senha, u.senha_hash)) {
-      erroLogin(ip);
+      limite.errou("restrito", ip, conta);
       /* A tentativa SEM SUCESSO é a linha mais importante da trilha: é ela que
          revela alguém tentando entrar. Guarda o login digitado — nunca a senha. */
       auditar({ req, sessao: null, acao: "login_falhou",
@@ -862,7 +869,7 @@ async function rotaApi(req, res, p) {
         detalhe: { usuario_informado: String(usuario || "").slice(0, 60), existe: !!u } });
       return json(res, 401, { error: "Usuário ou senha incorretos." });
     }
-    tentativas.delete(ip);
+    limite.acertou("restrito", ip, conta);
     const rid = novaSessao(u);
     auditar({ req, sessao: { userId: u.id, nome: u.nome, perfil: u.perfil }, acao: "login",
       resumo: `${u.nome} entrou no sistema` });
@@ -981,9 +988,18 @@ async function rotaApi(req, res, p) {
   }
 
   if (p === "senha" && req.method === "POST") {
+    /* Aqui também se adivinha senha: este endereço recebe a senha ATUAL.
+       Sem freio, quem chegasse a um cookie de sessão poderia testá-la à
+       vontade por aqui, contornando o login. A conta é a de quem está logado. */
+    const vS = limite.verificar("troca-senha", ip, String(s.userId));
+    if (!vS.ok) { res.setHeader("Retry-After", String(vS.esperar)); return json(res, 429, { error: vS.mensagem }); }
     const { atual, nova } = await readBody(req);
     const u = await Q.get("SELECT * FROM g_usuarios WHERE id=?", s.userId);
-    if (!confereSenha(atual, u.senha_hash)) return json(res, 400, { error: "Senha atual incorreta." });
+    if (!confereSenha(atual, u.senha_hash)) {
+      limite.errou("troca-senha", ip, String(s.userId));
+      return json(res, 400, { error: "Senha atual incorreta." });
+    }
+    limite.acertou("troca-senha", ip, String(s.userId));
     if (String(nova || "").length < 8) return json(res, 400, { error: "A nova senha precisa de ao menos 8 caracteres." });
     await Q.run("UPDATE g_usuarios SET senha_hash=? WHERE id=?", hashSenha(nova), s.userId);
     for (const [k, v] of sessoes) if (v.userId === s.userId && k !== s.rid) sessoes.delete(k);
@@ -1833,14 +1849,17 @@ function handleExterno(req, res, pathname) {
 async function rotaExt(req, res, p) {
   const ip = clientIp(req);
   if (p === "login" && req.method === "POST") {
-    if (bloqueado(ip)) return json(res, 429, { error: "Muitas tentativas. Aguarde 15 minutos." });
     const { cpf, senha } = await readBody(req);
     const dig = String(cpf || "").replace(/\D/g, "");
+    /* A "conta" é o CPF digitado — é o identificador que o atacante escolhe,
+       e portanto o que precisa ser contado. */
+    const v = limite.verificar("externo", ip, dig || "sem-cpf");
+    if (!v.ok) { res.setHeader("Retry-After", String(v.esperar)); return json(res, 429, { error: v.mensagem }); }
     // acha o associado pelo CPF e confere o HASH da senha (nunca comparamos texto puro)
     const cand = dig ? await Q.all("SELECT id,nome,cpf,senha_externo FROM associados WHERE senha_externo IS NOT NULL AND senha_externo<>''") : [];
     const a = cand.find((x) => String(x.cpf || "").replace(/\D/g, "") === dig && confereSenha(String(senha || "").trim(), x.senha_externo));
-    if (!a) { erroLogin(ip); return json(res, 401, { error: "CPF ou senha incorretos." }); }
-    tentativas.delete(ip);
+    if (!a) { limite.errou("externo", ip, dig || "sem-cpf"); return json(res, 401, { error: "CPF ou senha incorretos." }); }
+    limite.acertou("externo", ip, dig || "sem-cpf");
     const eid = crypto.randomBytes(24).toString("hex");
     sessoesExt.set(eid, { associadoId: a.id, nome: a.nome, ts: Date.now() });
     res.setHeader("Set-Cookie", `eid=${eid}; HttpOnly; SameSite=Lax; Path=/externo; Max-Age=${SESSAO_EXT_HORAS * 3600}${req.headers["x-forwarded-proto"] === "https" ? "; Secure" : ""}`);

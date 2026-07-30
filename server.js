@@ -19,6 +19,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { abrirBanco, DRIVER_NOME, DRIVER_AVISO } = require("./db");
+const { criarLimitador } = require("./limitador");
 
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópia para testes
@@ -27,7 +28,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "2.8.0";
+const APP_VERSION = "2.9.0";
 
 /* ==========================================================================
    CONSULTA DE CEP
@@ -665,8 +666,8 @@ if (!getS("cnpj") || getS("cnpj") === "00.000.000/0001-00") setS("cnpj", "02.192
 /* ------------------------------ Sessões ---------------------------------- */
 /* ------------------------- Sessão e força bruta --------------------------- */
 const SESSAO_HORAS = 12;          // sessão parada por mais que isso, cai
-const TENTATIVAS_MAX = 5;         // erros de senha antes do bloqueio
-const BLOQUEIO_MIN = 15;          // duração do bloqueio por IP
+/* Os números da força bruta saíram daqui: moram em limitador.js, junto das
+   regras que os usam. */
 
 const sessions = new Map();
 const authed = (req) => {
@@ -691,24 +692,21 @@ registrarEncerrarPainel((req) => {
   return true;
 });
 
-/* Sem isto, dá para tentar senha à vontade: 100 mil tentativas por minuto
-   quebram qualquer senha curta. O bloqueio é por IP e some sozinho. */
-const tentativas = new Map();
-function loginBloqueado(ip) {
-  const t = tentativas.get(ip);
-  if (!t) return 0;
-  if (Date.now() > t.ate) { tentativas.delete(ip); return 0; }
-  return t.erros >= TENTATIVAS_MAX ? Math.ceil((t.ate - Date.now()) / 60000) : 0;
-}
-function registrarErro(ip) {
-  const t = tentativas.get(ip) || { erros: 0, ate: 0 };
-  t.erros++;
-  t.ate = Date.now() + BLOQUEIO_MIN * 60000;
-  tentativas.set(ip, t);
-}
+/* FREIO CONTRA ADIVINHAÇÃO DE SENHA — ver limitador.js.
+
+   A trava anterior contava só por IP e não enxergava o ataque distribuído: a
+   conta é uma só, mas os IPs não, então uma lista de proxies dava um
+   orçamento novo de cinco tentativas a cada endereço e o bloqueio nunca
+   disparava. O limitador soma também POR CONTA, faz a espera crescer a cada
+   erro e grava a contagem em disco — antes ela morria no reinício automático
+   de madrugada, devolvendo o orçamento inteiro ao atacante. */
+const limite = criarLimitador({ arquivo: path.join(ROOT, "data", "limites.json") });
+limite.carregar();
+process.on("exit", () => limite.gravar());
+
 setInterval(() => {
   const agora = Date.now();
-  for (const [k, v] of tentativas) if (agora > v.ate) tentativas.delete(k);
+  limite.limpar();
   for (const [k, v] of sessions) if (agora - v > SESSAO_HORAS * 3600_000) sessions.delete(k);
 }, 10 * 60 * 1000).unref();
 
@@ -1878,12 +1876,15 @@ Consulte <code>journalctl -u kenosis -n 40</code>.</small></p></div>`);
     if (p.startsWith("/api/")) {
       if (p === "/api/login" && req.method === "POST") {
         const ip = clientIp(req);
-        const faltam = loginBloqueado(ip);
-        if (faltam) return json(res, 429, { error: `Muitas tentativas. Tente de novo em ${faltam} min.` });
+        /* O painel tem um dono só, então a "conta" é sempre a mesma — e é
+           isso que faz o balde por conta valer aqui: ele soma os erros de
+           TODOS os endereços. */
+        const v = limite.verificar("painel", ip, "admin");
+        if (!v.ok) { res.setHeader("Retry-After", String(v.esperar)); return json(res, 429, { error: v.mensagem }); }
         const { password } = await readBody(req);
         const guardado = getS("admin_password_hash");
         if (!confereSenha(password, guardado)) {
-          registrarErro(ip);
+          limite.errou("painel", ip, "admin");
           console.warn(`  ⚠ senha incorreta no painel — origem ${ip}`);
           return json(res, 401, { error: "Senha incorreta" });
         }
@@ -1893,7 +1894,7 @@ Consulte <code>journalctl -u kenosis -n 40</code>.</small></p></div>`);
           setS("admin_password_hash", hashSenha(password));
           console.log("  · senha do painel migrada de sha256 para scrypt");
         }
-        tentativas.delete(ip);
+        limite.acertou("painel", ip, "admin");
         const t = crypto.randomBytes(24).toString("hex");
         sessions.set(t, Date.now());
         // Secure só quando a requisição chegou por HTTPS (nginx informa no X-Forwarded-Proto).
