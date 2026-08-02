@@ -24,7 +24,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.17.0";
+const SISTEMA_VERSION = "1.17.1";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -675,6 +675,60 @@ const adminsAtivos = async () => Number((await Q.get("SELECT COUNT(*) c FROM g_u
    PRAGMA table_info do SQLite). */
 const COLS = {};
 
+/* O TIPO de cada coluna, do mesmo information_schema. Existe por causa de um
+   defeito que só apareceu depois da mudança para o PostgreSQL:
+
+   Um campo de número deixado em branco no formulário chega aqui como STRING
+   VAZIA — o navegador não manda `null`, manda `""`. O SQLite engolia isso sem
+   reclamar (guardava a string na coluna INTEGER). O PostgreSQL recusa:
+
+     invalid input syntax for type integer: ""
+
+   e o salvar devolve 500. Editar um projeto e deixar a Ordem em branco era o
+   suficiente; o mesmo valia para outras 17 colunas inteiras espalhadas por
+   nove módulos — vínculo de usuário, profissional, prontuário, projeto,
+   número de participantes.
+
+   O tratamento fica AQUI, na beira do banco, e não em cada tela: tela se
+   esquece, e a próxima coluna numérica que alguém acrescentar já nasceria com o
+   mesmo defeito.
+
+   Nem todo branco vira NULL, porém — o banco tem três respostas diferentes:
+
+   · coluna que aceita nulo      → NULL, que é o que "não informado" significa
+   · coluna com valor PADRÃO     → sai da instrução, e o padrão vale (é o caso
+                                   de `pacientes.ativo DEFAULT 1`: gravar NULL
+                                   ali quebraria por outro motivo)
+   · coluna obrigatória sem padrão → é campo que a tela deixou passar em branco.
+                                   Devolve 400 dizendo qual, em vez de 500 —
+                                   quem preenche precisa saber o que faltou. */
+const TIPOS = {};
+const TIPO_NAO_TEXTO = /^(integer|bigint|smallint|numeric|real|double|boolean|date|timestamp|time)/i;
+
+function destinoDoVazio(tabela, coluna) {
+  const meta = TIPOS[tabela]?.[coluna];
+  if (!meta || !TIPO_NAO_TEXTO.test(meta.tipo)) return "texto";   // em texto, "" é valor legítimo
+  if (meta.nulavel) return "nulo";
+  return meta.padrao ? "omitir" : "obrigatorio";
+}
+
+/* Coluna → rótulo legível, para a mensagem não sair em nome de banco. */
+const rotuloColuna = (c) => String(c).replace(/_id$/, "").replace(/_/g, " ");
+
+function prepararCampos(tabela, colunas, b) {
+  const usar = [], valores = [], faltando = [];
+  for (const c of colunas) {
+    if (b[c] !== "") { usar.push(c); valores.push(b[c]); continue; }
+    switch (destinoDoVazio(tabela, c)) {
+      case "nulo": usar.push(c); valores.push(null); break;
+      case "omitir": break;                        // deixa o padrão da coluna valer
+      case "obrigatorio": faltando.push(rotuloColuna(c)); break;
+      default: usar.push(c); valores.push(b[c]);
+    }
+  }
+  return { usar, valores, faltando };
+}
+
 /* ==========================================================================
    INICIALIZAÇÃO — o que antes rodava solto no topo do arquivo
 
@@ -708,8 +762,11 @@ async function iniciarRestrito() {
   /* 2. quais colunas cada tabela tem de verdade */
   for (const t of Object.keys(TAB)) {
     const cols = await Q.all(
-      "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=?", t);
+      `SELECT column_name, data_type, is_nullable, column_default
+         FROM information_schema.columns WHERE table_schema='public' AND table_name=?`, t);
     COLS[t] = new Set(cols.map((c) => c.column_name));
+    TIPOS[t] = Object.fromEntries(cols.map((c) => [c.column_name,
+      { tipo: c.data_type, nulavel: c.is_nullable === "YES", padrao: c.column_default != null }]));
     if (!COLS[t].size) console.error(`  ✖ /restrito: a tabela "${t}" não existe no banco — migration faltando?`);
   }
 
@@ -1634,14 +1691,18 @@ async function rotaApi(req, res, p) {
       if (tabela === "projetos") { b.slug = slugify(b.slug || b.title); if (b.slug && await Q.get("SELECT id FROM projetos WHERE slug=?", b.slug)) b.slug = `${b.slug}-${Date.now().toString(36)}`; }
       const use = cols.filter((c) => c in b && COLS[tabela].has(c));
       const temCriado = COLS[tabela].has("criado");
-      const campos = temCriado ? use.concat("criado") : use;
       /* Cópia em texto claro ANTES de cifrar — é o que a auditoria registra.
          Depois de proteger(), `b` carrega texto cifrado, e a trilha guardaria
          um monte de "enc:1:..." em vez do que foi cadastrado. */
       const comoVeio = {}; for (const c of use) comoVeio[c] = b[c];
       limparHtmlDoRegistro(tabela, b);     // HTML do prontuário sai higienizado
       proteger(tabela, b);     // cifra os campos sensíveis antes de gravar
-      const valores = temCriado ? use.map((c) => b[c]).concat(agora()) : use.map((c) => b[c]);
+      /* Trata os campos em branco pelo que a COLUNA aceita (ver prepararCampos). */
+      const pronto = prepararCampos(tabela, use, b);
+      if (pronto.faltando.length)
+        return json(res, 400, { error: `Preencha antes de salvar: ${pronto.faltando.join(", ")}.` });
+      const campos = temCriado ? pronto.usar.concat("criado") : pronto.usar;
+      const valores = temCriado ? pronto.valores.concat(agora()) : pronto.valores;
       /* Q.inserir e não Q.run: o id novo é preciso na resposta (a tela usa para
          abrir o registro recém-criado). No SQLite ele vinha de lastInsertRowid;
          no PostgreSQL só existe com RETURNING, que o Q.inserir acrescenta. */
@@ -1703,7 +1764,14 @@ async function rotaApi(req, res, p) {
       const comoVeio = {}; for (const c of use) comoVeio[c] = b[c];
       limparHtmlDoRegistro(tabela, b);     // HTML do prontuário sai higienizado
       proteger(tabela, b);     // mesma cifragem do INSERT
-      if (use.length) await Q.run(`UPDATE ${tabela} SET ${use.map((c) => c + "=?").join(",")} WHERE id=?`, ...use.map((c) => b[c]), id);
+      /* Mesmo tratamento do cadastro: em branco vira NULL, ou sai da instrução
+         quando a coluna tem padrão (aí o valor atual fica como está). */
+      const pronto = prepararCampos(tabela, use, b);
+      if (pronto.faltando.length)
+        return json(res, 400, { error: `Preencha antes de salvar: ${pronto.faltando.join(", ")}.` });
+      if (pronto.usar.length)
+        await Q.run(`UPDATE ${tabela} SET ${pronto.usar.map((c) => c + "=?").join(",")} WHERE id=?`,
+          ...pronto.valores, id);
       /* Lançamento editado guarda QUANDO foi editado e o que mudou entra na
          linha do tempo: num registro de acompanhamento, "alguém mexeu nisto
          depois" é informação, não detalhe. */

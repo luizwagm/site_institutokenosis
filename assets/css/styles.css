@@ -515,12 +515,15 @@ h1, h2, h3, h4 {
    cliente pediu — mais alta que a da Memória, para a notícia ter presença.
    `height` fixo com `object-fit: cover` recorta o que sobra e mantém a fileira
    alinhada; por isso o `aspect-ratio` é anulado (senão ele brigaria com a
-   altura). No celular, onde o cartão ocupa a largura toda, 500px viraria uma
-   faixa desproporcional — cai para 300px. */
+   altura).
+
+   No celular vale a MESMA altura. Havia uma queda para 300px aqui, na ideia de
+   que 500px numa tela estreita viraria faixa demais; na prática ficou o
+   contrário — o cartão sozinho na largura toda pedia a foto grande, e a lista
+   ficava sem peso. Uma altura só para os dois tamanhos. */
 .materia--feed .materia__foto img {
   height: 500px; aspect-ratio: auto;
 }
-@media (max-width: 640px) { .materia--feed .materia__foto img { height: 300px; } }
 .materia:hover .materia__foto img { transform: scale(1.05); }
 .materia__corpo { padding: 1.4rem 1.5rem; display: flex; flex-direction: column; flex: 1; }
 

@@ -2262,7 +2262,12 @@ async function abrirForm(id){
     PRONT_ABERTO = Number(id);
     abrirPainelPront();
   } else {
-    host.innerHTML=`<div class="modal-bg" onclick="if(event.target===this)fecharModal()"><div class="modal">
+    /* Clicar FORA não fecha. Estes formulários são longos — cadastro de
+       usuário, agenda, prontuário — e um clique de raspão na área escura
+       jogava fora tudo o que tinha sido digitado, sem aviso e sem desfazer.
+       Só fecha por Cancelar, Salvar ou Excluir, que são decisões de quem
+       preenche. */
+    host.innerHTML=`<div class="modal-bg"><div class="modal">
       <h2>${id?"Editar":m.novo||"Novo"}</h2>
       <div class="modal-corpo">${corpo}</div>
       <div class="acoes">
@@ -2906,7 +2911,10 @@ function imprimirAgenda(){
 /* Mostra a senha do portal UMA vez (não fica recuperável depois). */
 function mostrarSenhaGerada(senha){
   const host=$("#modal-host2")||(()=>{const d=document.createElement("div");d.id="modal-host2";document.body.appendChild(d);return d;})();
-  host.innerHTML=`<div class="modal-bg" style="z-index:70" onclick="if(event.target===this)this.parentElement.innerHTML=''">
+  /* Aqui o clique fora era pior que nos outros: esta senha NÃO é recuperável.
+     Fechar sem querer antes de anotar obrigava a gerar outra, invalidando a
+     que o associado talvez já tivesse recebido. Só o botão Fechar fecha. */
+  host.innerHTML=`<div class="modal-bg" style="z-index:70">
     <div class="modal" style="max-width:420px;text-align:center">
       <h2 style="margin-bottom:.4rem">Senha do portal do associado</h2>
       <p class="hint" style="color:var(--dim)">Anote e repasse ao associado. Por segurança, ela <b>não será exibida novamente</b>.</p>
