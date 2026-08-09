@@ -24,7 +24,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.17.1";
+const SISTEMA_VERSION = "1.18.0";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -188,6 +188,15 @@ function proteger(tabela, obj) {
    que as entregou.
    ========================================================================== */
 const HISTORICO_VERSOES = [
+  { versao: "1.18.0", data: "2026-08-09", titulo: "Impressões em papel timbrado", mudancas: [
+    "Marca d'água do Instituto ao centro de todas as folhas impressas",
+    "Escolha entre retrato e paisagem na hora de imprimir, em qualquer documento",
+    "Timbre e rodapé passam a se repetir em TODAS as páginas, não só na primeira",
+    "Data, título e endereço que o navegador imprimia na borda da folha saíram",
+    "Rótulos e valores deixam de sair picados em tiras verticais",
+    "Lançamento do prontuário e assinatura não se partem mais entre duas folhas",
+    "No prontuário completo, cada pasta começa em folha nova",
+  ] },
   { versao: "1.16.0", data: "2026-07-28", titulo: "Prontuário em pasta", mudancas: [
     "Prontuário passa a ser uma PASTA por usuário + serviço, com número próprio",
     "Dentro da pasta, lançamentos datados: avaliação, evolução, plano e encaminhamento",

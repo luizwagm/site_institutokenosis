@@ -2552,25 +2552,129 @@ async function excluirReg(id){
      · subtitulo — diz de que recorte o papel fala (quantos, qual filtro).
    Sem isso a relação impressa seria só uma tabela sem contexto, e quem a
    recebesse não teria como saber o que está olhando. */
+/* ==========================================================================
+   O PAPEL TIMBRADO
+
+   Quatro coisas mudaram aqui, e cada uma resolve um problema que só aparece
+   depois que o papel sai da impressora:
+
+   1. MARCA D'ÁGUA — o símbolo do Instituto ao centro, bem apagado.
+      `position:fixed` é o que faz o navegador repeti-la em TODAS as páginas.
+
+      Ela entra como <img>, e NÃO como SVG embutido. O `simbolo.svg` traz um
+      <style> interno com nomes genéricos (`.cls-2`, `.cls-3`…) e o <style> de
+      um SVG embutido NÃO é isolado: aquelas regras passariam a valer para o
+      documento inteiro, e `.cls-3{font-size:116.75px}` acertaria qualquer
+      coisa que casasse. Dentro de <img> o arquivo é um documento à parte.
+
+   2. RETRATO OU PAISAGEM, ESCOLHIDO NA HORA. Antes a orientação vinha travada
+      de quem chamou: a relação de usuários nascia deitada e o prontuário em
+      pé, sem meio-termo. Agora há uma barra no alto — que não sai no papel —
+      e o `@page` é reescrito ao vivo, junto das margens e do tamanho da marca
+      d'água.
+
+   3. O TIMBRE SE REPETE EM TODA PÁGINA. O documento passou a ser uma tabela
+      com <thead> e <tfoot>: é o único jeito de o cabeçalho e o rodapé se
+      repetirem a cada folha na impressão. Um prontuário de quatro páginas
+      saía com o timbre só na primeira, e da segunda em diante era papel
+      anônimo — o que, num documento que sai do prédio, é o que importa.
+
+   4. `@page{margin:0}` APAGA O CABEÇALHO DO NAVEGADOR (data, título, URL) que
+      vinha impresso na borda de todo documento. O respiro da folha passou a
+      vir do padding das células, que é o que faz o timbre repetido nascer
+      espaçado igual em todas as páginas.
+
+   E some o `window.print()` automático. Ele disparava 250 ms depois de abrir
+   — antes, portanto, de o logo do cabeçalho ter necessariamente carregado.
+   Com a barra, quem imprime escolhe a orientação primeiro, e a essa altura o
+   documento inteiro já está na tela.
+
+   `op` cobre o que muda de um impresso para outro:
+     · paisagem — só o PADRÃO da folha; a barra continua permitindo trocar;
+     · subtitulo — diz de que recorte o papel fala (quantos, qual filtro).
+   ========================================================================== */
 function timbreHTML(titulo, corpo, op){
   op = op || {};
   const base=location.origin;
+  const mx = op.paisagem ? "1.2cm" : "1.5cm";
+  /* ALTURA da marca d'água, não largura — e isso não é detalhe de gosto.
+
+     O símbolo do Instituto é ALTO (proporção 114x150). Medindo pela largura,
+     62% da folha viravam 1030px de altura numa janela de 720: a marca
+     sangrava por cima e por baixo. A flor do outro projeto, de onde estes
+     números vieram, é LARGA — os mesmos 62% davam uma marca baixa.
+
+     Medindo pela altura, a marca ocupa sempre a mesma fatia vertical da
+     folha, seja qual for o desenho que entre aqui um dia. */
+  const wm = op.paisagem ? "58%" : "46%";
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escA(titulo)} — Instituto Kenósis</title>
+  <style id="pg">
+   /* Este bloco INTEIRO é reescrito pelos botões Retrato/Paisagem. Margem e
+      marca d'água são variáveis justamente para o documento se ajustar junto
+      com a folha, sem recarregar nada. */
+   @page{margin:0;size:A4${op.paisagem?" landscape":""}}
+   :root{--mx:${mx};--wm:${wm}}
+  </style>
   <style>
-   @page{margin:1.6cm${op.paisagem?";size:landscape":""}}
    *{box-sizing:border-box}
    body{font:13px/1.55 'Segoe UI',system-ui,Arial,sans-serif;color:#232733;margin:0}
+
+   /* MARCA D'AGUA. A regra print-color-adjust:exact nao e enfeite: sem ela o
+      navegador tira imagens de fundo e cores claras na impressao "para
+      economizar tinta", e a marca simplesmente nao sai.
+      (ATENCAO: este CSS vive dentro de um template literal — nada de crase
+      aqui, nem em comentario: ela fecha a string e derruba o arquivo.) */
+   .marcadagua{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+     height:var(--wm);opacity:.05;z-index:0;pointer-events:none;
+     -webkit-print-color-adjust:exact;print-color-adjust:exact}
+   .marcadagua img{height:100%;width:auto;display:block}
+
+   /* A tabela que dá o cabeçalho e o rodapé repetidos. O conteúdo fica sempre
+      acima da marca d'água. */
+   .pag{width:100%;border-collapse:collapse;position:relative;z-index:1}
+   .pag thead td{padding:var(--mx) var(--mx) 0}
+   .pag tbody td{padding:0 var(--mx)}
+   .pag tfoot td{padding:0 var(--mx) var(--mx)}
+   .pag thead td,.pag tfoot td{border:0}
+
+   /* Barra de controle: só na tela, nunca no papel. */
+   .barra-imp{position:sticky;top:0;z-index:9;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;
+     background:#FAF7F2;border-bottom:1px solid #e7ecf4;padding:.55rem .9rem;
+     font:13px/1.4 'Segoe UI',system-ui,Arial,sans-serif}
+   .barra-imp b{color:#253282}
+   .barra-imp button{font:inherit;cursor:pointer;border:1.5px solid #cfd8e8;background:#fff;color:#253282;
+     border-radius:999px;padding:.32rem .85rem;font-weight:600}
+   .barra-imp button:hover{background:#eef4fb}
+   .barra-imp button.on{background:#253282;color:#fff;border-color:#253282}
+   .barra-imp .imp{background:#1EA1E4;color:#fff;border-color:#1EA1E4}
+   .barra-imp .dica{color:#8a90a0;margin-left:auto}
+   @media print{.barra-imp{display:none!important}}
+
    .timbre{display:flex;align-items:center;gap:.9rem;border-bottom:3px solid #253282;padding-bottom:.7rem}
    .timbre img{height:54px;width:auto}
    .timbre .nome{font-weight:700;color:#253282;font-size:1.15rem;line-height:1.05}
    .timbre .sub{color:#6b7280;font-size:.74rem}
-   .timbre .doc{margin-left:auto;text-align:right;color:#6b7280;font-size:.72rem;line-height:1.5}
-   .faixa{height:4px;background:linear-gradient(90deg,#253282,#1EA1E4);margin:0 0 1.3rem}
+   /* Um dado por linha, sem quebrar no meio: o telefone partido ao meio fica
+      ilegível no papel, e ninguém liga para um número pela metade. */
+   .timbre .doc{margin-left:auto;text-align:right;color:#6b7280;font-size:.72rem;line-height:1.5;max-width:52%}
+   .timbre .doc div{white-space:nowrap}
+   .faixa{height:4px;background:linear-gradient(90deg,#253282,#1EA1E4);margin:0 0 1.3rem;
+     -webkit-print-color-adjust:exact;print-color-adjust:exact}
    h1{color:#253282;font-size:1.2rem;margin:.2rem 0 1rem}
-   .sec{margin:1.5rem 0 .5rem;color:#1EA1E4;font-size:.72rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;border-bottom:1px solid #e7ecf4;padding-bottom:.25rem}
+   .sec{margin:1.5rem 0 .5rem;color:#1EA1E4;font-size:.72rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;border-bottom:1px solid #e7ecf4;padding-bottom:.25rem;page-break-after:avoid}
    table{width:100%;border-collapse:collapse}
-   th{text-align:left;width:180px;color:#5a6172;font-weight:600;vertical-align:top;padding:.4rem .6rem;border-bottom:1px solid #eef1f6}
-   td{padding:.4rem .6rem;border-bottom:1px solid #eef1f6}
+   /* O RÓTULO ocupa a largura do próprio texto; o VALOR fica com o resto.
+
+      Com os 180px fixos de antes, o valor era espremido no que sobrasse — e
+      na ficha, onde a foto ainda flutua a direita, e-mail e endereco saiam
+      picados em tiras verticais de poucas letras. width:1% mais nowrap e
+      como se diz "encolha ate o conteudo": o nowrap manda, e o 1% vira so a
+      ordem de prioridade na hora de distribuir a largura. */
+   th{text-align:left;width:1%;white-space:nowrap;color:#5a6172;font-weight:600;vertical-align:top;padding:.4rem .6rem;border-bottom:1px solid #eef1f6}
+   td{width:100%;padding:.4rem .6rem;border-bottom:1px solid #eef1f6;vertical-align:top}
+   /* E-mail e endereço não têm onde quebrar sozinhos e estouram a coluna no
+      papel, que é mais estreito que a tela. */
+   td,table.m td{overflow-wrap:break-word}
    .foto{width:108px;height:108px;object-fit:cover;border-radius:10px;border:1px solid #dce2ec;float:right;margin:0 0 .6rem 1rem}
    .cards{display:flex;flex-wrap:wrap;gap:.6rem;margin:.4rem 0}
    .kpi{border:1px solid #e7ecf4;border-radius:10px;padding:.6rem .9rem;min-width:120px}
@@ -2579,7 +2683,12 @@ function timbreHTML(titulo, corpo, op){
    .barra{display:flex;align-items:center;gap:.6rem;margin:.28rem 0;font-size:.82rem}
    .barra .lb{width:200px}.barra .b{flex:1;height:9px;background:#eef2f8;border-radius:5px;overflow:hidden}
    .barra .b i{display:block;height:100%;background:#1EA1E4}.barra .n{width:32px;text-align:right;font-weight:700;color:#253282}
-   .evo{border-left:3px solid #1EA1E4;padding:.1rem 0 .1rem .8rem;margin:.7rem 0}
+   /* Um lançamento partido entre duas folhas fica com o cabeçalho numa e o
+      texto na outra — e quem lê a segunda não sabe de que data é. */
+   .evo{border-left:3px solid #1EA1E4;padding:.1rem 0 .1rem .8rem;margin:.7rem 0;page-break-inside:avoid}
+   /* Cada pasta do prontuário completo começa em folha nova (menos a primeira,
+      que já está no alto da página). */
+   .quebra{page-break-before:always}
    .evo .cab{font-weight:700;color:#253282;font-size:.9rem}
    .evo .met{color:#8a90a0;font-size:.74rem;margin-bottom:.25rem}
    .selo-num{float:right;border:1px solid #e7ecf4;border-radius:8px;padding:.35rem .7rem;font-size:.8rem;color:#5a6172}
@@ -2595,17 +2704,52 @@ function timbreHTML(titulo, corpo, op){
    table.m td,table.m th{font-size:.78rem;padding:.3rem .45rem}
    .rod{margin-top:2.2rem;border-top:1px solid #eef1f6;padding-top:.6rem;color:#9aa0ad;font-size:.72rem;display:flex;justify-content:space-between}
   </style></head><body>
-   <div class="timbre">
-     <img src="${base}/assets/img/simbolo.svg" alt="">
-     <div><div class="nome">Instituto Kenósis</div><div class="sub">Fonte das Graças Conceição &amp; Menezes</div></div>
-     <div class="doc">CNPJ 63.991.397/0001-40<br>Caruaru — PE<br>institutokenosis.com</div>
-   </div>
-   <div class="faixa"></div>
-   <h1>${escA(titulo)}</h1>
-   ${op.subtitulo?`<p style="margin:-.7rem 0 1rem;color:#6b7280;font-size:.8rem">${escA(op.subtitulo)}</p>`:""}
-   ${corpo}
-   <div class="rod"><span>Instituto Kenósis · documento de uso interno</span><span>Emitido em ${new Date().toLocaleString("pt-BR")}</span></div>
-   <scr`+`ipt>window.onload=function(){setTimeout(function(){window.print()},250)}</scr`+`ipt>
+  <div class="barra-imp">
+    <b>Orientação:</b>
+    <button type="button" id="bt-retrato" onclick="orientar(false)">Retrato (vertical)</button>
+    <button type="button" id="bt-paisagem" onclick="orientar(true)">Paisagem (horizontal)</button>
+    <button type="button" class="imp" onclick="window.print()">🖨 Imprimir</button>
+    <span class="dica">Esta barra não sai no papel.</span>
+  </div>
+  <div class="marcadagua" aria-hidden="true"><img src="${base}/assets/img/simbolo.svg" alt=""></div>
+  <table class="pag">
+   <thead><td>
+     <div class="timbre">
+       <img src="${base}/assets/img/simbolo.svg" alt="">
+       <div><div class="nome">Instituto Kenósis</div><div class="sub">Fonte das Graças Conceição &amp; Menezes</div></div>
+       <div class="doc">
+         <div>CNPJ 63.991.397/0001-40</div>
+         <div>Caruaru — PE</div>
+         <div>institutokenosis.com</div>
+       </div>
+     </div>
+     <div class="faixa"></div>
+   </td></thead>
+   <tfoot><td>
+     <div class="rod"><span>Instituto Kenósis · documento de uso interno — dado sensível (LGPD)</span><span>Emitido em ${new Date().toLocaleString("pt-BR")}</span></div>
+   </td></tfoot>
+   <tbody><tr><td>
+     <h1>${escA(titulo)}</h1>
+     ${op.subtitulo?`<p style="margin:-.7rem 0 1rem;color:#6b7280;font-size:.8rem">${escA(op.subtitulo)}</p>`:""}
+     ${corpo}
+   </td></tr></tbody>
+  </table>
+  <scr`+`ipt>
+   /* Trocar a orientação é reescrever o bloco <style id="pg"> inteiro: o
+      @page vira a folha, e as variáveis levam junto a margem e o tamanho da
+      marca d'água. Um @page acrescentado por cima não substituiria o
+      anterior — as duas regras valeriam, e o resultado dependeria da ordem. */
+   var ehPaisagem = ${op.paisagem ? "true" : "false"};
+   function orientar(p){
+     ehPaisagem = p;
+     document.getElementById("pg").textContent =
+       "@page{margin:0;size:A4" + (p ? " landscape" : "") + "}" +
+       ":root{--mx:" + (p ? "1.2cm" : "1.5cm") + ";--wm:" + (p ? "58%" : "46%") + "}";
+     document.getElementById("bt-retrato").className = p ? "" : "on";
+     document.getElementById("bt-paisagem").className = p ? "on" : "";
+   }
+   orientar(ehPaisagem);
+  </scr`+`ipt>
   </body></html>`;
 }
 function abrirImpressao(titulo, corpo, op){
@@ -2756,7 +2900,11 @@ function blocoVinculosImpresso(atend){
       <td>${escA(a.status||"—")}</td></tr>`).join("")+`</table>`;
 }
 function assinaturaImpressa(nome){
-  return `<div style="margin-top:2.6rem;text-align:center">
+  /* `page-break-inside:avoid` aqui: a linha da assinatura e o nome de quem
+     assina são uma coisa só. Separados por uma quebra de página, sobra uma
+     folha terminando num traço e outra começando com um nome solto — e é
+     justamente esta a parte do documento que alguém vai assinar. */
+  return `<div style="margin-top:2.6rem;text-align:center;page-break-inside:avoid">
     <div style="border-top:1px solid #b9c0cf;width:min(320px,70%);margin:0 auto"></div>
     <div style="font-size:.8rem;color:#5a6172;margin-top:.3rem">${escA(nome||"Responsável técnico")}</div></div>`;
 }
@@ -2810,8 +2958,14 @@ async function imprimirHistorico(pacienteId){
       <div class="kpi"><b>${nAt}</b><span>Agendamentos</span></div>
     </div>`;
 
+  /* Da SEGUNDA pasta em diante, folha nova. Na primeira não: ela já está no
+     alto da página, e uma quebra ali abriria o documento com uma folha em
+     branco. */
+  let primeira = true;
   for(const pasta of pastas){
-    corpo += `<div class="sec">Prontuário ${escA(pasta.numero||"")} · ${escA(pasta.especialidade||"")}</div>
+    corpo += `<div class="sec${primeira ? "" : " quebra"}">Prontuário ${escA(pasta.numero||"")} · ${escA(pasta.especialidade||"")}</div>`;
+    primeira = false;
+    corpo += `
       <table>${L("Profissional responsável",pasta.profissional)}${L("Aberto em",dataBR(pasta.aberto_em))}
         ${L("Situação",pasta.status==="Alta"?"Alta (encerrado)":"Em acompanhamento")}
         ${pasta.alta_em?L("Alta em",dataBR(pasta.alta_em)):""}${pasta.alta_motivo?L("Motivo",pasta.alta_motivo):""}</table>
@@ -2888,8 +3042,12 @@ function imprimirAgenda(){
     ].filter(Boolean).join(" &nbsp;·&nbsp; ");
     return `<div class="ag-l" style="border-left:3px solid ${cor}"><span class="ag-h">${faixa}</span><span class="ag-d">${partes}</span></div>`;
   };
+  /* O `@page` que morava AQUI foi embora. Ele travava a agenda em paisagem e,
+     pior, brigava com os botões de orientação: dois `@page` no mesmo
+     documento não se substituem — os dois valem, e quem ganha depende da
+     ordem. A folha agora é escolhida na barra, e o padrão vai por `paisagem`
+     na chamada, como nas outras impressões. */
   let corpo=`<style>
-     @page{size:A4 landscape;margin:1.2cm}
      .ag-sub{color:#5a6172;font-size:.82rem;margin:-.4rem 0 1rem}
      .ag-dia{margin:1.1rem 0 .3rem;color:#253282;font-weight:700;font-size:.9rem;border-bottom:1px solid #e7ecf4;padding-bottom:.25rem;text-transform:capitalize}
      .ag-l{display:flex;gap:.7rem;align-items:baseline;padding:.34rem .55rem;border-bottom:1px solid #f1f4f9;page-break-inside:avoid}
@@ -2905,7 +3063,7 @@ function imprimirAgenda(){
     corpo+=dados.filter((x)=>x.data===dia).map(linha).join("");
   }
   corpo+=`<p class="ag-tot">Total de registros: ${dados.length}</p>`;
-  abrirImpressao("Agenda de serviços", corpo);
+  abrirImpressao("Agenda de serviços", corpo, { paisagem:true, subtitulo: periodo + (filtro ? filtro.replace(/^ · /, " · ") : "") });
 }
 
 /* Mostra a senha do portal UMA vez (não fica recuperável depois). */
