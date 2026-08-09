@@ -24,7 +24,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.18.0";
+const SISTEMA_VERSION = "1.19.0";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -60,6 +60,16 @@ const iguais = (a, b) => a.length === b.length && crypto.timingSafeEqual(a, b);
 function confereSenha(senha, guardado) {
   if (!guardado || !guardado.startsWith("scrypt$")) return false;
   const [, N, r, p, saltHex, dkHex] = guardado.split("$");
+  /* A CONFERÊNCIA DO FORMATO, e não só do prefixo. Um hash truncado ou de
+     outro formato passava pelo `startsWith` e chegava ao `Buffer.from` com
+     `undefined`, que ESTOURA — e a tela de entrada respondia 500 "erro
+     interno" em vez de "usuário ou senha incorretos".
+
+     Não é hipótese: aconteceu aqui, com uma conta criada por script fora do
+     sistema. A consequência real é pior que o incômodo — a trava de tentativas
+     não conta um 500, então uma conta com hash corrompido deixaria de ser
+     protegida contra insistência, e ninguém saberia por quê. */
+  if (!N || !r || !p || !saltHex || !dkHex || !/^[0-9a-f]+$/i.test(saltHex) || !/^[0-9a-f]+$/i.test(dkHex)) return false;
   const dk = crypto.scryptSync(String(senha), Buffer.from(saltHex, "hex"), dkHex.length / 2, { N: +N, r: +r, p: +p });
   return iguais(Buffer.from(dkHex, "hex"), dk);
 }
@@ -188,6 +198,14 @@ function proteger(tabela, obj) {
    que as entregou.
    ========================================================================== */
 const HISTORICO_VERSOES = [
+  { versao: "1.19.0", data: "2026-08-09", titulo: "Arquivar usuário e prontuário", mudancas: [
+    "Arquivar tira o usuário da lista de Usuários sem apagar nada",
+    "Arquivar tira o prontuário da tela de Prontuários, com o acompanhamento inteiro guardado",
+    "Nova tela Arquivados, no menu da conta, com uma aba para cada área",
+    "Restaurar devolve o registro à lista de origem com um clique",
+    "Arquivar NÃO é inativar nem dar alta: essas duas continuam à vista, com etiqueta",
+    "Quem arquivou e quando ficam registrados na linha do tempo",
+  ] },
   { versao: "1.18.0", data: "2026-08-09", titulo: "Impressões em papel timbrado", mudancas: [
     "Marca d'água do Instituto ao centro de todas as folhas impressas",
     "Escolha entre retrato e paisagem na hora de imprimir, em qualquer documento",
@@ -535,6 +553,21 @@ const PERM = {
   profissional: new Set(["atendimentos", "prontuario", "prontuario_registros", "historico"]),
 };
 const PERM_LEITURA = { profissional: new Set(["pacientes", "profissionais", "servicos"]) };
+
+/* ==========================================================================
+   O QUE PODE SER ARQUIVADO
+
+   Arquivar é decisão de ORGANIZAÇÃO da tela: "tire isto da minha frente".
+   Não diz que a pessoa deixou de ser atendida (para isso existe `ativo`) nem
+   que o acompanhamento terminou (para isso existe `status = Alta`). Some da
+   lista, continua no banco, volta num clique.
+
+   As três tabelas usam a MESMA dupla de colunas (`arquivado` 0/1 e
+   `arquivado_em`), o mesmo parâmetro de consulta e a mesma rota — foi o que
+   permitiu que `prontuario_registros`, que já arquivava desde a 006, entrasse
+   nesta lista sem mudar de comportamento.
+   ========================================================================== */
+const TEM_ARQUIVO = new Set(["pacientes", "prontuario", "prontuario_registros"]);
 
 /* De quem é este prontuário. A tela guarda o NOME do profissional (é o que a
    equipe digita e lê); o recorte de acesso precisa do ID. Resolver aqui, na
@@ -1385,22 +1418,59 @@ async function rotaApi(req, res, p) {
         ORDER BY a.data DESC, a.hora DESC, a.id DESC`, pr.paciente_id));
   }
 
-  /* -------- Arquivar / restaurar lançamento (NUNCA excluir) -------------
-     Registro de acompanhamento não se apaga: some das telas e volta com um
-     clique. Quem escreveu erra e corrige; quem audita precisa poder ver. */
-  const rm = p.match(/^prontuario_registros\/(\d+)\/(arquivar|restaurar)$/);
+  /* ======================================================================
+     ARQUIVAR E RESTAURAR — pessoa, pasta e lançamento pela MESMA rota
+
+     Uma rota para as três, porque é a mesma operação: `arquivado` vira 1, a
+     linha some das listas e volta num clique. Três rotas parecidas
+     divergiriam — e a que ficasse para trás esqueceria de registrar no
+     histórico, que é o que responde "quem tirou isto da tela".
+
+     NADA É APAGADO. Arquivar é organização, não exclusão: o registro continua
+     inteiro no banco, sai nos backups e é lido pela tela de Arquivados.
+
+     PERMISSÃO POR TABELA, não uma só para todas: a secretaria organiza a
+     lista de pessoas atendidas mas não entra no prontuário; o profissional
+     organiza as pastas DELE e não mexe na lista de pessoas.
+     ====================================================================== */
+  const ARQUIVAVEIS = {
+    pacientes: { perm: "pacientes", oQue: "Usuário", entidade: "paciente" },
+    prontuario: { perm: "prontuario", oQue: "Prontuário", entidade: "prontuario" },
+    prontuario_registros: { perm: "prontuario", oQue: "Lançamento", entidade: "prontuario" },
+  };
+  const rm = p.match(/^(pacientes|prontuario|prontuario_registros)\/(\d+)\/(arquivar|restaurar)$/);
   if (rm && req.method === "POST") {
-    if (!pode(s.perfil, "prontuario")) return json(res, 403, { error: "Sem permissão." });
-    const arq = rm[2] === "arquivar";
-    const reg = await Q.get("SELECT * FROM prontuario_registros WHERE id=?", rm[1]);
-    if (!reg) return json(res, 404, { error: "Lançamento não encontrado." });
-    if (s.perfil === "profissional" && String(reg.usuario_id) !== String(s.userId))
-      return json(res, 403, { error: "Lançamento de outro profissional." });
-    await Q.run("UPDATE prontuario_registros SET arquivado=?, arquivado_em=? WHERE id=?",
-      arq ? 1 : 0, arq ? agora() : null, rm[1]);
-    await anotar("prontuario", reg.prontuario_id,
-      (arq ? "Lançamento arquivado: " : "Lançamento restaurado: ") + rotuloTipo(reg.tipo), "", s);
-    return json(res, 200, { ok: true });
+    const def = ARQUIVAVEIS[rm[1]];
+    if (!pode(s.perfil, def.perm)) return json(res, 403, { error: "Sem permissão." });
+    const arq = rm[3] === "arquivar";
+    const linha = await Q.get(`SELECT * FROM ${rm[1]} WHERE id=?`, rm[2]);
+    if (!linha) return json(res, 404, { error: def.oQue + " não encontrado." });
+
+    /* O RECORTE DO PROFISSIONAL vale aqui como vale na leitura: ele só
+       organiza o que é dele. Sem isto, quem não pode nem VER a pasta de outro
+       poderia fazê-la sumir da tela de todo mundo. */
+    if (s.perfil === "profissional") {
+      if (rm[1] === "prontuario_registros" && String(linha.usuario_id) !== String(s.userId))
+        return json(res, 403, { error: "Lançamento de outro profissional." });
+      if (rm[1] === "prontuario") {
+        const recusa = recusaPorDono(s, linha);
+        if (recusa) return json(res, 403, { error: recusa });
+      }
+    }
+
+    await Q.run(`UPDATE ${rm[1]} SET arquivado=?, arquivado_em=? WHERE id=?`,
+      arq ? 1 : 0, arq ? agora() : null, rm[2]);
+
+    /* Quem arquivou e quando entram na linha do tempo. Arquivar tira da vista
+       — e "sumiu da lista" sem registro é a diferença entre um sistema que se
+       explica e um que faz alguém desconfiar do banco. */
+    const alvoHist = rm[1] === "prontuario_registros" ? linha.prontuario_id : linha.id;
+    const nome = rm[1] === "prontuario_registros" ? rotuloTipo(linha.tipo)
+               : rm[1] === "prontuario" ? (linha.numero || linha.especialidade || "")
+               : (linha.nome || "");
+    await anotar(def.entidade, alvoHist,
+      def.oQue + (arq ? " arquivado" : " restaurado") + (nome ? ": " + nome : ""), "", s);
+    return json(res, 200, { ok: true, arquivado: arq ? 1 : 0 });
   }
 
   /* --------- Linha do tempo de uma pessoa ou de uma pasta --------------- */
@@ -1603,6 +1673,27 @@ async function rotaApi(req, res, p) {
         filtrarNaMemoria = true;
       }
       if (donoCol) { cond.push(donoCol + "=?"); args.push(donoVal); }
+
+      /* ================================================================
+         ARQUIVADO SOME DA LISTA
+
+         Um parâmetro, três valores — e não dois parâmetros parecidos, que é
+         como alguém acaba usando o errado:
+
+             (ausente)          só o que NÃO está arquivado   ← o dia a dia
+             ?arquivados=1      inclui os arquivados          ← já era assim
+                                                                nos lançamentos
+             ?arquivados=so     SÓ os arquivados              ← a tela nova
+
+         `so` é o que a tela de Arquivados pede. Sem ele, ela teria de trazer
+         tudo e filtrar no navegador — e a lista inteira de pessoas atendidas
+         viajaria pelo fio para mostrar as três que foram arquivadas.
+         ================================================================ */
+      if (TEM_ARQUIVO.has(tabela)) {
+        const modo = q.get("arquivados");
+        if (modo === "so") cond.push("arquivado=1");
+        else if (modo !== "1") cond.push("arquivado=0");
+      }
       /* Os lançamentos são sempre pedidos de DENTRO de uma pasta; devolver a
          tabela inteira misturaria o acompanhamento de todo mundo numa lista só. */
       if (tabela === "prontuario_registros") {
@@ -1613,8 +1704,9 @@ async function rotaApi(req, res, p) {
         const recusaLista = recusaPorDono(s, pasta);
         if (recusaLista) return json(res, 403, { error: recusaLista });
         cond.push("prontuario_id=?"); args.push(Number(pid));
-        // arquivado some da tela, mas volta com ?arquivados=1
-        if (q.get("arquivados") !== "1") cond.push("arquivado=0");
+        /* O filtro de arquivado desta tabela é o mesmo das outras e está
+           logo acima, em TEM_ARQUIVO — antes vivia aqui, sozinho, e foi de
+           onde saiu a regra. */
       }
       if (cond.length) sql += " WHERE " + cond.join(" AND ");
       /* O acompanhamento se lê do mais recente para o mais antigo — mas por

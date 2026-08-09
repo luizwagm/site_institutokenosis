@@ -64,6 +64,14 @@
     .tn-panel .navbtn:hover{background:#eef4fb;color:var(--marinho)}
     .tn-panel .navbtn.on{background:var(--celeste);color:#fff}
     .tn-sep{border:0;border-top:1px solid var(--line);margin:.35rem .2rem}
+    /* ---------------------- Abas da tela de Arquivados ------------------ */
+    .abas-arq{display:flex;gap:.5rem;flex-wrap:wrap;margin:0 0 .9rem}
+    .aba-arq{font:inherit;font-size:.86rem;font-weight:600;cursor:pointer;
+      border:1.5px solid var(--line);background:var(--surface);color:var(--marinho);
+      border-radius:999px;padding:.34rem .95rem}
+    .aba-arq:hover{border-color:var(--celeste)}
+    .aba-arq.on{background:var(--marinho);color:#fff;border-color:var(--marinho)}
+    .ajuda{font-size:.84rem;color:var(--muted);line-height:1.55}
     .tn-versao{font-size:.7rem;color:var(--dim);text-align:center;margin:.45rem 0 .1rem}
     .tn-quem{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px}
     /* combobox com busca */
@@ -488,6 +496,7 @@
           <!-- Backup: só o admin vê (o JS esconde para os demais perfis) -->
           <button class="navbtn" id="btn-backup" onclick="baixarBackup(this)" hidden>⬇ Backup do banco</button>
           <hr class="tn-sep" id="sep-backup" hidden>
+          <button class="navbtn" data-nav="arquivados">Arquivados</button>
           <button class="navbtn" data-nav="auditoria">Auditoria</button>
           <button class="navbtn" data-nav="sobre">Sobre o sistema</button>
           <button class="navbtn" onclick="sair()">Sair</button>
@@ -570,6 +579,37 @@
       <div class="stat-grid" id="relpac-stats"></div>
       <div class="card" id="relpac-tabela" style="padding:0;overflow:auto"></div>
       <div id="relpac-paginacao" class="paginacao"></div>
+    </section>
+
+    <!-- ====================================================================
+         ARQUIVADOS — onde vai o que saiu das listas
+
+         Fica no menu da CONTA, e não na lateral junto dos cadastros, porque
+         não é uma área de trabalho: é o lugar aonde se vai de vez em quando
+         para conferir ou trazer alguém de volta. Na lateral, ao lado de
+         Usuários e Prontuário, viraria um quarto item de rotina competindo
+         com os três que se usa todo dia.
+
+         Uma tela com abas, e não duas telas: a pergunta que traz alguém aqui
+         é "onde foi parar aquilo?", e ela não vem sabendo se o que sumiu era
+         a pessoa ou a pasta.
+         ==================================================================== -->
+    <section class="panel" id="pane-arquivados">
+      <div class="topbar">
+        <h1>Arquivados</h1>
+        <button class="btn btn-ghost btn-sm" onclick="carregarArquivados()">↻ Atualizar</button>
+      </div>
+      <div class="card" style="padding:.9rem 1rem">
+        <p class="ajuda" style="margin:0">
+          Arquivar tira da lista sem apagar nada. <b>Não é o mesmo que inativar</b>
+          (a pessoa parou de ser atendida) nem que dar <b>alta</b> (o acompanhamento
+          terminou) — essas duas continuam à vista, com etiqueta, porque são
+          informação de trabalho. Aqui está só o que alguém decidiu tirar da frente.
+        </p>
+      </div>
+      <div class="abas-arq" id="arq-abas"></div>
+      <div class="card" id="arq-tabela" style="padding:0;overflow:auto"></div>
+      <div id="arq-paginacao" class="paginacao"></div>
     </section>
 
     <!-- Auditoria: tudo o que acontece no sistema. Só o admin. -->
@@ -1072,6 +1112,149 @@ const AU_CLASSE = {           // cor da etiqueta por tipo de ação
   backup:"alerta", senha:"alerta", bloquear:"alerta",
 };
 
+/* ==========================================================================
+   ARQUIVADOS
+
+   Duas listas na mesma tela, uma aba cada. Elas pedem ao servidor a MESMA
+   rota que as telas normais, com `?arquivados=so` — não há consulta especial
+   nem tela paralela para manter em dia.
+
+   Cada linha diz TAMBÉM o estado real do registro (ativo/inativo, em
+   acompanhamento/alta). Sem isso, restaurar seria às cegas: arquivado só quer
+   dizer que alguém tirou da frente, e quem traz de volta precisa saber o que
+   vai reaparecer na lista.
+   ========================================================================== */
+var ARQ_ABA = "pacientes";
+
+/* A MESMA fonte de verdade do menu (`PERM_CLIENTE`). Uma segunda regra de
+   permissão aqui divergiria da do menu, e a divergência apareceria como uma
+   aba que abre para quem o servidor vai recusar. */
+function podeVerArea(chave){
+  const allow = PERM_CLIENTE[ME && ME.perfil];
+  return !allow || allow.has(chave);
+}
+
+const ARQ_ABAS = [
+  { chave: "pacientes",  rotulo: "Usuários",    perm: "pacientes" },
+  { chave: "prontuario", rotulo: "Prontuários", perm: "prontuario" },
+];
+
+function trocarAbaArq(chave){ ARQ_ABA = chave; reiniciarPagina("arquivados"); carregarArquivados(); }
+
+async function carregarArquivados(){
+  /* As abas respeitam a permissão: a secretaria não entra no prontuário, e uma
+     aba que devolve "sem permissão" ao ser clicada é pior que uma aba que não
+     existe. */
+  const visiveis = ARQ_ABAS.filter((a)=>podeVerArea(a.chave));
+  if(!visiveis.length){ $("#arq-tabela").innerHTML='<p class="vazio">Sem permissão.</p>'; return; }
+  if(!visiveis.some((a)=>a.chave===ARQ_ABA)) ARQ_ABA = visiveis[0].chave;
+
+  $("#arq-abas").innerHTML = visiveis.map((a)=>
+    `<button class="aba-arq${ARQ_ABA===a.chave?" on":""}" onclick="trocarAbaArq('${a.chave}')">${a.rotulo}</button>`
+  ).join("");
+
+  $("#arq-tabela").innerHTML='<p class="vazio">Carregando…</p>';
+  let d;
+  try{ d = await api(ARQ_ABA + "?arquivados=so"); }
+  catch(e){ $("#arq-tabela").innerHTML='<p class="vazio">'+escA(e.message)+'</p>'; return; }
+  if(!Array.isArray(d)) d = [];
+
+  /* ------------------------------------------------------------------
+     O NOME DE QUEM TAMBÉM FOI ARQUIVADO
+
+     `nomePac()` lê o CACHE, e o cache só tem quem está nas listas — ou seja,
+     quem NÃO está arquivado. Uma pasta arquivada cujo dono também foi
+     arquivado aparecia com "—" no lugar do nome, e a tela que existe para
+     dizer "onde foi parar aquilo" não dizia de quem era.
+
+     Só nesta tela, e só quando a aba é a de prontuários: uma consulta a mais
+     aqui não pesa, e resolver isso enchendo o cache global de arquivados os
+     traria de volta a todos os seletores do sistema.
+     ------------------------------------------------------------------ */
+  let nomeDoDono = nomePac;
+  if(ARQ_ABA === "prontuario" && d.length){
+    try{
+      const arq = await api("pacientes?arquivados=so");
+      const mapa = {};
+      (Array.isArray(arq)?arq:[]).forEach((x)=>{ mapa[x.id] = x.nome; });
+      /* `nomePac` devolve TRAVESSÃO quando não acha, não string vazia — e
+         travessão é verdadeiro em JavaScript, então um `||` simples nunca
+         chegaria ao mapa. O sintoma era a tela continuar mostrando "—" com o
+         nome carregado ao lado, na memória. */
+      const achou = (v)=> v && v !== "—";
+      nomeDoDono = (id)=> achou(nomePac(id)) ? nomePac(id) : (mapa[id] || "");
+    }catch(e){ /* sem o mapa, cai no cache — o nome falta, a tela não quebra */ }
+  }
+
+  if(!d.length){
+    $("#arq-tabela").innerHTML='<p class="vazio">Nada arquivado aqui.</p>';
+    barraPaginacao("arq-paginacao","arquivados",{total:0});
+    return;
+  }
+  const info = fatiar("arquivados", d);
+  barraPaginacao("arq-paginacao","arquivados",info);
+
+  $("#arq-tabela").innerHTML = ARQ_ABA==="pacientes"
+    ? tabelaArqPacientes(info.itens) : tabelaArqProntuarios(info.itens, nomeDoDono);
+}
+
+function tabelaArqPacientes(itens){
+  return `<table><thead><tr><th>Usuário</th><th style="width:120px">Nascimento</th>
+    <th style="width:130px">Situação</th><th style="width:150px">Arquivado em</th>
+    <th style="width:130px"></th></tr></thead><tbody>` +
+    itens.map((x)=>`<tr>
+      <td><b>${escA(x.nome||"—")}</b>${x.cpf?`<br><span style="color:var(--dim);font-size:.76rem">${escA(x.cpf)}</span>`:""}</td>
+      <td>${escA(dataBR(x.nascimento)||"—")}</td>
+      <td>${(x.ativo===0||x.ativo==="0")
+            ? '<span class="tag tag-Inativo">Inativo</span>'
+            : '<span class="tag tag-Ativo">Ativo</span>'}</td>
+      <td>${escA(dataHoraBR(x.arquivado_em)||"—")}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="restaurarArquivado('pacientes',${x.id})">Restaurar</button></td>
+    </tr>`).join("") + "</tbody></table>";
+}
+
+function tabelaArqProntuarios(itens, nomeDoDono){
+  return `<table><thead><tr><th style="width:150px">Número</th><th>Usuário</th>
+    <th>Serviço</th><th style="width:130px">Situação</th>
+    <th style="width:150px">Arquivado em</th><th style="width:130px"></th></tr></thead><tbody>` +
+    itens.map((x)=>`<tr>
+      <td><b>${escA(x.numero||"—")}</b></td>
+      <td>${escA(nomeDoDono(x.paciente_id)||"—")}</td>
+      <td>${escA(x.especialidade||"—")}</td>
+      <td>${x.status==="Alta"
+            ? '<span class="tag tag-Inativo">Alta</span>'
+            : '<span class="tag tag-Ativo">Em acompanhamento</span>'}</td>
+      <td>${escA(dataHoraBR(x.arquivado_em)||"—")}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="restaurarArquivado('prontuario',${x.id})">Restaurar</button></td>
+    </tr>`).join("") + "</tbody></table>";
+}
+
+/* Arquivar e restaurar são a MESMA função, com a rota trocada — foi assim que
+   os lançamentos já funcionavam desde a 006, e repetir o desenho evita que uma
+   das duas esqueça de recarregar a tela e deixe a linha visível depois de
+   arquivada. */
+async function arquivarRegistro(tabela, id, restaurar){
+  const acao = restaurar ? "restaurar" : "arquivar";
+  /* Sem embrulho de espera: o `api()` já trava a tela e acende o botão que
+     foi clicado (ver `travarTela`). Um segundo mecanismo aqui competiria com
+     esse e deixaria botão travado depois da resposta. */
+  try{ await api(`${tabela}/${id}/${acao}`,"POST",{}); }
+  catch(e){ return toast(e.message,true); }
+  toast(restaurar ? "Restaurado." : "Arquivado — está em Arquivados, no menu da conta.");
+  return true;
+}
+
+async function restaurarArquivado(tabela, id){
+  if(await arquivarRegistro(tabela, id, true)) carregarArquivados();
+}
+
+/* Chamado das telas normais (lista de usuários e de prontuários). */
+async function arquivarDaLista(tabela, id){
+  const oQue = tabela==="pacientes" ? "este usuário" : "este prontuário";
+  if(!confirm(`Arquivar ${oQue}?\n\nEle sai da lista e continua guardado. Para trazer de volta: menu da conta → Arquivados.`)) return;
+  if(await arquivarRegistro(tabela, id, false)) carregarLista();
+}
+
 async function carregarAuditoria(pagina){
   if(pagina) AU_PAGINA = pagina;
   const corpo = $("#au-tabela");
@@ -1378,6 +1561,7 @@ document.querySelectorAll(".navbtn[data-nav]").forEach((b)=>b.addEventListener("
   if(nav==="painel"){ $("#pane-painel").classList.add("on"); carregarPainel(); }
   else if(nav==="conta"){ $("#pane-conta").classList.add("on"); }
   else if(nav==="sobre"){ $("#pane-sobre").classList.add("on"); carregarSobre(); }
+  else if(nav==="arquivados"){ $("#pane-arquivados").classList.add("on"); carregarArquivados(); }
   else if(nav==="auditoria"){ $("#pane-auditoria").classList.add("on"); carregarAuditoria(1); }
   else if(nav==="relatorios"){ $("#pane-relatorios").classList.add("on"); carregarRelatorios(); }
   else if(nav==="relatorios_pacientes"){ $("#pane-relpac").classList.add("on"); carregarRelacaoPacientes(); }
@@ -1994,6 +2178,13 @@ function acoesDaLinha(m, row){
   if(MOD==="profissionais"){
     const at=Number(row.ativo)!==0;
     itens.push([at?"Bloquear acesso":"Liberar acesso", `alternarBloqueio(${row.id},${at?1:0})`]);
+  }
+  /* ARQUIVAR fica por ÚLTIMO no menu, e é o único item que tira a linha da
+     tela. Entre "Abrir" e "Inativar", quem só quer abrir a ficha acertaria
+     nele com frequência — e teria de vir aqui procurar de onde a pessoa
+     sumiu. É também por isso que ele pede confirmação. */
+  if(MOD==="pacientes" || MOD==="prontuario"){
+    itens.push(["Arquivar", `arquivarDaLista('${MOD}',${row.id})`]);
   }
   const abrir=`abrirForm(${row.id})`;
 
