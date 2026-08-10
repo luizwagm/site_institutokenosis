@@ -69,7 +69,13 @@ if git fetch --quiet origin main 2>/dev/null; then
   fi
 fi
 
-./deploy.sh
+# Chamado por "bash ./deploy.sh", e não direto: o passo acima traz o arquivo do
+# remoto com o MODO gravado no git, e um deploy.sh commitado como 100644 chega
+# aqui sem o bit de execucao — mesmo tendo sido executavel no disco antes.
+# Aconteceu no Kenosis: a auto-atualizacao rebaixou a permissao e a entrega
+# morreu com "Permission denied" (codigo 126) no arquivo que ela mesma acabara
+# de buscar. Chamando pelo interpretador, o modo deixa de importar.
+bash ./deploy.sh
 CODIGO=$?
 echo "=== entrega terminou com código $CODIGO ==="
 
