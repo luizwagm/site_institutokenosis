@@ -1,0 +1,203 @@
+# ==========================================================================
+#  Entrega automática — Instituto Kenósis
+#
+#  Dois trabalhos em sequência: PROVAR e ENTREGAR. O segundo só existe se o
+#  primeiro passar (`needs`), então uma suíte vermelha não vira site no ar.
+#
+#  Isto importa mais aqui do que na maioria: do outro lado há paciente marcando
+#  consulta e prontuário no Postgres. O `deploy.sh` protege o CONTEÚDO — faz
+#  backup, compara o inventário e restaura se algo sumir —, mas ele não tem como
+#  saber se o código novo está com defeito. Quem sabe disso é a suíte.
+#
+#  A CHAVE DESTE WORKFLOW NÃO DÁ SHELL. No servidor ela está presa a um
+#  `command=` que roda só a entrega deste site. Provado antes de ligar: com a
+#  chave presa a um `echo`, pedir `cat /etc/shadow`, pedir o caminho do deploy e
+#  pedir terminal devolveram todos o echo, e o túnel para a porta do Postgres foi
+#  recusado.
+# ==========================================================================
+name: Provar e entregar
+
+on:
+  push:
+    branches: [main]
+  # Também roda em pull request, mas aí SÓ a prova: ninguém entrega a partir de
+  # um branch que ainda está em discussão.
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: entrega-kenosis
+  cancel-in-progress: false
+
+jobs:
+  # ======================================================================
+  #  1. PROVAR — o portão
+  # ======================================================================
+  provar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    # Postgres descartável, só para esta execução. O sistema de gestão vive
+    # nele, e sem banco a suíte do /restrito não sai do lugar. As migrations
+    # sobem o esquema do zero e são idempotentes — foi para isso que elas
+    # substituíram a lista de ALTER TABLE no boot.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: kenosis
+          POSTGRES_PASSWORD: senha-de-prova-descartavel
+          POSTGRES_DB: kenosis_gestao
+        ports: ["5432:5432"]
+        # Sem o health check o passo seguinte corre antes de o banco aceitar
+        # conexão, e a falha aparece como "connection refused" — que parece
+        # erro de código e não de tempo.
+        options: >-
+          --health-cmd "pg_isready -U kenosis"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: kenosis
+      PGPASSWORD: senha-de-prova-descartavel
+      PGDATABASE: kenosis_gestao
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # A mesma linha do servidor (Node 22). Provar em outra versão é provar
+      # outro programa — e o `node:sqlite` mudou de comportamento entre versões.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar dependências
+        run: npm ci --no-audit --no-fund
+
+      # ------------------------------------------------------------------
+      #  Conferências estáticas — baratas e pegam o que mais quebrou aqui
+      # ------------------------------------------------------------------
+      - name: Todo JavaScript compila
+        run: |
+          erros=0
+          while IFS= read -r f; do
+            node --check "$f" || { echo "ERRO de sintaxe: $f"; erros=1; }
+          done < <(git ls-files '*.js' '*.cjs')
+          exit $erros
+
+      - name: Todo shell script compila
+        run: |
+          erros=0
+          while IFS= read -r f; do
+            bash -n "$f" || { echo "ERRO de sintaxe: $f"; erros=1; }
+          done < <(git ls-files '*.sh')
+          exit $erros
+
+      # Um `\r` no fim da linha faz o bash ler "bash\r" como interpretador e o
+      # script morre com "no such file or directory" — apontando para um arquivo
+      # que existe. O .gitattributes previne; isto CONFERE, porque prevenção sem
+      # conferência é promessa.
+      - name: Nenhum script com fim de linha do Windows
+        run: |
+          if git ls-files '*.sh' | xargs grep -lP '\r$' 2>/dev/null | grep .; then
+            echo "Os arquivos acima têm CRLF — o bash não roda assim."
+            exit 1
+          fi
+          echo "todos com LF"
+
+      # ------------------------------------------------------------------
+      #  Suítes
+      # ------------------------------------------------------------------
+      - name: Suíte do limitador de tentativas
+        run: node testar-limitador.js
+
+      - name: Preparar o banco de prova
+        run: node migrar.js
+
+      # A CHAVE PRECISA SER BASE64 DE 32 BYTES EXATOS — não um texto qualquer.
+      # `cripto.js` decodifica e confere o tamanho; se não bater, ele recusa a
+      # chave, a camada de gestão para de responder e TODA rota do /restrito
+      # devolve 503. Na primeira execução deste workflow eu tinha posto uma
+      # frase no lugar, e o sintoma foi "o banco de dados não respondeu" — que
+      # parece falta de Postgres, e não chave malformada.
+      #
+      # Gerada aqui e morta com a execução: ela cifra dado pessoal em produção,
+      # e a de prova não pode ter relação nenhuma com aquela.
+      - name: Gerar a chave de cifra da prova
+        run: echo "DADOS_CHAVE=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+
+      # O Kenósis não tem a suíte de campo vazio do BemEstar. O que ele precisa
+      # provar aqui é o essencial: que o servidor SOBE e RESPONDE com o esquema
+      # recém-criado. É a falha que tira o site do ar — um require quebrado, uma
+      # coluna que a migration não criou, uma variável de ambiente que faltou.
+      #
+      # Mata pelo PID guardado, nunca por `pkill -f "node server.js"`: no
+      # servidor todos os sites rodam exatamente essa linha de comando com o
+      # mesmo usuário, e um pkill assim derrubou a Imobiliária inteira.
+      - name: O servidor sobe e responde
+        env:
+          PORT: 5297
+          HOST: 127.0.0.1
+        run: |
+          node server.js & PID=$!
+          for i in $(seq 1 20); do
+            CODIGO=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:5297/" || echo 000)
+            [ "$CODIGO" = "200" ] && break
+            sleep 1
+          done
+          kill "$PID" 2>/dev/null || true
+          if [ "$CODIGO" != "200" ]; then
+            echo "o servidor não respondeu 200 (veio $CODIGO)"
+            exit 1
+          fi
+          echo "servidor respondeu 200"
+
+  # ======================================================================
+  #  2. ENTREGAR — só depois do portão, e só na main
+  # ======================================================================
+  entregar:
+    needs: provar
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Preparar a chave e o host conhecido
+        env:
+          CHAVE: ${{ secrets.SSH_CHAVE_ENTREGA }}
+          HOST_CONHECIDO: ${{ secrets.SSH_HOST_CONHECIDO }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$CHAVE" > ~/.ssh/id_entrega
+          chmod 600 ~/.ssh/id_entrega
+          # Host FIXADO, não aceito na hora. Com StrictHostKeyChecking=no,
+          # qualquer servidor que responda no meio do caminho receberia a
+          # conexão — e a chave junto.
+          printf '%s\n' "$HOST_CONHECIDO" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Pedir a entrega
+        env:
+          DESTINO: ${{ secrets.SSH_DESTINO }}
+        run: |
+          set -o pipefail
+          # Nenhum comando é enviado: o servidor ignora o que viesse aqui e roda
+          # o `command=` preso à chave.
+          ssh -T -i ~/.ssh/id_entrega \
+              -o BatchMode=yes -o ConnectTimeout=20 \
+              -o StrictHostKeyChecking=yes \
+              "$DESTINO" 2>&1 | tee saida-da-entrega.txt
+
+      - name: Guardar o log da entrega
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-da-entrega
+          path: saida-da-entrega.txt
+          retention-days: 30
+          if-no-files-found: ignore
