@@ -3029,16 +3029,19 @@ function imprimirFrequencia(){
   const linhas=FREQ.participantes.map(freqPessoa);
   if(!linhas.length){ $("#freq-status").textContent="A folha está vazia — acrescente usuários antes de imprimir."; return; }
   const bordas='border:1px solid #6b7280;padding:.28rem .45rem';
-  /* Colunas travadas como nas outras listagens: os dias dividem uma fatia
-     fixa entre si (larga com poucas aulas, nunca menor que a assinatura),
-     e Nome fica com o que sobra. */
-  const diaW=Math.min(8, Math.max(5, Math.round(46/dias.length)));
-  const cab=`<tr><th style="${bordas};text-align:left">Nome</th><th style="${bordas};width:12%">CPF</th><th style="${bordas};width:4%">Nº</th>${dias.map((d)=>`<th style="${bordas};width:${diaW}%">${d}</th>`).join("")}</tr>`;
-  const corpo=linhas.map((p,i)=>`<tr><td style="${bordas}">${escA(p.nome)}</td><td style="${bordas}">${escA(p.cpf||"")}</td><td style="${bordas};text-align:center">${String(i+1).padStart(2,"0")}</td>${`<td style="${bordas};height:1.85rem"></td>`.repeat(dias.length)}</tr>`).join("");
+  /* TODAS as colunas com largura declarada, somando 100. No table-layout
+     fixed do Chrome, coluna SEM largura não fica com a sobra — as colunas
+     com percentual é que são infladas para fechar a tabela, e o Nome ficou
+     com 15px (uma letra por linha). Dia e Nº são estreitos (dois dígitos),
+     CPF cabe justo (000.000.000-00) e o Nome leva todo o resto. */
+  const diaW=4.5, cpfW=12, numW=4;
+  const nomeW=(100 - cpfW - numW - diaW*dias.length).toFixed(1);
+  const cab=`<tr><th style="${bordas};text-align:left;width:${nomeW}%">Nome</th><th style="${bordas};width:${cpfW}%">CPF</th><th style="${bordas};width:${numW}%">Nº</th>${dias.map((d)=>`<th style="${bordas};width:${diaW}%">${d}</th>`).join("")}</tr>`;
+  const corpo=linhas.map((p,i)=>`<tr><td style="${bordas}">${escA(p.nome)}</td><td style="${bordas};white-space:nowrap">${escA(p.cpf||"")}</td><td style="${bordas};text-align:center">${String(i+1).padStart(2,"0")}</td>${`<td style="${bordas};height:1.85rem"></td>`.repeat(dias.length)}</tr>`).join("");
   abrirImpressao(FREQ_TITULO+" — Turma "+FREQ.turma,
     `<p style="text-align:center;font-weight:700;margin:.2rem 0 .8rem">DATAS — MÊS ${freqMesLabel(FREQ.mes)}</p>
      <table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:.82rem">${cab}${corpo}</table>`,
-    { paisagem:true, subtitulo:`${linhas.length} participante(s) · emitida em ${new Date().toLocaleDateString("pt-BR")}` });
+    { paisagem:true });
 }
 
 function timbreHTML(titulo, corpo, op){
@@ -3099,13 +3102,13 @@ function timbreHTML(titulo, corpo, op){
    @media print{.barra-imp{display:none!important}}
 
    /* O timbre do projeto: Vida Ativa a esquerda, Instituto Kenosis a direita
-      (o logo do Kenosis ja traz o proprio nome). CNPJ, cidade e site foram
-      para o rodape de toda folha - a informacao continua no papel. */
-   .timbre{display:flex;align-items:center;justify-content:space-between;gap:.9rem;border-bottom:3px solid #253282;padding-bottom:.7rem}
-   .timbre img{height:62px;width:auto}
-   .faixa{height:4px;background:linear-gradient(90deg,#253282,#1EA1E4);margin:0 0 1.3rem;
-     -webkit-print-color-adjust:exact;print-color-adjust:exact}
-   h1{color:#253282;font-size:1.2rem;margin:.2rem 0 1rem}
+      (o logo do Kenosis ja traz o proprio nome) — sem linha separadora, a
+      pedido do cliente: os logotipos maiores ja marcam o cabecalho. */
+   .timbre{display:flex;align-items:center;justify-content:space-between;gap:.9rem;padding-bottom:.4rem}
+   .timbre img{height:80px;width:auto}
+   /* 1rem, nao 1.2: o titulo da frequencia e longo e precisava caber numa
+      linha so em paisagem. */
+   h1{color:#253282;font-size:1rem;margin:.2rem 0 1rem}
    .sec{margin:1.5rem 0 .5rem;color:#1EA1E4;font-size:.72rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;border-bottom:1px solid #e7ecf4;padding-bottom:.25rem;page-break-after:avoid}
    table{width:100%;border-collapse:collapse}
    /* O RÓTULO ocupa a largura do próprio texto; o VALOR fica com o resto.
@@ -3153,7 +3156,6 @@ function timbreHTML(titulo, corpo, op){
    table.m{table-layout:fixed}
    table.m th{width:auto;white-space:normal;overflow-wrap:break-word}
    table.m td,table.m th{font-size:.78rem;padding:.3rem .45rem}
-   .rod{margin-top:2.2rem;border-top:1px solid #eef1f6;padding-top:.6rem;color:#9aa0ad;font-size:.72rem;display:flex;justify-content:space-between}
   </style></head><body>
   <div class="barra-imp">
     <b>Orientação:</b>
@@ -3169,11 +3171,10 @@ function timbreHTML(titulo, corpo, op){
        <img class="t-esq" src="${base}/assets/img/logo_vida_ativa.png" alt="Vida Ativa">
        <img class="t-dir" src="${base}/assets/img/logo-timbre.svg" alt="Instituto Kenósis">
      </div>
-     <div class="faixa"></div>
    </td></thead>
-   <tfoot><td>
-     <div class="rod"><span>Instituto Kenósis · CNPJ 63.991.397/0001-40 · Caruaru — PE · institutokenosis.com · uso interno — dado sensível (LGPD)</span><span>Emitido em ${new Date().toLocaleString("pt-BR")}</span></div>
-   </td></tfoot>
+   <!-- O tfoot vazio fica: é ele quem garante a margem inferior em toda
+        página. O texto de rodapé saiu por pedido do cliente. -->
+   <tfoot><td></td></tfoot>
    <tbody><tr><td>
      <h1>${escA(titulo)}</h1>
      ${op.subtitulo?`<p style="margin:-.7rem 0 1rem;color:#6b7280;font-size:.8rem">${escA(op.subtitulo)}</p>`:""}
