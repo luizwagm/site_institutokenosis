@@ -24,7 +24,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.21.0";
+const SISTEMA_VERSION = "1.22.0";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -710,6 +710,22 @@ async function idDoProfissional(nome) {
   const r = await Q.get("SELECT id FROM profissionais WHERE LOWER(TRIM(nome))=LOWER(TRIM(?))", String(nome));
   return r ? r.id : null;
 }
+/* ==========================================================================
+   "A EQUIPE MUDOU" — aviso para quem estiver interessado (hoje: o chat)
+
+   A gestão não conhece o chat, e é assim que fica: ela anuncia o fato, quem
+   quiser que escute. O aviso dispara DEPOIS da escrita e não é esperado: o
+   cadastro de um usuário não pode ficar lento nem falhar porque um ouvinte
+   demorou. Mesma receita do BemEstarClinic.
+   ========================================================================== */
+const ouvintesDaEquipe = [];
+function aoMudarEquipe(fn) { if (typeof fn === "function") ouvintesDaEquipe.push(fn); }
+function equipeMudou(motivo) {
+  for (const fn of ouvintesDaEquipe) {
+    try { Promise.resolve(fn(motivo)).catch(() => { }); } catch { }
+  }
+}
+
 const pode = (perfil, modulo) => perfil === "admin" || (PERM[perfil] ? PERM[perfil].has(modulo) : false);
 const podeLer = (perfil, modulo) => pode(perfil, modulo) || (PERM_LEITURA[perfil] && PERM_LEITURA[perfil].has(modulo));
 const adminsAtivos = async () => Number((await Q.get("SELECT COUNT(*) c FROM g_usuarios WHERE perfil='admin' AND ativo=1")).c);
@@ -1265,6 +1281,7 @@ async function rotaApi(req, res, p) {
       try {
         await Q.run("INSERT INTO g_usuarios(nome,email,senha_hash,perfil,ativo,profissional_id,criado) VALUES(?,?,?,?,?,?,?)", nome, email, hashSenha(b.senha), perfil, b.ativo === undefined ? 1 : (Number(b.ativo) ? 1 : 0), profId, agora());
       } catch (e) { return json(res, 400, { error: /UNIQUE/.test(e.message) ? "Já existe um usuário com esse login." : "Erro ao criar usuário." }); }
+      equipeMudou("usuário criado");
       return json(res, 200, { ok: true });
     }
     if (req.method === "PUT" && id) {
@@ -1286,6 +1303,7 @@ async function rotaApi(req, res, p) {
       if (sets.length) {
         try { await Q.run(`UPDATE g_usuarios SET ${sets.join(",")} WHERE id=?`, ...args, id); }
         catch (e) { return json(res, 400, { error: /UNIQUE/.test(e.message) ? "Já existe um usuário com esse login." : "Erro ao salvar." }); }
+        equipeMudou("usuário editado");
       }
       return json(res, 200, { ok: true });
     }
@@ -1294,6 +1312,7 @@ async function rotaApi(req, res, p) {
       const alvo = await Q.get("SELECT perfil,ativo FROM g_usuarios WHERE id=?", id);
       if (alvo && alvo.perfil === "admin" && alvo.ativo && (await adminsAtivos()) <= 1) return json(res, 400, { error: "Não é possível excluir o único administrador." });
       await Q.run("DELETE FROM g_usuarios WHERE id=?", id);
+      equipeMudou("usuário excluído");
       return json(res, 200, { ok: true });
     }
   }
@@ -1591,6 +1610,7 @@ async function rotaApi(req, res, p) {
     const u = await Q.get("SELECT id FROM g_usuarios WHERE profissional_id=?", id);
     if (u) {
       await Q.run("UPDATE g_usuarios SET ativo=? WHERE id=?", bloquear ? 0 : 1, u.id);
+      equipeMudou(bloquear ? "profissional bloqueado" : "profissional liberado");
       // sessão aberta continuaria valendo até expirar: encerra agora
       if (bloquear) for (const [k, v] of sessoes) if (v.userId === u.id) sessoes.delete(k);
     }
@@ -2090,5 +2110,5 @@ async function importarServicos(rows) {
 }
 
 module.exports = { handleRestrito, handleExterno, iniciarRestrito, sessao, SISTEMA_VERSION, CAMPOS_PROTEGIDOS,
-  registrarEncerrarPainel, auditar,
+  registrarEncerrarPainel, auditar, aoMudarEquipe,
   listarProjetos, contarProjetos, importarProjetos, listarServicos, contarServicos, importarServicos };

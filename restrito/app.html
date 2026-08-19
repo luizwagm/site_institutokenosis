@@ -151,6 +151,10 @@
     .freq-cel{height:2.1rem}
     .freq-x{border:0;background:none;cursor:pointer;color:#b04a3a;font-weight:700;padding:.2rem .45rem;border-radius:6px}
     .freq-x:hover{background:#fbeae6}
+    .freq-sub{margin:1.4rem 0 .6rem;color:var(--navy,#253282);font-size:1.02rem}
+    .freq-linha{cursor:pointer}
+    .freq-linha:hover td{background:#f2f7fd}
+    .freq-linha.on td{background:#eaf3fb;font-weight:600}
     .filtro-chip button{border:0;background:#2a5bbd;color:#fff;width:18px;height:18px;border-radius:50%;font-size:.7rem;line-height:1;cursor:pointer}
     .modal-bg{position:fixed;inset:0;background:rgba(20,28,60,.45);display:grid;place-items:start center;padding:2rem 1rem;overflow:auto;z-index:40}
     .modal{width:min(760px,96vw);background:#fff;border-radius:16px;padding:1.4rem 1.5rem;box-shadow:0 30px 70px rgba(20,30,80,.3)}
@@ -635,6 +639,17 @@
         </table>
       </div>
       <p class="ajuda" id="freq-status"></p>
+
+      <!-- As folhas já registradas. Clicar numa linha abre a folha em cima,
+           para conferir ou atualizar — é a mesma tela, no mesmo lugar. -->
+      <h2 class="freq-sub">Folhas registradas</h2>
+      <div class="card" style="padding:0;overflow:auto">
+        <table>
+          <thead><tr><th>Mês</th><th>Turma</th><th>Aulas</th><th>Participantes</th><th></th></tr></thead>
+          <tbody id="freq-lista"></tbody>
+        </table>
+      </div>
+      <div id="freq-paginacao" class="paginacao"></div>
     </section>
 
     <!-- ====================================================================
@@ -1814,6 +1829,10 @@ function barraPaginacao(alvo, chave, info){
 }
 function repintarPagina(chave){
   if(chave === "relpac") return pintarRelpacTabela();
+  if(chave === "freq") return pintarListaFolhas();
+  /* Faltava: trocar de página nos Arquivados repintava a tabela de módulo
+     (que nem está na tela) e a lista ficava parada na página 1. */
+  if(chave === "arquivados") return carregarArquivados();
   return MOD === "atendimentos" ? pintarAtendimentos() : renderTabela();
 }
 function mudarTamanhoPagina(chave, valor){
@@ -2875,11 +2894,14 @@ function freqMesesOpcoes(){
 
 async function abrirFrequencia(){
   try{ FREQ_LISTA = await api("frequencias"); }catch{ FREQ_LISTA = []; }
+  montarSeletoresFreq();
+  await carregarFolha();
+}
+function montarSeletoresFreq(){
   const selT=$("#freq-turma"), selM=$("#freq-mes");
   if(!selT.options.length) selT.innerHTML = FREQ_TURMAS.map((t)=>`<option>${t}</option>`).join("");
   const mesAtual = selM.value;
   selM.innerHTML = freqMesesOpcoes().map((m)=>`<option value="${m}"${m===mesAtual?" selected":""}>${freqMesLabel(m)}</option>`).join("");
-  await carregarFolha();
 }
 
 async function carregarFolha(){
@@ -2890,6 +2912,7 @@ async function carregarFolha(){
     : { id:0, turma, mes, datas:[], participantes:[] };
   FREQ_SUJO=false; $("#freq-status").textContent="";
   pintarFrequencia();
+  pintarListaFolhas();      // realça na lista a folha que está aberta
 }
 
 /* Trocar de folha com alteração pendente descartaria o trabalho em silêncio —
@@ -2961,10 +2984,40 @@ async function salvarFrequencia(){
     else { const r=await api("frequencias","POST",corpo); FREQ.id=r.id; }
     FREQ.datas=freqDatas(); FREQ_SUJO=false;
     try{ FREQ_LISTA = await api("frequencias"); }catch{}
-    pintarFrequencia();
+    pintarFrequencia(); pintarListaFolhas();
     $("#freq-status").textContent=`Folha salva — turma ${FREQ.turma}, ${freqMesLabel(FREQ.mes)}.`;
   }catch(e){ $("#freq-status").textContent="Não salvou: "+e.message; }
   btn.disabled=false;
+}
+
+/* ==========================================================================
+   AS FOLHAS REGISTRADAS — lista paginada, do mês mais novo para o mais velho.
+   Clicar numa linha traz a folha para o editor em cima: escolher e abrir são
+   a mesma coisa, pelo mesmo caminho que os selects já usam.
+   ========================================================================== */
+function pintarListaFolhas(){
+  const lista=[...FREQ_LISTA].sort((a,b)=> String(b.mes).localeCompare(String(a.mes)) || String(a.turma).localeCompare(String(b.turma)));
+  const info=fatiar("freq", lista);
+  barraPaginacao("freq-paginacao","freq",info);
+  $("#freq-lista").innerHTML = info.itens.length
+    ? info.itens.map((f)=>{
+        const aulas=freqArr(f.datas).length, gente=freqArr(f.participantes).length;
+        const aberta=FREQ && FREQ.id===f.id;
+        return `<tr class="freq-linha${aberta?" on":""}" onclick="abrirFolhaSalva(${f.id})" title="Abrir esta folha">
+          <td>${escA(freqMesLabel(f.mes))}</td><td>${escA(f.turma)}</td>
+          <td>${aulas}</td><td>${gente}</td>
+          <td style="text-align:right;color:var(--muted,#6b7280);font-size:.8rem">${aberta?"aberta acima":"abrir ›"}</td></tr>`;
+      }).join("")
+    : `<tr><td class="vazio" colspan="5">Nenhuma folha registrada ainda — monte a primeira acima e clique em Salvar.</td></tr>`;
+}
+function abrirFolhaSalva(id){
+  const f=FREQ_LISTA.find((x)=>x.id===id);
+  if(!f) return;
+  if(FREQ_SUJO && !confirm("Há alterações não salvas na folha aberta. Trocar mesmo assim?")) return;
+  montarSeletoresFreq();               // garante o mês da folha no seletor
+  $("#freq-turma").value=f.turma; $("#freq-mes").value=f.mes;
+  carregarFolha();
+  $("#pane-freq").scrollIntoView({ block:"start" });
 }
 
 /* A impressão reproduz a folha de papel: título do projeto com a turma, a
@@ -2975,11 +3028,15 @@ function imprimirFrequencia(){
   const linhas=FREQ.participantes.map(freqPessoa);
   if(!linhas.length){ $("#freq-status").textContent="A folha está vazia — acrescente usuários antes de imprimir."; return; }
   const bordas='border:1px solid #6b7280;padding:.28rem .45rem';
-  const cab=`<tr><th style="${bordas};text-align:left">Nome</th><th style="${bordas}">CPF</th><th style="${bordas}">Nº</th>${dias.map((d)=>`<th style="${bordas};min-width:3.2rem">${d}</th>`).join("")}</tr>`;
-  const corpo=linhas.map((p,i)=>`<tr><td style="${bordas}">${escA(p.nome)}</td><td style="${bordas};white-space:nowrap">${escA(p.cpf||"")}</td><td style="${bordas};text-align:center">${String(i+1).padStart(2,"0")}</td>${`<td style="${bordas};height:1.85rem"></td>`.repeat(dias.length)}</tr>`).join("");
+  /* Colunas travadas como nas outras listagens: os dias dividem uma fatia
+     fixa entre si (larga com poucas aulas, nunca menor que a assinatura),
+     e Nome fica com o que sobra. */
+  const diaW=Math.min(8, Math.max(5, Math.round(46/dias.length)));
+  const cab=`<tr><th style="${bordas};text-align:left">Nome</th><th style="${bordas};width:12%">CPF</th><th style="${bordas};width:4%">Nº</th>${dias.map((d)=>`<th style="${bordas};width:${diaW}%">${d}</th>`).join("")}</tr>`;
+  const corpo=linhas.map((p,i)=>`<tr><td style="${bordas}">${escA(p.nome)}</td><td style="${bordas}">${escA(p.cpf||"")}</td><td style="${bordas};text-align:center">${String(i+1).padStart(2,"0")}</td>${`<td style="${bordas};height:1.85rem"></td>`.repeat(dias.length)}</tr>`).join("");
   abrirImpressao(FREQ_TITULO+" — Turma "+FREQ.turma,
     `<p style="text-align:center;font-weight:700;margin:.2rem 0 .8rem">DATAS — MÊS ${freqMesLabel(FREQ.mes)}</p>
-     <table style="width:100%;border-collapse:collapse;font-size:.82rem">${cab}${corpo}</table>`,
+     <table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:.82rem">${cab}${corpo}</table>`,
     { paisagem:true, subtitulo:`${linhas.length} participante(s) · emitida em ${new Date().toLocaleDateString("pt-BR")}` });
 }
 
@@ -3087,7 +3144,13 @@ function timbreHTML(titulo, corpo, op){
    .texto-rico ul,.texto-rico ol{margin:.3rem 0 .6rem;padding-left:1.4rem}
    .texto-rico li{margin:.12rem 0}
    .texto-rico b,.texto-rico strong{font-weight:700}
-   table.m th{width:auto}
+   /* LISTAGENS (table.m): colunas TRAVADAS, não negociadas linha a linha.
+      Com o layout automático, cada linha puxava a largura — endereço longo
+      espremia as vizinhas e a mesma relação saía com colunas diferentes a
+      cada emissão. Com fixed, vale a largura declarada no cabeçalho (em %,
+      para servir igual em retrato e paisagem); o conteúdo quebra dentro dela. */
+   table.m{table-layout:fixed}
+   table.m th{width:auto;white-space:normal;overflow-wrap:break-word}
    table.m td,table.m th{font-size:.78rem;padding:.3rem .45rem}
    .rod{margin-top:2.2rem;border-top:1px solid #eef1f6;padding-top:.6rem;color:#9aa0ad;font-size:.72rem;display:flex;justify-content:space-between}
   </style></head><body>
@@ -3225,9 +3288,9 @@ function imprimirRelPacientes(){
       <div class="kpi"><b>${ativos}</b><span>Ativos</span></div>
       <div class="kpi"><b>${d.length-ativos}</b><span>Inativos</span></div>
     </div>
-    <table class="m"><tr><th>Usuário</th><th>Endereço completo</th><th style="width:105px">Telefone</th>
-      <th style="width:130px">Projeto</th><th style="width:150px">Serviços</th>
-      <th style="width:140px">Profissional</th><th style="width:66px">Situação</th></tr>`+
+    <table class="m"><tr><th style="width:21%">Usuário</th><th style="width:23%">Endereço completo</th><th style="width:10%">Telefone</th>
+      <th style="width:12%">Projeto</th><th style="width:14%">Serviços</th>
+      <th style="width:13%">Profissional</th><th style="width:7%">Situação</th></tr>`+
     d.map((x)=>`<tr>
       <td>${escA(x.nome)}</td>
       <td>${escA(enderecoCompleto(x)||"—")}</td>
@@ -3276,7 +3339,7 @@ function blocoLancamentos(registros, incluirArquivados){
 function blocoVinculosImpresso(atend){
   if(!atend || !atend.length) return "";
   return `<div class="sec">Agendamentos vinculados (${atend.length})</div>
-    <table class="d m"><tr><th>Data</th><th>Hora</th><th>Serviços</th><th>Profissional</th><th>Situação</th></tr>`+
+    <table class="d m"><tr><th style="width:14%">Data</th><th style="width:9%">Hora</th><th style="width:38%">Serviços</th><th style="width:26%">Profissional</th><th style="width:13%">Situação</th></tr>`+
     atend.map((a)=>`<tr><td>${escA(dataBR(a.data))}</td><td>${escA(a.hora||"")}</td>
       <td>${escA(servicosTexto(a.especialidade))}</td><td>${escA(a.profissional_nome||"—")}</td>
       <td>${escA(a.status||"—")}</td></tr>`).join("")+`</table>`;
@@ -3568,5 +3631,35 @@ async function trocarSenha(){
 (async()=>{ try{ const me=await api("me"); iniciarApp(me); }
   catch{ $("#login").hidden=false; $("#lg-user").focus(); } })();
 </script>
+
+<!-- ==========================================================================
+     LA CHAT — módulo instalado, carregado por último (receita do BemEstar)
+
+     O botão 💬 flutuante no canto inferior direito, com o contador de não
+     lidas; clicando, o chat abre em gaveta por cima da tela.
+
+     `defer` e no fim do documento: o chat é conveniência, e não pode atrasar
+     a agenda nem o prontuário, que é o trabalho de verdade desta tela.
+
+     QUEM ENTRA É QUEM JÁ ESTÁ LOGADO no /restrito — o `usuario()` do conector,
+     no server.js, lê a MESMA sessão. Não há segundo login: quem está aqui já
+     está no chat, e quem não está não vê botão nenhum (o script carrega,
+     pede o passe, recebe 401 e some).
+
+     O caminho é `/restrito/chat`, e não `/chat`: o cookie da gestão tem
+     `Path=/restrito`, e fora dali o navegador não o envia — o chat pediria o
+     passe e levaria 401. Ver o comentário do conector no server.js.
+
+     Atualizar o chat NÃO mexe neste arquivo: o cliente vem do serviço do chat.
+     O que se atualiza é o `lachat.js` da raiz.
+     ========================================================================== -->
+<script src="/restrito/chat/cliente.js" defer data-auto data-modo="drawer"
+        data-base="/restrito/chat"></script>
+<style>
+  /* As cores do chat seguem a identidade do Instituto — o celeste do logo e o
+     raio de canto do resto do sistema. É o gancho que o próprio módulo
+     documenta, e por isso não encosta no código dele. */
+  la-chat { --chat-primaria: #1EA1E4; --chat-raio: 12px; }
+</style>
 </body>
 </html>

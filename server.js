@@ -14,7 +14,53 @@ carregarAmbiente(__dirname);
 const { handleRestrito, handleExterno, iniciarRestrito,
         sessao: sessaoRestrito, auditar: auditarRestrito, registrarEncerrarPainel,
         listarProjetos, contarProjetos, importarProjetos,
-        listarServicos, contarServicos, importarServicos } = require("./restrito");
+        listarServicos, contarServicos, importarServicos, aoMudarEquipe } = require("./restrito");
+
+/* ==========================================================================
+   LA CHAT — módulo instalado, não biblioteca copiada (mesma receita do
+   BemEstarClinic). `lachat.js` é o conector do projeto LA-Chat, copiado para
+   cá inteiro: não lê o nosso banco, não grava arquivo, não abre porta — só
+   repassa `/restrito/chat/*` para o serviço do chat e emite o PASSE que diz
+   quem está logado. ATUALIZAR o chat é substituir o lachat.js.
+
+   POR QUE A SESSÃO DO /restrito, e não a do /admin: o chat é da EQUIPE do
+   Instituto (administração, secretaria, profissionais), que é exatamente quem
+   tem conta no sistema de gestão. O /admin é o painel do SITE, com uma senha
+   só, compartilhada — ali não há "quem", e um chat sem quem não é chat.
+   Visitante do site e associado no /externo recebem `null` daqui, e para eles
+   o chat simplesmente não existe.
+
+   SOB /restrito por causa do COOKIE: a sessão da gestão tem `Path=/restrito`,
+   e fora desse caminho o navegador não a envia — o passe responderia 401. */
+const conectorChat = require("./lachat");
+const CARGO_POR_PERFIL = {
+  admin: "Administração", secretaria: "Secretaria", profissional: "Profissional",
+};
+const chat = conectorChat({
+  url: process.env.CHAT_URL || "http://127.0.0.1:5197",
+  segredo: process.env.CHAT_SEGREDO_PASSE,
+  contexto: "kenosis",              // separa as conversas do Instituto das dos outros sites
+  prefixo: "restrito/chat",
+  usuario(req) {
+    /* SÍNCRONO por contrato — o conector não espera Promise. Só o que a
+       sessão em memória já carrega entra aqui. */
+    const s = sessaoRestrito(req);
+    if (!s || !s.userId) return null;
+    return {
+      id: s.userId,
+      /* QUEM A PESSOA É, e não que conta ela usa: conta é descartável
+         (apagar e recriar o login de um profissional geraria gente nova no
+         chat e partiria a conversa em duas — aconteceu no BemEstar). O
+         `profissional_id` sobrevive à troca de conta; quem não tem vínculo
+         (secretaria, administração) fica pela própria conta. PRECISA SER A
+         MESMA FÓRMULA do elenco, mais abaixo. */
+      identidade: s.profissionalId ? `prof-${s.profissionalId}` : `conta-${s.userId}`,
+      nome: s.nome,
+      cargo: CARGO_POR_PERFIL[s.perfil] || "Equipe",
+      papel: s.perfil === "admin" ? "admin" : "membro",
+    };
+  },
+});
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
@@ -1778,6 +1824,11 @@ const servidor = http.createServer(async (req, res) => {
   if (req.headers["x-forwarded-proto"] === "https")
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
 
+  /* O chat vem ANTES de tudo do /restrito: ele não depende do PostgreSQL
+     (a sessão vive em memória e o resto é repasse), então continua de pé
+     mesmo com o banco da gestão fora do ar. */
+  if (chat.rota(req, res)) return;
+
   // Área restrita (sistema de gestão): atendida por módulo à parte, antes de
   // qualquer roteamento do site. Se ele tratou, encerra aqui.
   /* Se o banco da gestão não inicializou, o /restrito e o /externo respondem
@@ -2159,6 +2210,71 @@ async function ligarGestao() {
   await iniciarRestrito();
   await migrarParaAGestao();     // migração única de projetos e serviços
   ERRO_GESTAO = null;
+  /* Com a gestão de pé, o chat já pode saber quem é a equipe. Sem `await`: a
+     sincronização é conveniência, e o sistema não espera por ela. */
+  sincronizarElencoDoChat("boot");
+  ligarElencoContinuo();
+}
+
+/* ==========================================================================
+   QUEM É A EQUIPE, para o chat (mesma receita do BemEstarClinic)
+
+   O chat, sozinho, só conhece quem JÁ ENTROU nele — a primeira pessoa a abrir
+   encontraria "Ninguém por aqui ainda". Mandar o elenco resolve: roda no boot,
+   a cada mudança de usuário (aviso da gestão) e de 5 em 5 minutos (rede de
+   segurança para chat reiniciado ou fora do ar na hora do cadastro).
+
+   Só quem está ATIVO entra (`ativo = 1`): desativado não faz login, e listá-lo
+   convidaria alguém a escrever para quem nunca vai ler. NUNCA DERRUBA NADA:
+   falha em silêncio — o chat é conveniência, a gestão é o trabalho.
+   ========================================================================== */
+let elencoContinuoLigado = false;
+function ligarElencoContinuo() {
+  if (elencoContinuoLigado || !chat.ligado) return;
+  elencoContinuoLigado = true;
+  if (typeof aoMudarEquipe === "function") aoMudarEquipe((motivo) => agendarElencoDoChat(motivo));
+  const relogio = setInterval(() => sincronizarElencoDoChat("periódico"), 5 * 60_000);
+  if (relogio.unref) relogio.unref();
+}
+
+async function sincronizarElencoDoChat(motivo = "boot") {
+  if (!chat.ligado || typeof chat.sincronizarElenco !== "function") return;
+  try {
+    const equipe = await Q.all(
+      "SELECT id, nome, perfil, profissional_id FROM g_usuarios WHERE ativo = 1 ORDER BY nome");
+    if (!equipe.length) return;
+    const r = await chat.sincronizarElenco(equipe.map((u) => ({
+      id: u.id,
+      /* A MESMA fórmula do `usuario()` do conector, de propósito: se as duas
+         divergirem, o elenco aponta a pessoa para um lado e o login para
+         outro, e o chat duplica gente. */
+      identidade: u.profissional_id ? `prof-${u.profissional_id}` : `conta-${u.id}`,
+      nome: u.nome,
+      /* O e-mail do login NÃO vai: nestes cadastros ele é um apelido
+         ("admin"), não um endereço — no chat viraria contato falso. */
+      cargo: CARGO_POR_PERFIL[u.perfil] || "Equipe",
+      papel: u.perfil === "admin" ? "admin" : "membro",
+    })));
+    if (r && r.ok && (motivo === "boot" || r.mudou)) {
+      console.log(`  · LA Chat: ${r.sincronizados} pessoa(s) da equipe no chat` +
+        (r.desativados ? `, ${r.desativados} desativada(s)` : "") +
+        (motivo === "boot" ? "." : ` (${motivo}).`));
+    } else if (r && !r.ok && r.motivo && motivo === "boot") {
+      console.log(`  · LA Chat: elenco não sincronizado (${r.motivo}).`);
+    }
+  } catch (e) {
+    console.warn("  ⚠ LA Chat: falha ao sincronizar o elenco —", e.message);
+  }
+}
+
+/* Debounce de 2 s no aviso: salvar um usuário às vezes escreve duas vezes
+   (g_usuarios + profissionais), e não faz sentido mandar o elenco inteiro
+   duas vezes no mesmo segundo. */
+let elencoAgendado = null;
+function agendarElencoDoChat(motivo) {
+  if (elencoAgendado) clearTimeout(elencoAgendado);
+  elencoAgendado = setTimeout(() => { elencoAgendado = null; sincronizarElencoDoChat(motivo); }, 2000);
+  if (elencoAgendado.unref) elencoAgendado.unref();
 }
 
 /* true se a gestão está no ar — religando antes, se for a hora de tentar. */
@@ -2212,6 +2328,11 @@ async function gestaoNoAr() {
     console.error("    religa sozinho no primeiro acesso ao /restrito.\n");
   }
 })();
+
+/* O WebSocket do chat chega pelo evento `upgrade`, que NÃO passa pelo handler
+   acima nem por `chat.rota()`. Sem esta linha o chat carrega, autentica e
+   nunca recebe mensagem em tempo real — sem erro nenhum aparecendo. */
+chat.conectarUpgrade(servidor);
 
 servidor.listen(PORT, process.env.HOST || "127.0.0.1", async () => {
   console.log(`\n  Instituto Kenósis — site + gerenciador v${APP_VERSION}`);
