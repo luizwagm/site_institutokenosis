@@ -626,7 +626,14 @@
           <div><label>Turma</label><select id="freq-turma" onchange="trocarFolha()"></select></div>
           <div><label>Mês</label><select id="freq-mes" onchange="trocarFolha()"></select></div>
           <div class="freq-add-wrap"><label>Adicionar usuário</label>
-            <select id="freq-add" onchange="addNaFolha(this.value)"></select></div>
+            <!-- combobox com busca (o mesmo cbx da agenda): digitar filtra,
+                 escolher acrescenta a linha na hora -->
+            <div class="cbx" data-cbx data-tab="pacientes" data-valor="id" data-id="freq-add">
+              <input type="text" id="freq-add-txt" class="cbx-inp" autocomplete="off" placeholder="Digite para buscar…"
+                oninput="cbxFiltrar('freq-add')" onfocus="cbxFiltrar('freq-add')" onkeydown="cbxTecla(event,'freq-add')" onblur="cbxBlur('freq-add')">
+              <input type="hidden" id="freq-add" onchange="addNaFolha(this.value)">
+              <div class="cbx-list" id="freq-add-list" hidden></div>
+            </div></div>
         </div>
         <p class="ajuda" style="margin:.7rem 0 0">Digite os <b>dias do mês</b> das aulas nos cabeçalhos das colunas
           (deixe em branco as que não usar). As células ficam vazias de propósito — são as assinaturas, no papel.
@@ -2880,12 +2887,12 @@ let FREQ_SUJO = false;     // alteração ainda não salva
 const freqArr = (v)=>{ try{ const a=JSON.parse(v||"[]"); return Array.isArray(a)?a:[]; }catch{ return []; } };
 const freqMesLabel = (ym)=>{ const [a,m]=String(ym).split("-"); return (MESES_PT[Number(m)-1]||"").toUpperCase()+"/"+a; };
 
-/* O mês corrente e os 6 seguintes, sempre — mais os meses de folhas já
+/* O mês corrente e os 16 seguintes, sempre — mais os meses de folhas já
    salvas: sem isso, virado o mês, a folha antiga sumiria do seletor e viraria
    linha órfã no banco. */
 function freqMesesOpcoes(){
   const ops=[]; const hoje=new Date();
-  for(let i=0;i<=6;i++){
+  for(let i=0;i<=16;i++){
     const x=new Date(hoje.getFullYear(), hoje.getMonth()+i, 1);
     ops.push(`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}`);
   }
@@ -2951,13 +2958,8 @@ function pintarFrequencia(){
     ? linhas.map((p,i)=>`<tr><td>${escA(p.nome)}</td><td>${escA(p.cpf||"—")}</td><td class="freq-num">${String(i+1).padStart(2,"0")}</td>${'<td class="freq-cel"></td>'.repeat(FREQ_COLS)}<td><button class="freq-x" title="Tirar da folha" onclick="tirarDaFolha('${p.id}')">✕</button></td></tr>`).join("")
     : `<tr><td class="vazio" colspan="${FREQ_COLS+4}">Nenhum usuário na folha — escolha em "Adicionar usuário".</td></tr>`;
 
-  // no seletor, só quem está ATIVO e ainda não está na folha
-  const ja=new Set(FREQ.participantes.map(String));
-  const ops=(CACHE.pacientes||[])
-    .filter((p)=>!ja.has(String(p.id)) && estaAtivo(p))
-    .sort((a,b)=>String(a.nome).localeCompare(String(b.nome),"pt-BR"))
-    .map((p)=>`<option value="${p.id}">${escA(p.nome)}</option>`).join("");
-  $("#freq-add").innerHTML = `<option value="">Escolher usuário…</option>`+ops;
+  // o seletor agora é o combobox genérico (cbx) — lê o CACHE sozinho e já
+  // filtra inativos; quem já está na folha é barrado no addNaFolha
 }
 
 function mudarDataFreq(i, campo){
@@ -2967,6 +2969,12 @@ function mudarDataFreq(i, campo){
 }
 function addNaFolha(id){
   if(!id) return;
+  /* Limpa o combobox ANTES de repintar: o blur dele valida o texto 160ms
+     depois da escolha e redisparia o change com o mesmo id — vazio, o
+     redisparo morre sozinho. */
+  const hid=$("#freq-add"), txt=$("#freq-add-txt");
+  if(hid) hid.value=""; if(txt) txt.value="";
+  if(FREQ.participantes.some((x)=>String(x)===String(id))) return;  // já está na folha
   FREQ.participantes.push(Number(id)); FREQ_SUJO=true;
   pintarFrequencia();
 }
@@ -3037,7 +3045,11 @@ function imprimirFrequencia(){
   const diaW=4.5, cpfW=12, numW=4;
   const nomeW=(100 - cpfW - numW - diaW*dias.length).toFixed(1);
   const cab=`<tr><th style="${bordas};text-align:left;width:${nomeW}%">Nome</th><th style="${bordas};width:${cpfW}%">CPF</th><th style="${bordas};width:${numW}%">Nº</th>${dias.map((d)=>`<th style="${bordas};width:${diaW}%">${d}</th>`).join("")}</tr>`;
-  const corpo=linhas.map((p,i)=>`<tr><td style="${bordas}">${escA(p.nome)}</td><td style="${bordas};white-space:nowrap">${escA(p.cpf||"")}</td><td style="${bordas};text-align:center">${String(i+1).padStart(2,"0")}</td>${`<td style="${bordas};height:1.85rem"></td>`.repeat(dias.length)}</tr>`).join("");
+  /* Linhas mais baixas que as do cabeçalho, de propósito: a meta é 20 nomes
+     por folha em paisagem. ~23px por linha (texto + este padding) fecha a
+     conta com o timbre e o título da primeira página. */
+  const celula='border:1px solid #6b7280;padding:.12rem .45rem';
+  const corpo=linhas.map((p,i)=>`<tr><td style="${celula};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escA(p.nome)}</td><td style="${celula};white-space:nowrap">${escA(p.cpf||"")}</td><td style="${celula};text-align:center">${String(i+1).padStart(2,"0")}</td>${`<td style="${celula};height:1.15rem"></td>`.repeat(dias.length)}</tr>`).join("");
   abrirImpressao(FREQ_TITULO+" — Turma "+FREQ.turma,
     `<p style="text-align:center;font-weight:700;margin:.2rem 0 .8rem">DATAS — MÊS ${freqMesLabel(FREQ.mes)}</p>
      <table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:.82rem">${cab}${corpo}</table>`,
