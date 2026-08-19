@@ -24,7 +24,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.22.0";
+const SISTEMA_VERSION = "1.23.0";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -1269,8 +1269,8 @@ async function rotaApi(req, res, p) {
     const idm = p.match(/^usuarios\/(\d+)$/);
     const id = idm ? idm[1] : null;
     // nunca devolvemos o hash da senha
-    if (req.method === "GET" && !id) return json(res, 200, await Q.all("SELECT id,nome,email,perfil,ativo,profissional_id FROM g_usuarios ORDER BY id"));
-    if (req.method === "GET" && id) return json(res, 200, await Q.get("SELECT id,nome,email,perfil,ativo,profissional_id FROM g_usuarios WHERE id=?", id) || {});
+    if (req.method === "GET" && !id) return json(res, 200, await Q.all("SELECT id,nome,email,perfil,ativo,profissional_id,foto FROM g_usuarios ORDER BY id"));
+    if (req.method === "GET" && id) return json(res, 200, await Q.get("SELECT id,nome,email,perfil,ativo,profissional_id,foto FROM g_usuarios WHERE id=?", id) || {});
     if (req.method === "POST" && !id) {
       const b = await readBody(req);
       const nome = String(b.nome || "").trim(), email = String(b.email || "").trim(), perfil = String(b.perfil || "secretaria").trim();
@@ -1279,7 +1279,7 @@ async function rotaApi(req, res, p) {
       if (String(b.senha || "").length < 8) return json(res, 400, { error: "A senha precisa de ao menos 8 caracteres." });
       const profId = perfil === "profissional" && b.profissional_id ? Number(b.profissional_id) : null;
       try {
-        await Q.run("INSERT INTO g_usuarios(nome,email,senha_hash,perfil,ativo,profissional_id,criado) VALUES(?,?,?,?,?,?,?)", nome, email, hashSenha(b.senha), perfil, b.ativo === undefined ? 1 : (Number(b.ativo) ? 1 : 0), profId, agora());
+        await Q.run("INSERT INTO g_usuarios(nome,email,senha_hash,perfil,ativo,profissional_id,foto,criado) VALUES(?,?,?,?,?,?,?,?)", nome, email, hashSenha(b.senha), perfil, b.ativo === undefined ? 1 : (Number(b.ativo) ? 1 : 0), profId, String(b.foto || ""), agora());
       } catch (e) { return json(res, 400, { error: /UNIQUE/.test(e.message) ? "Já existe um usuário com esse login." : "Erro ao criar usuário." }); }
       equipeMudou("usuário criado");
       return json(res, 200, { ok: true });
@@ -1299,6 +1299,9 @@ async function rotaApi(req, res, p) {
       if (b.perfil !== undefined) { if (!PERFIS.includes(b.perfil)) return json(res, 400, { error: "Perfil inválido." }); sets.push("perfil=?"); args.push(b.perfil); }
       if (b.ativo !== undefined) { sets.push("ativo=?"); args.push(Number(b.ativo) ? 1 : 0); }
       if (b.profissional_id !== undefined) { sets.push("profissional_id=?"); args.push(b.profissional_id ? Number(b.profissional_id) : null); }
+      /* A foto é um CAMINHO do upload privado (/restrito/arquivos/…), nunca o
+         arquivo em si — e vazia limpa o retrato. */
+      if (b.foto !== undefined) { sets.push("foto=?"); args.push(String(b.foto || "")); }
       if (b.senha) { if (String(b.senha).length < 8) return json(res, 400, { error: "A senha precisa de ao menos 8 caracteres." }); sets.push("senha_hash=?"); args.push(hashSenha(b.senha)); }
       if (sets.length) {
         try { await Q.run(`UPDATE g_usuarios SET ${sets.join(",")} WHERE id=?`, ...args, id); }

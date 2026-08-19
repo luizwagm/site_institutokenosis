@@ -2241,7 +2241,7 @@ async function sincronizarElencoDoChat(motivo = "boot") {
   if (!chat.ligado || typeof chat.sincronizarElenco !== "function") return;
   try {
     const equipe = await Q.all(
-      "SELECT id, nome, perfil, profissional_id FROM g_usuarios WHERE ativo = 1 ORDER BY nome");
+      "SELECT id, nome, perfil, profissional_id, foto FROM g_usuarios WHERE ativo = 1 ORDER BY nome");
     if (!equipe.length) return;
     const r = await chat.sincronizarElenco(equipe.map((u) => ({
       id: u.id,
@@ -2254,6 +2254,12 @@ async function sincronizarElencoDoChat(motivo = "boot") {
          ("admin"), não um endereço — no chat viraria contato falso. */
       cargo: CARGO_POR_PERFIL[u.perfil] || "Equipe",
       papel: u.perfil === "admin" ? "admin" : "membro",
+      /* A foto vai como CAMINHO RELATIVO (/restrito/arquivos/…): resolve na
+         origem da página, o navegador de quem está no sistema leva o cookie
+         do /restrito e a imagem chega autenticada — sem rota pública e sem
+         token na URL. URL absoluta quebraria no localhost e contaria a um
+         terceiro quem está online, se algum dia apontasse para fora. */
+      avatar: u.foto || "",
     })));
     if (r && r.ok && (motivo === "boot" || r.mudou)) {
       console.log(`  · LA Chat: ${r.sincronizados} pessoa(s) da equipe no chat` +

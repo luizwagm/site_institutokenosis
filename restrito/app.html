@@ -1031,6 +1031,7 @@ const MODULOS = {
   usuarios: { titulo:"Usuários do Sistema", novo:"Novo usuário",
     colunas:[["nome","Nome"],["email","Login"],["perfil","Perfil","perfil"],["ativo","Ativo","bool"]],
     campos:[
+      ["foto","Foto do usuário (aparece no chat da equipe)","foto",{full:1}],
       ["nome","Nome completo","text",{req:1}],
       ["email","Usuário / login","text",{req:1}],
       ["senha","Senha (mín. 8 — em branco mantém a atual)","password"],
