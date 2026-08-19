@@ -603,10 +603,11 @@
     <!-- ====================================================================
          FREQUÊNCIA — a folha de assinaturas da aula de hidroginástica
 
-         Uma folha por TURMA + MÊS, montada aqui e impressa para as
-         assinaturas no papel — as células dos dias saem em branco de
-         propósito. A folha guarda só REFERÊNCIAS ao cadastro (ids), então a
-         impressão traz sempre o nome e o CPF atuais da pessoa.
+         Cada folha tem turma e mês como CAMPOS (pode haver várias da mesma
+         turma no mesmo mês) e é impressa para as assinaturas no papel — as
+         células dos dias saem em branco de propósito. A folha guarda só
+         REFERÊNCIAS ao cadastro (ids), então a impressão traz sempre o nome
+         e o CPF atuais da pessoa.
 
          Os cabeçalhos das colunas de dia são CAMPOS: a equipe digita os dias
          das aulas do mês (duas por semana — 8 a 10 colunas conforme o mês) e
@@ -616,6 +617,7 @@
       <div class="topbar">
         <h1>Frequência</h1>
         <div style="display:flex;gap:.5rem">
+          <button class="btn btn-ghost btn-sm" onclick="novaFolha()">＋ Nova folha</button>
           <button class="btn btn-ghost btn-sm" onclick="imprimirFrequencia()">🖨 Imprimir folha</button>
           <button class="btn btn-navy btn-sm" id="freq-salvar" onclick="salvarFrequencia()">Salvar</button>
         </div>
@@ -2873,8 +2875,10 @@ async function excluirReg(id){
 
    A tela é a própria folha: os cabeçalhos das colunas de dia são campos, as
    células ficam em branco (assinatura é no papel) e cada usuário escolhido no
-   seletor vira uma linha. Trocar turma ou mês carrega a folha daquele par, se
-   existir; senão começa uma em branco. Nada é gravado sem o Salvar.
+   seletor vira uma linha. Turma e mês são CAMPOS da folha — pode haver várias
+   da mesma turma no mesmo mês; quem identifica é o id. Salvar FECHA a folha
+   (editor em branco para a próxima) e folha existente se abre pela lista.
+   Nada é gravado sem o Salvar.
    ========================================================================== */
 const FREQ_TITULO = 'Projeto Socioassistencial "Movimento para a Vida Ativa" — Frequência Aula de Hidroginástica';
 /* As turmas são de hora em hora, das 07h às 20h — 13 opções fixas. */
@@ -2903,7 +2907,7 @@ function freqMesesOpcoes(){
 async function abrirFrequencia(){
   try{ FREQ_LISTA = await api("frequencias"); }catch{ FREQ_LISTA = []; }
   montarSeletoresFreq();
-  await carregarFolha();
+  novaFolha(true);
 }
 function montarSeletoresFreq(){
   const selT=$("#freq-turma"), selM=$("#freq-mes");
@@ -2912,24 +2916,25 @@ function montarSeletoresFreq(){
   selM.innerHTML = freqMesesOpcoes().map((m)=>`<option value="${m}"${m===mesAtual?" selected":""}>${freqMesLabel(m)}</option>`).join("");
 }
 
-async function carregarFolha(){
-  const turma=$("#freq-turma").value, mes=$("#freq-mes").value;
-  const salvo = FREQ_LISTA.find((f)=>f.turma===turma && f.mes===mes);
-  FREQ = salvo
-    ? { id:salvo.id, turma, mes, datas:freqArr(salvo.datas), participantes:freqArr(salvo.participantes) }
-    : { id:0, turma, mes, datas:[], participantes:[] };
+/* TURMA + MÊS NÃO IDENTIFICAM A FOLHA (decisão do cliente): pode haver mais
+   de uma folha da mesma turma no mesmo mês. Quem identifica é o id — folha
+   nova nasce em branco aqui, e folha existente se abre pela LISTA. */
+const folhaTemConteudo=()=> !!FREQ && (FREQ.participantes.length>0 || freqDatas().length>0);
+
+function novaFolha(semPergunta){
+  if(semPergunta!==true && FREQ_SUJO && folhaTemConteudo() &&
+     !confirm("Há alterações não salvas na folha aberta. Começar outra mesmo assim?")) return;
+  FREQ={ id:0, turma:$("#freq-turma").value, mes:$("#freq-mes").value, datas:[], participantes:[] };
   FREQ_SUJO=false; $("#freq-status").textContent="";
   pintarFrequencia();
-  pintarListaFolhas();      // realça na lista a folha que está aberta
+  pintarListaFolhas();
 }
 
-/* Trocar de folha com alteração pendente descartaria o trabalho em silêncio —
-   por isso a pergunta, e os selects voltam ao que eram se a resposta for não. */
+/* Trocar turma ou mês só muda o CAMPO da folha aberta — nada é carregado. */
 function trocarFolha(){
-  if(FREQ_SUJO && !confirm("Há alterações não salvas nesta folha. Trocar mesmo assim?")){
-    $("#freq-turma").value=FREQ.turma; $("#freq-mes").value=FREQ.mes; return;
-  }
-  carregarFolha();
+  if(!FREQ) return;
+  FREQ.turma=$("#freq-turma").value; FREQ.mes=$("#freq-mes").value;
+  if(FREQ.id || folhaTemConteudo()) FREQ_SUJO=true;
 }
 
 /* Dias normalizados para gravar e imprimir: só dígitos, 1–31, sem repetido,
@@ -2990,11 +2995,14 @@ async function salvarFrequencia(){
   btn.disabled=true;
   try{
     if(FREQ.id) await api("frequencias/"+FREQ.id,"PUT",corpo);
-    else { const r=await api("frequencias","POST",corpo); FREQ.id=r.id; }
-    FREQ.datas=freqDatas(); FREQ_SUJO=false;
+    else await api("frequencias","POST",corpo);
+    const salva={ turma:FREQ.turma, mes:FREQ.mes };
     try{ FREQ_LISTA = await api("frequencias"); }catch{}
-    pintarFrequencia(); pintarListaFolhas();
-    $("#freq-status").textContent=`Folha salva — turma ${FREQ.turma}, ${freqMesLabel(FREQ.mes)}.`;
+    /* Salvar FECHA a folha: o editor volta em branco, pronto para a próxima
+       turma, e a que acabou de ser salva aparece na lista logo abaixo. */
+    montarSeletoresFreq();
+    novaFolha(true);
+    $("#freq-status").textContent=`Folha salva — turma ${salva.turma}, ${freqMesLabel(salva.mes)}. Ela está na lista abaixo; o editor está pronto para a próxima.`;
   }catch(e){ $("#freq-status").textContent="Não salvou: "+e.message; }
   btn.disabled=false;
 }
@@ -3022,10 +3030,13 @@ function pintarListaFolhas(){
 function abrirFolhaSalva(id){
   const f=FREQ_LISTA.find((x)=>x.id===id);
   if(!f) return;
-  if(FREQ_SUJO && !confirm("Há alterações não salvas na folha aberta. Trocar mesmo assim?")) return;
+  if(FREQ_SUJO && folhaTemConteudo() && !confirm("Há alterações não salvas na folha aberta. Trocar mesmo assim?")) return;
   montarSeletoresFreq();               // garante o mês da folha no seletor
   $("#freq-turma").value=f.turma; $("#freq-mes").value=f.mes;
-  carregarFolha();
+  FREQ={ id:f.id, turma:f.turma, mes:f.mes, datas:freqArr(f.datas), participantes:freqArr(f.participantes) };
+  FREQ_SUJO=false; $("#freq-status").textContent="";
+  pintarFrequencia();
+  pintarListaFolhas();
   $("#pane-freq").scrollIntoView({ block:"start" });
 }
 

@@ -24,7 +24,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.24.0";
+const SISTEMA_VERSION = "1.25.0";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -1764,17 +1764,14 @@ async function rotaApi(req, res, p) {
     }
     if (req.method === "POST" && !id) {
       const b = await readBody(req);
-      /* FREQUÊNCIA: uma folha por turma + mês. O índice único no banco é quem
-         garante; esta checagem existe para o recado ser útil — sem ela a
-         equipe veria um erro seco e abriria chamado. */
+      /* FREQUÊNCIA: pode haver mais de uma folha da mesma turma no mesmo mês
+         (decisão do cliente — o par único saiu na migration 010). Só o básico
+         é conferido: sem turma ou mês a folha não se acha na lista. */
       if (tabela === "frequencias") {
         b.turma = String(b.turma || "").trim();
         b.mes = String(b.mes || "").trim();
         if (!b.turma) return json(res, 400, { error: "Escolha a turma." });
         if (!/^\d{4}-\d{2}$/.test(b.mes)) return json(res, 400, { error: "Escolha o mês." });
-        const ja = await Q.get("SELECT id FROM frequencias WHERE turma=? AND mes=?", b.turma, b.mes);
-        if (ja) return json(res, 409, {
-          error: "Já existe folha desta turma neste mês — a tela carrega a existente ao escolher turma e mês.", id: ja.id });
       }
       if (tabela === "prontuario") {
         b.usuario_id = s.userId;                                            // quem digitou
