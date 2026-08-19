@@ -137,6 +137,20 @@
     .barra.clik{cursor:pointer;border-radius:6px;padding:.1rem .2rem}
     .barra.clik:hover{background:#eef4fb}
     .filtro-chip{display:inline-flex;align-items:center;gap:.5rem;background:#eaf1fb;color:#2a5bbd;font-weight:600;font-size:.85rem;padding:.35rem .8rem;border-radius:999px;margin-bottom:1rem}
+    /* Frequência: a tela é a própria folha — cabeçalho de coluna é campo,
+       célula fica em branco (assinatura é no papel). */
+    .freq-projeto{font-weight:700;color:var(--navy,#253282);margin:0 0 .8rem}
+    .freq-controles{display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end}
+    .freq-controles label{display:block;font-size:.8rem;color:var(--muted,#6b7280);margin-bottom:.25rem}
+    .freq-controles select{font:inherit;padding:.4rem .6rem;border:1.5px solid #cfd8e8;border-radius:8px;background:#fff}
+    .freq-add-wrap select{min-width:16rem}
+    .freq-tab th,.freq-tab td{border-right:1px solid #eef1f7}
+    .freq-tab th:last-child,.freq-tab td:last-child{border-right:0}
+    .freq-dia input{width:3rem;text-align:center;font:inherit;font-weight:700;padding:.25rem .2rem;border:1.5px solid #cfd8e8;border-radius:6px}
+    .freq-num{text-align:center;font-weight:600}
+    .freq-cel{height:2.1rem}
+    .freq-x{border:0;background:none;cursor:pointer;color:#b04a3a;font-weight:700;padding:.2rem .45rem;border-radius:6px}
+    .freq-x:hover{background:#fbeae6}
     .filtro-chip button{border:0;background:#2a5bbd;color:#fff;width:18px;height:18px;border-radius:50%;font-size:.7rem;line-height:1;cursor:pointer}
     .modal-bg{position:fixed;inset:0;background:rgba(20,28,60,.45);display:grid;place-items:start center;padding:2rem 1rem;overflow:auto;z-index:40}
     .modal{width:min(760px,96vw);background:#fff;border-radius:16px;padding:1.4rem 1.5rem;box-shadow:0 30px 70px rgba(20,30,80,.3)}
@@ -439,6 +453,7 @@
       </div>
     </div>
     <button class="navbtn" data-nav="atendimentos">Agendamento</button>
+    <button class="navbtn" data-nav="frequencia">Frequência</button>
     <!-- Prontuário fica no menu principal, fora de Cadastros: não é cadastro, é
          o acompanhamento do atendimento — e é para onde a equipe técnica vai o
          dia inteiro. Enterrá-lo num accordion custa dois cliques por consulta. -->
@@ -579,6 +594,47 @@
       <div class="stat-grid" id="relpac-stats"></div>
       <div class="card" id="relpac-tabela" style="padding:0;overflow:auto"></div>
       <div id="relpac-paginacao" class="paginacao"></div>
+    </section>
+
+    <!-- ====================================================================
+         FREQUÊNCIA — a folha de assinaturas da aula de hidroginástica
+
+         Uma folha por TURMA + MÊS, montada aqui e impressa para as
+         assinaturas no papel — as células dos dias saem em branco de
+         propósito. A folha guarda só REFERÊNCIAS ao cadastro (ids), então a
+         impressão traz sempre o nome e o CPF atuais da pessoa.
+
+         Os cabeçalhos das colunas de dia são CAMPOS: a equipe digita os dias
+         das aulas do mês (duas por semana — 8 a 10 colunas conforme o mês) e
+         deixa em branco as colunas que não usar.
+         ==================================================================== -->
+    <section class="panel" id="pane-freq">
+      <div class="topbar">
+        <h1>Frequência</h1>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-ghost btn-sm" onclick="imprimirFrequencia()">🖨 Imprimir folha</button>
+          <button class="btn btn-navy btn-sm" id="freq-salvar" onclick="salvarFrequencia()">Salvar</button>
+        </div>
+      </div>
+      <div class="card">
+        <p class="freq-projeto">Projeto Socioassistencial "Movimento para a Vida Ativa" — Frequência Aula de Hidroginástica</p>
+        <div class="freq-controles">
+          <div><label>Turma</label><select id="freq-turma" onchange="trocarFolha()"></select></div>
+          <div><label>Mês</label><select id="freq-mes" onchange="trocarFolha()"></select></div>
+          <div class="freq-add-wrap"><label>Adicionar usuário</label>
+            <select id="freq-add" onchange="addNaFolha(this.value)"></select></div>
+        </div>
+        <p class="ajuda" style="margin:.7rem 0 0">Digite os <b>dias do mês</b> das aulas nos cabeçalhos das colunas
+          (deixe em branco as que não usar). As células ficam vazias de propósito — são as assinaturas, no papel.
+          Escolher um usuário no seletor acrescenta a linha na hora; a lista sai em ordem alfabética, numerada.</p>
+      </div>
+      <div class="card" style="padding:0;overflow:auto">
+        <table class="freq-tab">
+          <thead id="freq-thead"></thead>
+          <tbody id="freq-tbody"></tbody>
+        </table>
+      </div>
+      <p class="ajuda" id="freq-status"></p>
     </section>
 
     <!-- ====================================================================
@@ -974,7 +1030,7 @@ const PERFIL_ROTULO = { admin:"Administrador", secretaria:"Secretaria", profissi
    aqui é só para esconder o que não interessa). admin vê tudo. */
 const PERM_CLIENTE = {
   admin: null,
-  secretaria: new Set(["painel","pacientes","associados","profissionais","atendimentos","servicos","projetos","documentos_gestao","beneficios","eventos","relatorios","relatorios_pacientes","conta"]),
+  secretaria: new Set(["painel","pacientes","associados","profissionais","atendimentos","frequencia","servicos","projetos","documentos_gestao","beneficios","eventos","relatorios","relatorios_pacientes","conta"]),
   profissional: new Set(["atendimentos","prontuario","conta"]),   // SOMENTE a sua agenda e os seus prontuários
 };
 function aplicarPermissoes(perfil){
@@ -1565,6 +1621,7 @@ document.querySelectorAll(".navbtn[data-nav]").forEach((b)=>b.addEventListener("
   else if(nav==="auditoria"){ $("#pane-auditoria").classList.add("on"); carregarAuditoria(1); }
   else if(nav==="relatorios"){ $("#pane-relatorios").classList.add("on"); carregarRelatorios(); }
   else if(nav==="relatorios_pacientes"){ $("#pane-relpac").classList.add("on"); carregarRelacaoPacientes(); }
+  else if(nav==="frequencia"){ $("#pane-freq").classList.add("on"); abrirFrequencia(); }
   else { MOD=nav; $("#pane-mod").classList.add("on"); mostrarModulo(); }
   fecharDropdowns(); marcarTriggers();
 }));
@@ -2784,6 +2841,148 @@ async function excluirReg(id){
      · paisagem — só o PADRÃO da folha; a barra continua permitindo trocar;
      · subtitulo — diz de que recorte o papel fala (quantos, qual filtro).
    ========================================================================== */
+/* ==========================================================================
+   FREQUÊNCIA — folha de assinaturas por turma + mês
+
+   A tela é a própria folha: os cabeçalhos das colunas de dia são campos, as
+   células ficam em branco (assinatura é no papel) e cada usuário escolhido no
+   seletor vira uma linha. Trocar turma ou mês carrega a folha daquele par, se
+   existir; senão começa uma em branco. Nada é gravado sem o Salvar.
+   ========================================================================== */
+const FREQ_TITULO = 'Projeto Socioassistencial "Movimento para a Vida Ativa" — Frequência Aula de Hidroginástica';
+/* As turmas são de hora em hora, das 07h às 20h — 13 opções fixas. */
+const FREQ_TURMAS = Array.from({length:13},(_,i)=>`${String(7+i).padStart(2,"0")}h às ${String(8+i).padStart(2,"0")}h`);
+const FREQ_COLS = 10;      // duas aulas por semana: 8 a 10 dias conforme o mês
+let FREQ = null;           // a folha aberta {id, turma, mes, datas[], participantes[]}
+let FREQ_LISTA = [];       // as folhas salvas (para carregar ao trocar os selects)
+let FREQ_SUJO = false;     // alteração ainda não salva
+
+const freqArr = (v)=>{ try{ const a=JSON.parse(v||"[]"); return Array.isArray(a)?a:[]; }catch{ return []; } };
+const freqMesLabel = (ym)=>{ const [a,m]=String(ym).split("-"); return (MESES_PT[Number(m)-1]||"").toUpperCase()+"/"+a; };
+
+/* O mês corrente e os 6 seguintes, sempre — mais os meses de folhas já
+   salvas: sem isso, virado o mês, a folha antiga sumiria do seletor e viraria
+   linha órfã no banco. */
+function freqMesesOpcoes(){
+  const ops=[]; const hoje=new Date();
+  for(let i=0;i<=6;i++){
+    const x=new Date(hoje.getFullYear(), hoje.getMonth()+i, 1);
+    ops.push(`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}`);
+  }
+  for(const f of FREQ_LISTA) if(f.mes && !ops.includes(f.mes)) ops.push(f.mes);
+  return ops.sort();
+}
+
+async function abrirFrequencia(){
+  try{ FREQ_LISTA = await api("frequencias"); }catch{ FREQ_LISTA = []; }
+  const selT=$("#freq-turma"), selM=$("#freq-mes");
+  if(!selT.options.length) selT.innerHTML = FREQ_TURMAS.map((t)=>`<option>${t}</option>`).join("");
+  const mesAtual = selM.value;
+  selM.innerHTML = freqMesesOpcoes().map((m)=>`<option value="${m}"${m===mesAtual?" selected":""}>${freqMesLabel(m)}</option>`).join("");
+  await carregarFolha();
+}
+
+async function carregarFolha(){
+  const turma=$("#freq-turma").value, mes=$("#freq-mes").value;
+  const salvo = FREQ_LISTA.find((f)=>f.turma===turma && f.mes===mes);
+  FREQ = salvo
+    ? { id:salvo.id, turma, mes, datas:freqArr(salvo.datas), participantes:freqArr(salvo.participantes) }
+    : { id:0, turma, mes, datas:[], participantes:[] };
+  FREQ_SUJO=false; $("#freq-status").textContent="";
+  pintarFrequencia();
+}
+
+/* Trocar de folha com alteração pendente descartaria o trabalho em silêncio —
+   por isso a pergunta, e os selects voltam ao que eram se a resposta for não. */
+function trocarFolha(){
+  if(FREQ_SUJO && !confirm("Há alterações não salvas nesta folha. Trocar mesmo assim?")){
+    $("#freq-turma").value=FREQ.turma; $("#freq-mes").value=FREQ.mes; return;
+  }
+  carregarFolha();
+}
+
+/* Dias normalizados para gravar e imprimir: só dígitos, 1–31, sem repetido,
+   em ordem crescente e com dois algarismos — como na folha de papel. */
+const freqDatas = ()=>[...new Set(
+  FREQ.datas.map((d)=>String(d||"").replace(/\D/g,"")).filter((d)=>d && +d>=1 && +d<=31).map((d)=>d.padStart(2,"0"))
+)].sort();
+
+/* A pessoa da linha, mesmo que o cadastro tenha saído do cache (inativado
+   depois de entrar na folha): a linha continua aparecendo, com aviso. */
+const freqPessoa = (id)=> CACHE.pacientes.find((p)=>String(p.id)===String(id)) || { id, nome:"(cadastro não encontrado)", cpf:"" };
+
+function pintarFrequencia(){
+  // ordem alfabética, como na folha de papel — e o Nº acompanha
+  FREQ.participantes = FREQ.participantes
+    .map(freqPessoa)
+    .sort((a,b)=>String(a.nome).localeCompare(String(b.nome),"pt-BR"))
+    .map((p)=>p.id);
+  const dias=[];
+  for(let i=0;i<FREQ_COLS;i++)
+    dias.push(`<th class="freq-dia"><input maxlength="2" inputmode="numeric" value="${escA(FREQ.datas[i]||"")}" placeholder="—" onchange="mudarDataFreq(${i},this)"></th>`);
+  $("#freq-thead").innerHTML = `<tr><th style="text-align:left;min-width:220px">Nome</th><th>CPF</th><th>Nº</th>${dias.join("")}<th></th></tr>`;
+
+  const linhas = FREQ.participantes.map(freqPessoa);
+  $("#freq-tbody").innerHTML = linhas.length
+    ? linhas.map((p,i)=>`<tr><td>${escA(p.nome)}</td><td>${escA(p.cpf||"—")}</td><td class="freq-num">${String(i+1).padStart(2,"0")}</td>${'<td class="freq-cel"></td>'.repeat(FREQ_COLS)}<td><button class="freq-x" title="Tirar da folha" onclick="tirarDaFolha('${p.id}')">✕</button></td></tr>`).join("")
+    : `<tr><td class="vazio" colspan="${FREQ_COLS+4}">Nenhum usuário na folha — escolha em "Adicionar usuário".</td></tr>`;
+
+  // no seletor, só quem está ATIVO e ainda não está na folha
+  const ja=new Set(FREQ.participantes.map(String));
+  const ops=(CACHE.pacientes||[])
+    .filter((p)=>!ja.has(String(p.id)) && estaAtivo(p))
+    .sort((a,b)=>String(a.nome).localeCompare(String(b.nome),"pt-BR"))
+    .map((p)=>`<option value="${p.id}">${escA(p.nome)}</option>`).join("");
+  $("#freq-add").innerHTML = `<option value="">Escolher usuário…</option>`+ops;
+}
+
+function mudarDataFreq(i, campo){
+  const v=String(campo.value).replace(/\D/g,"").slice(0,2);
+  campo.value = (v && +v>=1 && +v<=31) ? v : "";
+  FREQ.datas[i]=campo.value; FREQ_SUJO=true;
+}
+function addNaFolha(id){
+  if(!id) return;
+  FREQ.participantes.push(Number(id)); FREQ_SUJO=true;
+  pintarFrequencia();
+}
+function tirarDaFolha(id){
+  FREQ.participantes = FREQ.participantes.filter((x)=>String(x)!==String(id));
+  FREQ_SUJO=true; pintarFrequencia();
+}
+
+async function salvarFrequencia(){
+  const btn=$("#freq-salvar");
+  const corpo={ turma:FREQ.turma, mes:FREQ.mes,
+    datas:JSON.stringify(freqDatas()), participantes:JSON.stringify(FREQ.participantes) };
+  btn.disabled=true;
+  try{
+    if(FREQ.id) await api("frequencias/"+FREQ.id,"PUT",corpo);
+    else { const r=await api("frequencias","POST",corpo); FREQ.id=r.id; }
+    FREQ.datas=freqDatas(); FREQ_SUJO=false;
+    try{ FREQ_LISTA = await api("frequencias"); }catch{}
+    pintarFrequencia();
+    $("#freq-status").textContent=`Folha salva — turma ${FREQ.turma}, ${freqMesLabel(FREQ.mes)}.`;
+  }catch(e){ $("#freq-status").textContent="Não salvou: "+e.message; }
+  btn.disabled=false;
+}
+
+/* A impressão reproduz a folha de papel: título do projeto com a turma, a
+   linha "DATAS — MÊS …" e a tabela com as células em branco para assinar.
+   Só as colunas de dia PREENCHIDAS saem no papel. Paisagem, com o timbre. */
+function imprimirFrequencia(){
+  const dias=freqDatas();
+  const linhas=FREQ.participantes.map(freqPessoa);
+  if(!linhas.length){ $("#freq-status").textContent="A folha está vazia — acrescente usuários antes de imprimir."; return; }
+  const bordas='border:1px solid #6b7280;padding:.28rem .45rem';
+  const cab=`<tr><th style="${bordas};text-align:left">Nome</th><th style="${bordas}">CPF</th><th style="${bordas}">Nº</th>${dias.map((d)=>`<th style="${bordas};min-width:3.2rem">${d}</th>`).join("")}</tr>`;
+  const corpo=linhas.map((p,i)=>`<tr><td style="${bordas}">${escA(p.nome)}</td><td style="${bordas};white-space:nowrap">${escA(p.cpf||"")}</td><td style="${bordas};text-align:center">${String(i+1).padStart(2,"0")}</td>${`<td style="${bordas};height:1.85rem"></td>`.repeat(dias.length)}</tr>`).join("");
+  abrirImpressao(FREQ_TITULO+" — Turma "+FREQ.turma,
+    `<p style="text-align:center;font-weight:700;margin:.2rem 0 .8rem">DATAS — MÊS ${freqMesLabel(FREQ.mes)}</p>
+     <table style="width:100%;border-collapse:collapse;font-size:.82rem">${cab}${corpo}</table>`,
+    { paisagem:true, subtitulo:`${linhas.length} participante(s) · emitida em ${new Date().toLocaleDateString("pt-BR")}` });
+}
+
 function timbreHTML(titulo, corpo, op){
   op = op || {};
   const base=location.origin;
@@ -2841,14 +3040,11 @@ function timbreHTML(titulo, corpo, op){
    .barra-imp .dica{color:#8a90a0;margin-left:auto}
    @media print{.barra-imp{display:none!important}}
 
-   .timbre{display:flex;align-items:center;gap:.9rem;border-bottom:3px solid #253282;padding-bottom:.7rem}
-   .timbre img{height:54px;width:auto}
-   .timbre .nome{font-weight:700;color:#253282;font-size:1.15rem;line-height:1.05}
-   .timbre .sub{color:#6b7280;font-size:.74rem}
-   /* Um dado por linha, sem quebrar no meio: o telefone partido ao meio fica
-      ilegível no papel, e ninguém liga para um número pela metade. */
-   .timbre .doc{margin-left:auto;text-align:right;color:#6b7280;font-size:.72rem;line-height:1.5;max-width:52%}
-   .timbre .doc div{white-space:nowrap}
+   /* O timbre do projeto: Vida Ativa a esquerda, Instituto Kenosis a direita
+      (o logo do Kenosis ja traz o proprio nome). CNPJ, cidade e site foram
+      para o rodape de toda folha - a informacao continua no papel. */
+   .timbre{display:flex;align-items:center;justify-content:space-between;gap:.9rem;border-bottom:3px solid #253282;padding-bottom:.7rem}
+   .timbre img{height:62px;width:auto}
    .faixa{height:4px;background:linear-gradient(90deg,#253282,#1EA1E4);margin:0 0 1.3rem;
      -webkit-print-color-adjust:exact;print-color-adjust:exact}
    h1{color:#253282;font-size:1.2rem;margin:.2rem 0 1rem}
@@ -2902,22 +3098,17 @@ function timbreHTML(titulo, corpo, op){
     <button type="button" class="imp" onclick="window.print()">🖨 Imprimir</button>
     <span class="dica">Esta barra não sai no papel.</span>
   </div>
-  <div class="marcadagua" aria-hidden="true"><img src="${base}/assets/img/simbolo.svg" alt=""></div>
+  <div class="marcadagua" aria-hidden="true"><img src="${base}/assets/img/logo-timbre.svg" alt=""></div>
   <table class="pag">
    <thead><td>
      <div class="timbre">
-       <img src="${base}/assets/img/simbolo.svg" alt="">
-       <div><div class="nome">Instituto Kenósis</div><div class="sub">Fonte das Graças Conceição &amp; Menezes</div></div>
-       <div class="doc">
-         <div>CNPJ 63.991.397/0001-40</div>
-         <div>Caruaru — PE</div>
-         <div>institutokenosis.com</div>
-       </div>
+       <img class="t-esq" src="${base}/assets/img/logo_vida_ativa.png" alt="Vida Ativa">
+       <img class="t-dir" src="${base}/assets/img/logo-timbre.svg" alt="Instituto Kenósis">
      </div>
      <div class="faixa"></div>
    </td></thead>
    <tfoot><td>
-     <div class="rod"><span>Instituto Kenósis · documento de uso interno — dado sensível (LGPD)</span><span>Emitido em ${new Date().toLocaleString("pt-BR")}</span></div>
+     <div class="rod"><span>Instituto Kenósis · CNPJ 63.991.397/0001-40 · Caruaru — PE · institutokenosis.com · uso interno — dado sensível (LGPD)</span><span>Emitido em ${new Date().toLocaleString("pt-BR")}</span></div>
    </td></tfoot>
    <tbody><tr><td>
      <h1>${escA(titulo)}</h1>

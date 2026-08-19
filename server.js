@@ -28,7 +28,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "2.9.1";
+const APP_VERSION = "2.10.2";
 
 /* ==========================================================================
    CONSULTA DE CEP
