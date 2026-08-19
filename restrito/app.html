@@ -152,6 +152,9 @@
     .freq-x{border:0;background:none;cursor:pointer;color:#b04a3a;font-weight:700;padding:.2rem .45rem;border-radius:6px}
     .freq-x:hover{background:#fbeae6}
     .freq-sub{margin:1.4rem 0 .6rem;color:var(--navy,#253282);font-size:1.02rem}
+    .freq-acao{border:1px solid #cfd8e8;background:#fff;color:var(--navy,#253282);cursor:pointer;
+      font-size:.78rem;padding:.18rem .55rem;border-radius:999px;margin-right:.6rem}
+    .freq-acao:hover{background:#eef4fb}
     .freq-linha{cursor:pointer}
     .freq-linha:hover td{background:#f2f7fd}
     .freq-linha.on td{background:#eaf3fb;font-weight:600}
@@ -3023,10 +3026,30 @@ function pintarListaFolhas(){
         return `<tr class="freq-linha${aberta?" on":""}" onclick="abrirFolhaSalva(${f.id})" title="Abrir esta folha">
           <td>${escA(freqMesLabel(f.mes))}</td><td>${escA(f.turma)}</td>
           <td>${aulas}</td><td>${gente}</td>
-          <td style="text-align:right;color:var(--muted,#6b7280);font-size:.8rem">${aberta?"aberta acima":"abrir ›"}</td></tr>`;
+          <td style="text-align:right;color:var(--muted,#6b7280);font-size:.8rem">
+            <button class="freq-acao" onclick="event.stopPropagation();duplicarFolha(${f.id})"
+              title="Copia os nomes desta folha para uma folha NOVA — escolha o mês e salve">⧉ duplicar</button>
+            ${aberta?"aberta acima":"abrir ›"}</td></tr>`;
       }).join("")
     : `<tr><td class="vazio" colspan="5">Nenhuma folha registrada ainda — monte a primeira acima e clique em Salvar.</td></tr>`;
 }
+/* Duplicar: os MESMOS nomes (e os dias, como ponto de partida) numa folha
+   NOVA, sem id — a original não é tocada. O uso típico é virar o mês: escolhe
+   o mês novo no seletor, ajusta os dias e salva outro registro. */
+function duplicarFolha(id){
+  const f=FREQ_LISTA.find((x)=>x.id===id);
+  if(!f) return;
+  if(FREQ_SUJO && folhaTemConteudo() && !confirm("Há alterações não salvas na folha aberta. Trocar mesmo assim?")) return;
+  montarSeletoresFreq();
+  $("#freq-turma").value=f.turma; $("#freq-mes").value=f.mes;
+  FREQ={ id:0, turma:f.turma, mes:f.mes, datas:freqArr(f.datas), participantes:freqArr(f.participantes) };
+  FREQ_SUJO=true;      // é uma folha nova com conteúdo — sair sem salvar perde
+  $("#freq-status").textContent=`Cópia da folha de ${freqMesLabel(f.mes)} (${f.turma}) — escolha o mês, ajuste os dias e clique em Salvar para registrar a nova.`;
+  pintarFrequencia();
+  pintarListaFolhas();
+  $("#pane-freq").scrollIntoView({ block:"start" });
+}
+
 function abrirFolhaSalva(id){
   const f=FREQ_LISTA.find((x)=>x.id===id);
   if(!f) return;
