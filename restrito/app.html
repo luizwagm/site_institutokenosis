@@ -621,7 +621,6 @@
         <h1>Frequência</h1>
         <div style="display:flex;gap:.5rem">
           <button class="btn btn-ghost btn-sm" onclick="novaFolha()">＋ Nova folha</button>
-          <button class="btn btn-ghost btn-sm" onclick="imprimirFrequencia()">🖨 Imprimir folha</button>
           <button class="btn btn-navy btn-sm" id="freq-salvar" onclick="salvarFrequencia()">Salvar</button>
         </div>
       </div>
@@ -2942,9 +2941,10 @@ function trocarFolha(){
 
 /* Dias normalizados para gravar e imprimir: só dígitos, 1–31, sem repetido,
    em ordem crescente e com dois algarismos — como na folha de papel. */
-const freqDatas = ()=>[...new Set(
-  FREQ.datas.map((d)=>String(d||"").replace(/\D/g,"")).filter((d)=>d && +d>=1 && +d<=31).map((d)=>d.padStart(2,"0"))
+const normalizarDias = (arr)=>[...new Set(
+  (arr||[]).map((d)=>String(d||"").replace(/\D/g,"")).filter((d)=>d && +d>=1 && +d<=31).map((d)=>d.padStart(2,"0"))
 )].sort();
+const freqDatas = ()=>normalizarDias(FREQ.datas);
 
 /* A pessoa da linha, mesmo que o cadastro tenha saído do cache (inativado
    depois de entrar na folha): a linha continua aparecendo, com aviso. */
@@ -3029,6 +3029,8 @@ function pintarListaFolhas(){
           <td style="text-align:right;color:var(--muted,#6b7280);font-size:.8rem">
             <button class="freq-acao" onclick="event.stopPropagation();duplicarFolha(${f.id})"
               title="Copia os nomes desta folha para uma folha NOVA — escolha o mês e salve">⧉ duplicar</button>
+            <button class="freq-acao" onclick="event.stopPropagation();imprimirFolha(${f.id})"
+              title="Imprime esta folha, como está salva">🖨 imprimir</button>
             ${aberta?"aberta acima":"abrir ›"}</td></tr>`;
       }).join("")
     : `<tr><td class="vazio" colspan="5">Nenhuma folha registrada ainda — monte a primeira acima e clique em Salvar.</td></tr>`;
@@ -3063,13 +3065,20 @@ function abrirFolhaSalva(id){
   $("#pane-freq").scrollIntoView({ block:"start" });
 }
 
-/* A impressão reproduz a folha de papel: título do projeto com a turma, a
-   linha "DATAS — MÊS …" e a tabela com as células em branco para assinar.
-   Só as colunas de dia PREENCHIDAS saem no papel. Paisagem, com o timbre. */
-function imprimirFrequencia(){
-  const dias=freqDatas();
-  const linhas=FREQ.participantes.map(freqPessoa);
-  if(!linhas.length){ $("#freq-status").textContent="A folha está vazia — acrescente usuários antes de imprimir."; return; }
+/* A impressão sai do BOTÃO DA LINHA na lista — imprime aquela folha salva,
+   sem mexer no editor. Reproduz a folha de papel: título do projeto com a
+   turma, a linha "DATAS — MÊS …" e a tabela com as células em branco para
+   assinar. Só as colunas de dia PREENCHIDAS saem. Paisagem, com o timbre. */
+function imprimirFolha(id){
+  const f=FREQ_LISTA.find((x)=>x.id===id);
+  if(!f) return;
+  imprimirFrequencia({ turma:f.turma, mes:f.mes, datas:freqArr(f.datas), participantes:freqArr(f.participantes) });
+}
+function imprimirFrequencia(folha){
+  const dias=normalizarDias(folha.datas);
+  const linhas=folha.participantes.map(freqPessoa)
+    .sort((a,b)=>String(a.nome).localeCompare(String(b.nome),"pt-BR"));
+  if(!linhas.length){ $("#freq-status").textContent="Esta folha está vazia — abra-a, acrescente usuários e salve antes de imprimir."; return; }
   const bordas='border:1px solid #6b7280;padding:.28rem .45rem';
   /* TODAS as colunas com largura declarada, somando 100. No table-layout
      fixed do Chrome, coluna SEM largura não fica com a sobra — as colunas
@@ -3084,8 +3093,8 @@ function imprimirFrequencia(){
      conta com o timbre e o título da primeira página. */
   const celula='border:1px solid #6b7280;padding:.12rem .45rem';
   const corpo=linhas.map((p,i)=>`<tr><td style="${celula};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escA(p.nome)}</td><td style="${celula};white-space:nowrap">${escA(p.cpf||"")}</td><td style="${celula};text-align:center">${String(i+1).padStart(2,"0")}</td>${`<td style="${celula};height:1.15rem"></td>`.repeat(dias.length)}</tr>`).join("");
-  abrirImpressao(FREQ_TITULO+" — Turma "+FREQ.turma,
-    `<p style="text-align:center;font-weight:700;margin:.2rem 0 .8rem">DATAS — MÊS ${freqMesLabel(FREQ.mes)}</p>
+  abrirImpressao(FREQ_TITULO+" — Turma "+folha.turma,
+    `<p style="text-align:center;font-weight:700;margin:.2rem 0 .8rem">DATAS — MÊS ${freqMesLabel(folha.mes)}</p>
      <table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:.82rem">${cab}${corpo}</table>`,
     { paisagem:true });
 }
