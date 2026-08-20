@@ -3087,7 +3087,8 @@ function imprimirFrequencia(folha){
      CPF cabe justo (000.000.000-00) e o Nome leva todo o resto. */
   const diaW=4.5, cpfW=12, numW=4;
   const nomeW=(100 - cpfW - numW - diaW*dias.length).toFixed(1);
-  const cab=`<tr><th style="${bordas};text-align:left;width:${nomeW}%">Nome</th><th style="${bordas};width:${cpfW}%">CPF</th><th style="${bordas};width:${numW}%">Nº</th>${dias.map((d)=>`<th style="${bordas};width:${diaW}%">${d}</th>`).join("")}</tr>`;
+  const negrito=bordas+';font-weight:700;color:#232733';
+  const cab=`<tr><th style="${negrito};text-align:left;width:${nomeW}%">Nome</th><th style="${negrito};width:${cpfW}%">CPF</th><th style="${negrito};width:${numW}%">Nº</th>${dias.map((d)=>`<th style="${negrito};width:${diaW}%">${d}</th>`).join("")}</tr>`;
   /* Linhas mais baixas que as do cabeçalho, de propósito: a meta é 20 nomes
      por folha em paisagem. ~23px por linha (texto + este padding) fecha a
      conta com o timbre e o título da primeira página. */
@@ -3096,7 +3097,7 @@ function imprimirFrequencia(folha){
   abrirImpressao(FREQ_TITULO+" — Turma "+folha.turma,
     `<p style="text-align:center;font-weight:700;margin:.2rem 0 .8rem">DATAS — MÊS ${freqMesLabel(folha.mes)}</p>
      <table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:.82rem">${cab}${corpo}</table>`,
-    { paisagem:true });
+    { paisagem:true, tituloCentrado:true });
 }
 
 function timbreHTML(titulo, corpo, op){
@@ -3231,7 +3232,7 @@ function timbreHTML(titulo, corpo, op){
         página. O texto de rodapé saiu por pedido do cliente. -->
    <tfoot><td></td></tfoot>
    <tbody><tr><td>
-     <h1>${escA(titulo)}</h1>
+     <h1${op.tituloCentrado?' style="text-align:center"':""}>${escA(titulo)}</h1>
      ${op.subtitulo?`<p style="margin:-.7rem 0 1rem;color:#6b7280;font-size:.8rem">${escA(op.subtitulo)}</p>`:""}
      ${corpo}
    </td></tr></tbody>
