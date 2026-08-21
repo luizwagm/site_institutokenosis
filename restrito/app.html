@@ -149,8 +149,9 @@
     .freq-dia input{width:3rem;text-align:center;font:inherit;font-weight:700;padding:.25rem .2rem;border:1.5px solid #cfd8e8;border-radius:6px}
     .freq-num{text-align:center;font-weight:600}
     .freq-cel{height:2.1rem}
-    .freq-x{border:0;background:none;cursor:pointer;color:#b04a3a;font-weight:700;padding:.2rem .45rem;border-radius:6px}
-    .freq-x:hover{background:#fbeae6}
+    .freq-selbar{display:flex;gap:.6rem;align-items:center;margin:.2rem 0 .6rem}
+    .freq-selbar:empty{display:none}
+    .freq-sel{width:1.05rem;height:1.05rem;cursor:pointer}
     .freq-sub{margin:1.4rem 0 .6rem;color:var(--navy,#253282);font-size:1.02rem}
     .freq-acao{border:1px solid #cfd8e8;background:#fff;color:var(--navy,#253282);cursor:pointer;
       font-size:.78rem;padding:.18rem .55rem;border-radius:999px;margin-right:.6rem}
@@ -643,6 +644,8 @@
           (deixe em branco as que não usar). As células ficam vazias de propósito — são as assinaturas, no papel.
           Escolher um usuário no seletor acrescenta a linha na hora; a lista sai em ordem alfabética, numerada.</p>
       </div>
+      <!-- barra de seleção: o Remover só existe com alguém marcado -->
+      <div class="freq-selbar" id="freq-selbar"></div>
       <div class="card" style="padding:0;overflow:auto">
         <table class="freq-tab">
           <thead id="freq-thead"></thead>
@@ -2959,12 +2962,16 @@ function pintarFrequencia(){
   const dias=[];
   for(let i=0;i<FREQ_COLS;i++)
     dias.push(`<th class="freq-dia"><input maxlength="2" inputmode="numeric" value="${escA(FREQ.datas[i]||"")}" placeholder="—" onchange="mudarDataFreq(${i},this)"></th>`);
-  $("#freq-thead").innerHTML = `<tr><th style="text-align:left;min-width:220px">Nome</th><th>CPF</th><th>Nº</th>${dias.join("")}<th></th></tr>`;
+  $("#freq-thead").innerHTML = `<tr><th style="text-align:left;min-width:220px">Nome</th><th>CPF</th><th>Nº</th>${dias.join("")}<th style="width:2.4rem"></th></tr>`;
 
+  /* A seleção sobrevive à repintura (acrescentar alguém não desmarca os já
+     marcados), mas nunca guarda quem saiu da folha. */
+  FREQ_SEL = new Set([...FREQ_SEL].filter((id)=>FREQ.participantes.some((x)=>String(x)===String(id))));
   const linhas = FREQ.participantes.map(freqPessoa);
   $("#freq-tbody").innerHTML = linhas.length
-    ? linhas.map((p,i)=>`<tr><td>${escA(p.nome)}</td><td>${escA(p.cpf||"—")}</td><td class="freq-num">${String(i+1).padStart(2,"0")}</td>${'<td class="freq-cel"></td>'.repeat(FREQ_COLS)}<td><button class="freq-x" title="Tirar da folha" onclick="tirarDaFolha('${p.id}')">✕</button></td></tr>`).join("")
+    ? linhas.map((p,i)=>`<tr><td>${escA(p.nome)}</td><td>${escA(p.cpf||"—")}</td><td class="freq-num">${String(i+1).padStart(2,"0")}</td>${'<td class="freq-cel"></td>'.repeat(FREQ_COLS)}<td style="text-align:center"><input type="checkbox" class="freq-sel"${FREQ_SEL.has(String(p.id))?" checked":""} onchange="freqMarcar('${p.id}',this.checked)" title="Selecionar para remover"></td></tr>`).join("")
     : `<tr><td class="vazio" colspan="${FREQ_COLS+4}">Nenhum usuário na folha — escolha em "Adicionar usuário".</td></tr>`;
+  pintarSelecaoFreq();
 
   // o seletor agora é o combobox genérico (cbx) — lê o CACHE sozinho e já
   // filtra inativos; quem já está na folha é barrado no addNaFolha
@@ -2986,9 +2993,37 @@ function addNaFolha(id){
   FREQ.participantes.push(Number(id)); FREQ_SUJO=true;
   pintarFrequencia();
 }
-function tirarDaFolha(id){
-  FREQ.participantes = FREQ.participantes.filter((x)=>String(x)!==String(id));
-  FREQ_SUJO=true; pintarFrequencia();
+
+/* ==========================================================================
+   SELEÇÃO PARA REMOVER — checkbox por linha, no lugar do ✕ um a um.
+   O botão Remover só EXISTE com alguém marcado, e o confirm diz a conta.
+   ========================================================================== */
+let FREQ_SEL = new Set();
+
+function pintarSelecaoFreq(){
+  const barra=$("#freq-selbar"); if(!barra) return;
+  if(!FREQ || !FREQ.participantes.length){ barra.innerHTML=""; return; }
+  const n=FREQ_SEL.size, total=FREQ.participantes.length;
+  barra.innerHTML =
+    `<button class="btn btn-ghost btn-sm" onclick="freqSelTodos()">${n===total?"Desmarcar todos":"Selecionar todos"}</button>`+
+    (n?`<button class="btn btn-navy btn-sm" onclick="removerSelecionadosFreq()">Remover selecionados (${n})</button>`:"")+
+    (n?`<span class="ajuda" style="margin:0">${n} de ${total} selecionado(s)</span>`:"");
+}
+function freqMarcar(id, marcado){
+  if(marcado) FREQ_SEL.add(String(id)); else FREQ_SEL.delete(String(id));
+  pintarSelecaoFreq();
+}
+function freqSelTodos(){
+  if(FREQ_SEL.size===FREQ.participantes.length) FREQ_SEL.clear();
+  else FREQ_SEL=new Set(FREQ.participantes.map(String));
+  pintarFrequencia();
+}
+function removerSelecionadosFreq(){
+  const n=FREQ_SEL.size; if(!n) return;
+  if(!confirm(`Remover ${n} usuário(s) desta folha?\n\nEles saem só da folha — o cadastro não é tocado. A remoção só vale depois do Salvar.`)) return;
+  FREQ.participantes=FREQ.participantes.filter((x)=>!FREQ_SEL.has(String(x)));
+  FREQ_SEL.clear(); FREQ_SUJO=true;
+  pintarFrequencia();
 }
 
 async function salvarFrequencia(){
@@ -3045,6 +3080,7 @@ function duplicarFolha(id){
   montarSeletoresFreq();
   $("#freq-turma").value=f.turma; $("#freq-mes").value=f.mes;
   FREQ={ id:0, turma:f.turma, mes:f.mes, datas:freqArr(f.datas), participantes:freqArr(f.participantes) };
+  FREQ_SEL.clear();
   FREQ_SUJO=true;      // é uma folha nova com conteúdo — sair sem salvar perde
   $("#freq-status").textContent=`Cópia da folha de ${freqMesLabel(f.mes)} (${f.turma}) — escolha o mês, ajuste os dias e clique em Salvar para registrar a nova.`;
   pintarFrequencia();
@@ -3059,6 +3095,7 @@ function abrirFolhaSalva(id){
   montarSeletoresFreq();               // garante o mês da folha no seletor
   $("#freq-turma").value=f.turma; $("#freq-mes").value=f.mes;
   FREQ={ id:f.id, turma:f.turma, mes:f.mes, datas:freqArr(f.datas), participantes:freqArr(f.participantes) };
+  FREQ_SEL.clear();
   FREQ_SUJO=false; $("#freq-status").textContent="";
   pintarFrequencia();
   pintarListaFolhas();
@@ -3089,14 +3126,17 @@ function imprimirFrequencia(folha){
   const nomeW=(100 - cpfW - numW - diaW*dias.length).toFixed(1);
   const negrito=bordas+';font-weight:700;color:#232733';
   const cab=`<tr><th style="${negrito};text-align:left;width:${nomeW}%">Nome</th><th style="${negrito};width:${cpfW}%">CPF</th><th style="${negrito};width:${numW}%">Nº</th>${dias.map((d)=>`<th style="${negrito};width:${diaW}%">${d}</th>`).join("")}</tr>`;
-  /* Linhas mais baixas que as do cabeçalho, de propósito: a meta é 20 nomes
-     por folha em paisagem. ~23px por linha (texto + este padding) fecha a
-     conta com o timbre e o título da primeira página. */
-  const celula='border:1px solid #6b7280;padding:.12rem .45rem';
-  const corpo=linhas.map((p,i)=>`<tr><td style="${celula};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escA(p.nome)}</td><td style="${celula};white-space:nowrap">${escA(p.cpf||"")}</td><td style="${celula};text-align:center">${String(i+1).padStart(2,"0")}</td>${`<td style="${celula};height:1.15rem"></td>`.repeat(dias.length)}</tr>`).join("");
+  /* Linhas mais baixas que as do cabeçalho, de propósito: a meta é 25+ nomes
+     por folha em paisagem SEM mexer no tamanho da fonte — o aperto é todo de
+     padding e line-height (~19px por linha). */
+  const celula='border:1px solid #6b7280;padding:.05rem .45rem;line-height:1.15';
+  const corpo=linhas.map((p,i)=>`<tr><td style="${celula};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escA(p.nome)}</td><td style="${celula};white-space:nowrap">${escA(p.cpf||"")}</td><td style="${celula};text-align:center">${String(i+1).padStart(2,"0")}</td>${`<td style="${celula};height:1rem"></td>`.repeat(dias.length)}</tr>`).join("");
+  /* O cabeçalho vai em <thead> DE VERDADE: é o que o navegador repete no
+     alto de cada página impressa — da segunda em diante a tabela continua
+     dizendo quais são as datas, sem ninguém voltar à primeira folha. */
   abrirImpressao(FREQ_TITULO+" — Turma "+folha.turma,
     `<p style="text-align:center;font-weight:700;margin:.2rem 0 .8rem">DATAS — MÊS ${freqMesLabel(folha.mes)}</p>
-     <table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:.82rem">${cab}${corpo}</table>`,
+     <table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:.82rem"><thead>${cab}</thead><tbody>${corpo}</tbody></table>`,
     { paisagem:true, tituloCentrado:true });
 }
 
@@ -3224,8 +3264,8 @@ function timbreHTML(titulo, corpo, op){
   <table class="pag">
    <thead><td>
      <div class="timbre">
-       <img class="t-esq" src="${base}/assets/img/logo_vida_ativa.png" alt="Vida Ativa">
-       <img class="t-dir" src="${base}/assets/img/logo-timbre.svg" alt="Instituto Kenósis">
+       <img class="t-esq" src="${base}/assets/img/logo-timbre.svg" alt="Instituto Kenósis">
+       <img class="t-dir" src="${base}/assets/img/logo_vida_ativa.png" alt="Vida Ativa">
      </div>
    </td></thead>
    <!-- O tfoot vazio fica: é ele quem garante a margem inferior em toda
