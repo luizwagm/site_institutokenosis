@@ -2861,10 +2861,14 @@ async function excluirReg(id){
       saía com o timbre só na primeira, e da segunda em diante era papel
       anônimo — o que, num documento que sai do prédio, é o que importa.
 
-   4. `@page{margin:0}` APAGA O CABEÇALHO DO NAVEGADOR (data, título, URL) que
-      vinha impresso na borda de todo documento. O respiro da folha passou a
-      vir do padding das células, que é o que faz o timbre repetido nascer
-      espaçado igual em todas as páginas.
+   4. `@page{margin:0 0 1cm 0}`: topo e laterais sem margem APAGAM o
+      cabeçalho do navegador (data, título, URL) que vinha impresso na borda
+      de todo documento; o respiro vem do padding das células. A ÚNICA margem
+      é a de baixo (1cm), e ela existe para a NUMERAÇÃO: "Página N de M" sai
+      da caixa de margem `@bottom-center` com `counter(page)` — o navegador é
+      quem sabe quantas páginas há, e só ali ele conta. Se a caixa de
+      impressão estiver com "Cabeçalhos e rodapés" marcado, o Chrome ainda
+      pode pôr a URL nessa margem: é opção do usuário, desmarcar resolve.
 
    E some o `window.print()` automático. Ele disparava 250 ms depois de abrir
    — antes, portanto, de o logo do cabeçalho ter necessariamente carregado.
@@ -3126,6 +3130,17 @@ function imprimirFrequencia(folha){
   const nomeW=(100 - cpfW - numW - diaW*dias.length).toFixed(1);
   const negrito=bordas+';font-weight:700;color:#232733';
   const cab=`<tr><th style="${negrito};text-align:left;width:${nomeW}%">Nome</th><th style="${negrito};width:${cpfW}%">CPF</th><th style="${negrito};width:${numW}%">Nº</th>${dias.map((d)=>`<th style="${negrito};width:${diaW}%">${d}</th>`).join("")}</tr>`;
+  /* TÍTULO E PERÍODO EM TODA PÁGINA: os dois vão DENTRO do <thead>, como
+     linhas de colspan — é o <thead> que o navegador repete no alto de cada
+     folha impressa, então cada página nasce com título, turma, mês e as
+     datas, igual à primeira. O <colgroup> segura as larguras: no layout
+     fixo as colunas saem da PRIMEIRA linha, e uma linha de colspan na frente
+     desmontaria a tabela inteira. */
+  const nCols=3+dias.length;
+  const colgroup=`<colgroup><col style="width:${nomeW}%"><col style="width:${cpfW}%"><col style="width:${numW}%">${`<col style="width:${diaW}%">`.repeat(dias.length)}</colgroup>`;
+  const cabecalhoFolha=
+    `<tr><th colspan="${nCols}" style="border:0;text-align:center;font-size:1rem;color:#253282;font-weight:700;padding:.1rem 0 .35rem;white-space:normal">${escA(FREQ_TITULO+" — Turma "+folha.turma)}</th></tr>`+
+    `<tr><th colspan="${nCols}" style="border:0;text-align:center;font-weight:700;padding:0 0 .6rem">DATAS — MÊS ${escA(freqMesLabel(folha.mes))}</th></tr>`;
   /* Linhas mais baixas que as do cabeçalho, de propósito: a meta é 25+ nomes
      por folha em paisagem SEM mexer no tamanho da fonte — o aperto é todo de
      padding e line-height (~19px por linha). */
@@ -3134,10 +3149,10 @@ function imprimirFrequencia(folha){
   /* O cabeçalho vai em <thead> DE VERDADE: é o que o navegador repete no
      alto de cada página impressa — da segunda em diante a tabela continua
      dizendo quais são as datas, sem ninguém voltar à primeira folha. */
-  abrirImpressao(FREQ_TITULO+" — Turma "+folha.turma,
-    `<p style="text-align:center;font-weight:700;margin:.2rem 0 .8rem">DATAS — MÊS ${freqMesLabel(folha.mes)}</p>
-     <table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:.82rem"><thead>${cab}</thead><tbody>${corpo}</tbody></table>`,
-    { paisagem:true, tituloCentrado:true });
+  /* Sem título no corpo (ele já mora no thead); o da janela continua. */
+  abrirImpressao("",
+    `<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:.82rem">${colgroup}<thead>${cabecalhoFolha}${cab}</thead><tbody>${corpo}</tbody></table>`,
+    { paisagem:true, tituloJanela:FREQ_TITULO+" — Turma "+folha.turma });
 }
 
 function timbreHTML(titulo, corpo, op){
@@ -3154,12 +3169,12 @@ function timbreHTML(titulo, corpo, op){
      Medindo pela altura, a marca ocupa sempre a mesma fatia vertical da
      folha, seja qual for o desenho que entre aqui um dia. */
   const wm = op.paisagem ? "58%" : "46%";
-  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escA(titulo)} — Instituto Kenósis</title>
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escA(op.tituloJanela||titulo)} — Instituto Kenósis</title>
   <style id="pg">
    /* Este bloco INTEIRO é reescrito pelos botões Retrato/Paisagem. Margem e
       marca d'água são variáveis justamente para o documento se ajustar junto
       com a folha, sem recarregar nada. */
-   @page{margin:0;size:A4${op.paisagem?" landscape":""}}
+   @page{margin:0 0 1cm 0;size:A4${op.paisagem?" landscape":""};@bottom-center{content:"Página " counter(page) " de " counter(pages);font:10.5px system-ui,Arial,sans-serif;color:#6b7280}}
    :root{--mx:${mx};--wm:${wm}}
   </style>
   <style>
@@ -3183,7 +3198,7 @@ function timbreHTML(titulo, corpo, op){
    .pag{width:100%;border-collapse:collapse;position:relative;z-index:1}
    .pag thead td{padding:var(--mx) var(--mx) 0}
    .pag tbody td{padding:0 var(--mx)}
-   .pag tfoot td{padding:0 var(--mx) var(--mx)}
+   .pag tfoot td{padding:0 var(--mx) .4cm}
    .pag thead td,.pag tfoot td{border:0}
 
    /* Barra de controle: só na tela, nunca no papel. */
@@ -3274,7 +3289,7 @@ function timbreHTML(titulo, corpo, op){
         página. O texto de rodapé saiu por pedido do cliente. -->
    <tfoot><td></td></tfoot>
    <tbody><tr><td>
-     <h1${op.tituloCentrado?' style="text-align:center"':""}>${escA(titulo)}</h1>
+     ${titulo?`<h1${op.tituloCentrado?' style="text-align:center"':""}>${escA(titulo)}</h1>`:""}
      ${op.subtitulo?`<p style="margin:-.7rem 0 1rem;color:#6b7280;font-size:.8rem">${escA(op.subtitulo)}</p>`:""}
      ${corpo}
    </td></tr></tbody>
@@ -3288,7 +3303,8 @@ function timbreHTML(titulo, corpo, op){
    function orientar(p){
      ehPaisagem = p;
      document.getElementById("pg").textContent =
-       "@page{margin:0;size:A4" + (p ? " landscape" : "") + "}" +
+       "@page{margin:0 0 1cm 0;size:A4" + (p ? " landscape" : "") +
+         ';@bottom-center{content:"Página " counter(page) " de " counter(pages);font:10.5px system-ui,Arial,sans-serif;color:#6b7280}}' +
        ":root{--mx:" + (p ? "1.2cm" : "1.5cm") + ";--wm:" + (p ? "58%" : "46%") + "}";
      document.getElementById("bt-retrato").className = p ? "" : "on";
      document.getElementById("bt-paisagem").className = p ? "on" : "";
