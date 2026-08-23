@@ -3171,8 +3171,10 @@ function timbreHTML(titulo, corpo, op){
       economizar tinta", e a marca simplesmente nao sai.
       (ATENCAO: este CSS vive dentro de um template literal — nada de crase
       aqui, nem em comentario: ela fecha a string e derruba o arquivo.) */
+   /* .16 e nao .05: a 5% o logo azul-claro sumia no papel (o cliente nem via
+      que havia marca). A 16% ele aparece sem brigar com o texto por cima. */
    .marcadagua{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-     height:var(--wm);opacity:.05;z-index:0;pointer-events:none;
+     height:var(--wm);opacity:.16;z-index:0;pointer-events:none;
      -webkit-print-color-adjust:exact;print-color-adjust:exact}
    .marcadagua img{height:100%;width:auto;display:block}
 
