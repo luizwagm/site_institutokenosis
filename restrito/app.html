@@ -1063,10 +1063,28 @@ const PERFIL_ROTULO = { admin:"Administrador", secretaria:"Secretaria", profissi
 
    O motor continua inteiro: as rotas de arquivar/restaurar, as colunas, a tela
    de Arquivados e o filtro `?arquivados=` seguem funcionando. O Instituto
-   optou por NÃO usar agora — então os botões, a caixa "mostrar arquivados" e
-   o item do menu somem atrás desta chave. Religar = true.
+   optou por NÃO usar agora — então os botões de ARQUIVAR somem atrás desta
+   chave. Religar = true.
+
+   O CAMINHO DE VOLTA CONTINUA ABERTO, e é isso que a chave NÃO desliga: quem
+   já foi arquivado antes desta decisão precisa poder voltar. Por isso a tela
+   de Arquivados e o item do menu obedecem a outra regra — eles existem
+   ENQUANTO HOUVER algo arquivado (`ARQ_TOTAL`), e somem sozinhos quando o
+   último for restaurado. Sem porta de arquivar, esse número só desce.
    ========================================================================== */
 const ARQUIVO_NA_TELA = false;
+
+/* Quantos registros arquivados existem, do ponto de vista de quem está
+   logado. Zero = o item do menu não aparece. */
+let ARQ_TOTAL = 0;
+
+async function conferirArquivados(){
+  try { const r = await api("arquivados/contagem"); ARQ_TOTAL = Number(r && r.total) || 0; }
+  catch { ARQ_TOTAL = 0; }   /* falha de rede não deve inventar um menu */
+  const btn = document.querySelector('.navbtn[data-nav="arquivados"]');
+  if (btn) btn.style.display = ARQ_TOTAL ? "" : "none";
+  return ARQ_TOTAL;
+}
 
 const PERM_CLIENTE = {
   admin: null,
@@ -1341,7 +1359,19 @@ async function arquivarRegistro(tabela, id, restaurar){
 }
 
 async function restaurarArquivado(tabela, id){
-  if(await arquivarRegistro(tabela, id, true)) carregarArquivados();
+  if(!await arquivarRegistro(tabela, id, true)) return;
+  /* Restaurou o ÚLTIMO? O item do menu some agora, e a tela avisa em vez de
+     ficar num painel vazio sem explicação. */
+  const restam = await conferirArquivados();
+  if(!restam){
+    $("#arq-abas").innerHTML = "";
+    $("#arq-paginacao").innerHTML = "";
+    $("#arq-tabela").innerHTML =
+      '<p class="vazio">Tudo restaurado — não há mais nada arquivado.<br>' +
+      'Esta tela sai do menu até que exista algo aqui de novo.</p>';
+    return;
+  }
+  carregarArquivados();
 }
 
 /* Chamado das telas normais (lista de usuários e de prontuários). */
@@ -1637,10 +1667,11 @@ async function iniciarApp(me){
   $("#btn-backup").hidden = !soAdmin;
   $("#sep-backup").hidden = !soAdmin;
   $("#ap-admin").hidden = !soAdmin;
-  /* Sem arquivar na tela, o item Arquivados sai ANTES das permissões — o
-     esconde-seções conta os filhos visíveis e já se ajusta sozinho. */
-  if (!ARQUIVO_NA_TELA) document.querySelector('.navbtn[data-nav="arquivados"]')?.remove();
   aplicarPermissoes(me.perfil);
+  /* DEPOIS das permissões: elas decidem quem PODE ver o item, a contagem
+     decide se HÁ o que ver. Antes, o `display:none` desta função seria
+     reescrito pelo `aplicarPermissoes`, que mexe no mesmo atributo. */
+  conferirArquivados();
   $("#dl-esp").innerHTML=ESPECIALIDADES.map((e)=>`<option value="${escA(e)}">`).join("");
   await recarregarCache();
   // abre o Painel se o perfil o vê; senão, vai ao primeiro módulo visível

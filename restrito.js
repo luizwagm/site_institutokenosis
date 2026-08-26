@@ -24,7 +24,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.30.0";
+const SISTEMA_VERSION = "1.31.0";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -1441,6 +1441,30 @@ async function rotaApi(req, res, p) {
          LEFT JOIN profissionais pf ON pf.id=a.profissional_id
         WHERE a.paciente_id=? AND a.prontuario_id IS NULL
         ORDER BY a.data DESC, a.hora DESC, a.id DESC`, pr.paciente_id));
+  }
+
+  /* ======================================================================
+     QUANTOS ESTÃO ARQUIVADOS
+
+     Existe por causa da regra de tela: o item "Arquivados" no menu só aparece
+     enquanto houver algo lá dentro. Sem esta rota, a tela teria de baixar as
+     duas listas inteiras no boot só para descobrir se estão vazias — e
+     descobrir isso a cada acesso de cada pessoa.
+
+     Conta o que o PERFIL pode ver: um número que inclua o que a pessoa não
+     abre faria o menu mostrar um item que leva a uma tela vazia. O
+     profissional conta só as pastas dele, o mesmo recorte da listagem.
+     ====================================================================== */
+  if (p === "arquivados/contagem" && req.method === "GET") {
+    const conta = { pacientes: 0, prontuario: 0 };
+    if (podeLer(s.perfil, "pacientes"))
+      conta.pacientes = Number((await Q.get("SELECT COUNT(*) c FROM pacientes WHERE arquivado=1")).c);
+    if (podeLer(s.perfil, "prontuario")) {
+      const dono = filtroDono(s, "profissional_id");
+      conta.prontuario = Number((await Q.get(
+        `SELECT COUNT(*) c FROM prontuario WHERE arquivado=1${dono.sql}`, ...dono.args)).c);
+    }
+    return json(res, 200, { ...conta, total: conta.pacientes + conta.prontuario });
   }
 
   /* ======================================================================
