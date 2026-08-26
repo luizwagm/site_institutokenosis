@@ -1058,6 +1058,16 @@ const PERFIL_ROTULO = { admin:"Administrador", secretaria:"Secretaria", profissi
 
 /* Perfis: quais módulos cada um enxerga (o servidor faz a checagem de verdade;
    aqui é só para esconder o que não interessa). admin vê tudo. */
+/* ==========================================================================
+   ARQUIVAR FORA DA TELA — decisão do Instituto (2026-08)
+
+   O motor continua inteiro: as rotas de arquivar/restaurar, as colunas, a tela
+   de Arquivados e o filtro `?arquivados=` seguem funcionando. O Instituto
+   optou por NÃO usar agora — então os botões, a caixa "mostrar arquivados" e
+   o item do menu somem atrás desta chave. Religar = true.
+   ========================================================================== */
+const ARQUIVO_NA_TELA = false;
+
 const PERM_CLIENTE = {
   admin: null,
   secretaria: new Set(["painel","pacientes","associados","profissionais","atendimentos","frequencia","servicos","projetos","documentos_gestao","beneficios","eventos","relatorios","relatorios_pacientes","conta"]),
@@ -1627,6 +1637,9 @@ async function iniciarApp(me){
   $("#btn-backup").hidden = !soAdmin;
   $("#sep-backup").hidden = !soAdmin;
   $("#ap-admin").hidden = !soAdmin;
+  /* Sem arquivar na tela, o item Arquivados sai ANTES das permissões — o
+     esconde-seções conta os filhos visíveis e já se ajusta sozinho. */
+  if (!ARQUIVO_NA_TELA) document.querySelector('.navbtn[data-nav="arquivados"]')?.remove();
   aplicarPermissoes(me.perfil);
   $("#dl-esp").innerHTML=ESPECIALIDADES.map((e)=>`<option value="${escA(e)}">`).join("");
   await recarregarCache();
@@ -2051,8 +2064,8 @@ async function montarAreasProntuario(prontId){
   box.innerHTML=`<div id="pasta-vinculos"></div>
     <div class="areas-cab">
       <h3>Lançamentos do prontuário</h3>
-      <label class="chk" style="font-size:.82rem"><input type="checkbox" ${MOSTRAR_ARQUIVADOS?"checked":""}
-        onchange="MOSTRAR_ARQUIVADOS=this.checked;montarAreasProntuario(${prontId})"> mostrar arquivados</label>
+      ${ARQUIVO_NA_TELA?`<label class="chk" style="font-size:.82rem"><input type="checkbox" ${MOSTRAR_ARQUIVADOS?"checked":""}
+        onchange="MOSTRAR_ARQUIVADOS=this.checked;montarAreasProntuario(${prontId})"> mostrar arquivados</label>`:""}
     </div>` +
     TIPOS_PRONT.map(([tipo,rot,titulo])=>`
       <div class="area" data-area="${tipo}">
@@ -2080,7 +2093,7 @@ function pintarArea(tipo, itens, prontId){
       <td>${escA(r.profissional||"—")}</td>
       <td style="text-align:right;white-space:nowrap">
         <button type="button" class="btn btn-ghost btn-sm" onclick="abrirLancamento(${r.id},${prontId})">Acessar</button>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="arquivarLancamento(${r.id},${Number(r.arquivado)?0:1},${prontId})">${Number(r.arquivado)?"Restaurar":"Arquivar"}</button>
+        ${ARQUIVO_NA_TELA?`<button type="button" class="btn btn-ghost btn-sm" onclick="arquivarLancamento(${r.id},${Number(r.arquivado)?0:1},${prontId})">${Number(r.arquivado)?"Restaurar":"Arquivar"}</button>`:""}
       </td></tr>`).join("")+`</table>`;
 }
 
@@ -2172,8 +2185,8 @@ function editorLancamento({ id, tipo, prontId, reg }){
       <div id="lc-erro"></div>
     </div>
     <div class="acoes">
-      ${id&&!arquivado?`<button class="btn btn-ghost" onclick="arquivarLancamento(${id},1,${prontId},true)">Arquivar</button>`:""}
-      ${id&&arquivado?`<button class="btn btn-navy" onclick="arquivarLancamento(${id},0,${prontId},true)">Restaurar</button>`:""}
+      ${ARQUIVO_NA_TELA&&id&&!arquivado?`<button class="btn btn-ghost" onclick="arquivarLancamento(${id},1,${prontId},true)">Arquivar</button>`:""}
+      ${ARQUIVO_NA_TELA&&id&&arquivado?`<button class="btn btn-navy" onclick="arquivarLancamento(${id},0,${prontId},true)">Restaurar</button>`:""}
       <button class="btn btn-ghost" onclick="fecharLancamento()">Fechar</button>
       ${arquivado?"":`<button class="btn btn-navy" onclick="salvarLancamento(${id||0},'${tipo}',${prontId})">Salvar</button>`}
     </div></div></div>`;
@@ -2274,7 +2287,7 @@ function acoesDaLinha(m, row){
      tela. Entre "Abrir" e "Inativar", quem só quer abrir a ficha acertaria
      nele com frequência — e teria de vir aqui procurar de onde a pessoa
      sumiu. É também por isso que ele pede confirmação. */
-  if(MOD==="pacientes" || MOD==="prontuario"){
+  if(ARQUIVO_NA_TELA && (MOD==="pacientes" || MOD==="prontuario")){
     itens.push(["Arquivar", `arquivarDaLista('${MOD}',${row.id})`]);
   }
   const abrir=`abrirForm(${row.id})`;
