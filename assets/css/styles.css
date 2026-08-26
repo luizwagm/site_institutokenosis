@@ -727,3 +727,29 @@ body.tem-cookie-barra .zap-flutua { bottom: calc(var(--cookie-barra-h, 0px) + 1.
   .hero__acoes .btn { width: 100%; }
   .numeros { gap: 1.4rem 2rem; }
 }
+
+
+/* ==========================================================================
+   MATÉRIA EM VÍDEO (Feed e Memória)
+
+   Na lista, a capa é a imagem genérica e o selo diz — antes do clique — que
+   ali dentro tem vídeo. O selo é ::after do próprio link, para não pedir
+   marcação nova em cada cartão.
+   ========================================================================== */
+.materia__foto--video { position: relative; }
+.materia__foto--video::after {
+  content: "▶ vídeo";
+  position: absolute; left: .8rem; bottom: .8rem;
+  background: rgba(37, 50, 130, .85); color: #fff;
+  font-size: .74rem; font-weight: 600; letter-spacing: .04em;
+  padding: .22rem .6rem; border-radius: 999px; pointer-events: none;
+}
+/* O vídeo ocupa a mesma caixa da foto de capa. `height:auto` e NENHUM
+   object-fit: o arquivo pode ser vertical (celular) ou deitado, e cortá-lo
+   para caber numa proporção fixa esconderia justamente quem está falando. */
+.materia-capa--video video {
+  width: 100%; height: auto; display: block;
+  border-radius: 18px; background: #101a3a;
+  aspect-ratio: auto 16 / 9;
+}
+@media (max-width: 640px) { .materia-capa--video video { border-radius: 12px; } }

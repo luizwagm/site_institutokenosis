@@ -74,6 +74,8 @@
     .hint{font-size:.75rem;color:var(--dim)}
     .right{text-align:right}.mt{margin-top:1rem}.mb{margin-bottom:1rem}
     .thumb{width:82px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+    /* capa em video: o mesmo lugar do thumb, com o simbolo de play */
+    .thumb--video{display:grid;place-items:center;background:#e6f3fc;color:#253282;font-size:20px}
     .toast{position:fixed;bottom:1.2rem;left:50%;transform:translate(-50%,150%);background:var(--violet);color:#fff;
       padding:.8rem 1.3rem;border-radius:999px;font-weight:600;transition:transform .3s;z-index:99}
     .toast.on{transform:translate(-50%,0)}
@@ -976,12 +978,20 @@ function renderTable(t) {
           <input ${dados} value="${escA(r[f])}" oninput="this.dataset.tocado='1'">
           <p class="hint">Vem sozinha do título, tudo minúsculo e separado por hífen. Só é preenchida quando está vazia — trocar a URL de uma página já publicada quebraria o link e o que o Google indexou.</p>`;
         if (kind === "textarea") return `<label>${lab}</label>${editorRico(dados, r[f])}`;
-        if (kind === "image") return `<label>${lab}</label>
+        if (kind === "image") {
+          /* Feed e Memória aceitam VÍDEO na capa; as outras listas (parceiros,
+             equipe, projetos) são foto e só. */
+          const comVideo = t === "feed" || t === "posts";
+          return `<label>${lab}</label>
           <div class="imgrow">
             <input data-t="${t}" data-id="${r.id}" data-f="${f}" value="${escA(r[f])}" style="flex:1">
             <button class="btn btn-ghost btn-sm" onclick="pickImg(this)">Enviar foto</button>
-            ${r[f] ? `<img class="thumb" src="${escA(r[f])}" alt="">` : ""}
-          </div>`;
+            ${comVideo ? `<button class="btn btn-ghost btn-sm" onclick="pickVideo(this)">Enviar vídeo</button>` : ""}
+            ${ehVideo(r[f]) ? `<span class="thumb thumb--video" title="Matéria em vídeo">▶</span>`
+              : r[f] ? `<img class="thumb" src="${escA(r[f])}" alt="">` : ""}
+          </div>
+          ${comVideo ? `<p class="hint">Foto <b>ou</b> vídeo (MP4/WEBM). Com vídeo, a lista mostra uma capa dizendo que é vídeo, e o vídeo toca dentro da matéria.</p>` : ""}`;
+        }
         if (kind === "home") return `<label>${lab}</label>
           <select data-t="${t}" data-id="${r.id}" data-f="${f}">
             <option value="0"${Number(r[f]) ? "" : " selected"}>Não — só no guia de profissionais</option>
@@ -1178,6 +1188,49 @@ async function delRow(t, id) {
   DATA = await api("/api/content");
   renderTable(t);
   toast("Excluído. Lembre de publicar!");
+}
+
+const ehVideo = (u) => /\.(mp4|webm|ogv)(\?|#|$)/i.test(String(u || ""));
+
+/* ==========================================================================
+   ENVIAR VÍDEO — XHR, e não fetch, por causa da BARRA DE PROGRESSO.
+
+   O `fetch` não informa quanto do upload já subiu; num arquivo de 80 MB numa
+   internet de escritório, isso é um botão que fica cinza por minutos sem dizer
+   nada — e a pessoa clica de novo, ou desiste.
+
+   O arquivo vai em BINÁRIO puro (o servidor grava em fluxo). O nome viaja
+   codificado no cabeçalho `X-Nome-Arquivo`, porque nome de arquivo tem acento
+   e espaço, que não cabem num cabeçalho HTTP cru.
+   ========================================================================== */
+function pickVideo(btn) {
+  const target = btn.parentElement.querySelector("input[data-f]");
+  const fi = document.createElement("input");
+  fi.type = "file"; fi.accept = "video/mp4,video/webm,video/ogg,video/quicktime";
+  fi.onchange = () => {
+    const file = fi.files[0]; if (!file) return;
+    const rotulo = btn.textContent;
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/upload-video");
+    xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
+    xhr.setRequestHeader("X-Nome-Arquivo", encodeURIComponent(file.name));
+    xhr.upload.onprogress = (e) => {
+      if (!e.lengthComputable) return;
+      btn.disabled = true;
+      btn.textContent = `Enviando ${Math.round((e.loaded / e.total) * 100)}%`;
+    };
+    xhr.onload = () => {
+      btn.disabled = false; btn.textContent = rotulo;
+      let r = {}; try { r = JSON.parse(xhr.responseText); } catch {}
+      if (xhr.status === 200 && r.path) {
+        target.value = r.path;
+        toast("Vídeo enviado! Salve o item.");
+      } else toast(r.error || "Não consegui enviar o vídeo.", true);
+    };
+    xhr.onerror = () => { btn.disabled = false; btn.textContent = rotulo; toast("Falha de rede ao enviar o vídeo.", true); };
+    xhr.send(file);
+  };
+  fi.click();
 }
 
 function pickImg(btn) {

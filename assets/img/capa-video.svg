@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560" role="img" aria-label="Vídeo">
+  <!-- Capa genérica das matérias em VÍDEO (Feed e Memória): aparece na lista
+       no lugar da foto e é a imagem do compartilhamento — og:image não aceita
+       vídeo. Identidade do Instituto: areia, celeste e marinho. -->
+  <defs>
+    <linearGradient id="k" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FAF7F2"/>
+      <stop offset="1" stop-color="#DCEEFA"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="560" fill="url(#k)"/>
+  <!-- auréola: o motivo-assinatura do Instituto -->
+  <circle cx="450" cy="250" r="126" fill="none" stroke="#1EA1E4" stroke-width="2" opacity=".45"/>
+  <circle cx="450" cy="250" r="150" fill="none" stroke="#1EA1E4" stroke-width="1.5" opacity=".25"/>
+  <circle cx="450" cy="250" r="92" fill="#253282"/>
+  <path d="M424 212 l68 38 -68 38 z" fill="#ffffff"/>
+  <text x="450" y="404" text-anchor="middle" font-family="Outfit, Segoe UI, system-ui, sans-serif"
+        font-size="34" font-weight="700" letter-spacing="7" fill="#253282">VÍDEO</text>
+  <text x="450" y="446" text-anchor="middle" font-family="Outfit, Segoe UI, system-ui, sans-serif"
+        font-size="19" fill="#5b6480">Clique para assistir</text>
+</svg>

@@ -143,6 +143,7 @@ for wal in data/site.db-wal data/site.db-shm data/gestao.db-wal data/gestao.db-s
   [ -f "$wal" ] && mv "$wal" "$COFRE/$(basename "$wal")"
 done
 [ -d assets/img/uploads ] && cp -r assets/img/uploads "$COFRE/uploads"
+[ -d assets/video ] && cp -r assets/video "$COFRE/video"
 # anexos de prontuário/documentos dos pacientes
 [ -d restrito/arquivos ] && cp -r restrito/arquivos "$COFRE/arquivos"
 verde "     guardados em $COFRE"
@@ -226,13 +227,14 @@ fi
 
 # --------------------------------------------------------- 7. devolver
 azul "7/8  Devolvendo banco e fotos"
-mkdir -p data assets/img/uploads restrito/arquivos
+mkdir -p data assets/img/uploads assets/video restrito/arquivos
 [ -f "$COFRE/site.db" ] && mv "$COFRE/site.db" data/site.db
 [ -f "$COFRE/gestao.db" ] && mv "$COFRE/gestao.db" data/gestao.db
 for wal in site.db-wal site.db-shm gestao.db-wal gestao.db-shm; do
   [ -f "$COFRE/$wal" ] && mv "$COFRE/$wal" "data/$wal"
 done
 [ -d "$COFRE/uploads" ] && cp -rn "$COFRE/uploads/." assets/img/uploads/ 2>/dev/null
+[ -d "$COFRE/video" ] && cp -rn "$COFRE/video/." assets/video/ 2>/dev/null
 [ -d "$COFRE/arquivos" ] && cp -rn "$COFRE/arquivos/." restrito/arquivos/ 2>/dev/null
 
 # O dono precisa ser o usuário do serviço, não um palpite: com o dono errado o
@@ -246,9 +248,9 @@ GRUPO=$($SC show "$SERVICO" -p Group --value 2>/dev/null)
 # root e o serviço não conseguiria escrever ("attempt to write a readonly
 # database", sem erro visível na tela). Rodando como o próprio dono, ele é
 # comando sem efeito que ainda por cima falha em alguns sistemas.
-if [ "$SOU_ROOT" = "1" ]; then chown -R "$DONO:$GRUPO" data assets/img/uploads restrito/arquivos 2>/dev/null; fi
+if [ "$SOU_ROOT" = "1" ]; then chown -R "$DONO:$GRUPO" data assets/img/uploads assets/video restrito/arquivos 2>/dev/null; fi
 # a pasta precisa ser gravável: o SQLite cria o -journal ao lado do banco
-chmod 755 data assets/img/uploads restrito/arquivos 2>/dev/null
+chmod 755 data assets/img/uploads assets/video restrito/arquivos 2>/dev/null
 [ -f data/site.db ] && chmod 644 data/site.db
 verde "     de volta no lugar (dono: $DONO:$GRUPO)"
 

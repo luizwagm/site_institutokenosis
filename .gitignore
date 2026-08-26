@@ -14,6 +14,9 @@ data/
 
 # Imagens enviadas pelo painel em produção — pertencem ao servidor, não ao repo.
 assets/img/uploads/
+# Videos das materias (Feed e Memoria): arquivos grandes, enviados pelo
+# painel. Mesmo motivo das fotos - conteudo do cliente, nao codigo.
+assets/video/
 
 # Credenciais do PostgreSQL e a chave que cifra os dados dos beneficiários.
 # Em produção quem entrega isto é o systemd (EnvironmentFile=/etc/kenosis.env);

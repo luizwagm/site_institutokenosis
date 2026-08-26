@@ -1,6 +1,6 @@
 {
   "name": "instituto-kenosis",
-  "version": "2.10.2",
+  "version": "2.11.0",
   "private": true,
   "description": "Site, painel administrativo (/admin, SQLite) e sistema de gestão (/restrito, PostgreSQL) do Instituto Kenósis.",
   "main": "server.js",
