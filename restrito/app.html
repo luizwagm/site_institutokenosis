@@ -153,9 +153,10 @@
     .freq-selbar:empty{display:none}
     .freq-sel{width:1.05rem;height:1.05rem;cursor:pointer}
     .freq-sub{margin:1.4rem 0 .6rem;color:var(--navy,#253282);font-size:1.02rem}
-    .freq-acao{border:1px solid #cfd8e8;background:#fff;color:var(--navy,#253282);cursor:pointer;
-      font-size:.78rem;padding:.18rem .55rem;border-radius:999px;margin-right:.6rem}
-    .freq-acao:hover{background:#eef4fb}
+    .freq-filtros{display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end}
+    .freq-filtros label{display:block;font-size:.8rem;color:var(--muted,#6b7280);margin-bottom:.25rem}
+    .freq-filtros select,.freq-filtros input{font:inherit;padding:.4rem .6rem;border:1.5px solid #cfd8e8;border-radius:8px;background:#fff}
+    .freq-filtros input{min-width:15rem}
     .freq-linha{cursor:pointer}
     .freq-linha:hover td{background:#f2f7fd}
     .freq-linha.on td{background:#eaf3fb;font-weight:600}
@@ -621,10 +622,20 @@
       <div class="topbar">
         <h1>Frequência</h1>
         <div style="display:flex;gap:.5rem">
-          <button class="btn btn-ghost btn-sm" onclick="novaFolha()">＋ Nova folha</button>
-          <button class="btn btn-navy btn-sm" id="freq-salvar" onclick="salvarFrequencia()">Salvar</button>
+          <button class="btn btn-navy btn-sm" onclick="modalNovaFolha()">＋ Nova folha</button>
+          <button class="btn btn-navy btn-sm" id="freq-salvar" onclick="salvarFrequencia()" hidden>Salvar</button>
+          <button class="btn btn-ghost btn-sm" id="freq-fechar" onclick="fecharFolha()" hidden>Fechar folha</button>
         </div>
       </div>
+      <!-- ==================================================================
+           O EDITOR SÓ EXISTE COM UMA FOLHA ABERTA
+
+           Antes ele ficava sempre na tela, em branco, e a pessoa via um
+           formulário vazio sem saber se estava criando ou editando algo. Agora
+           a tela abre na LISTA (que é a pergunta de quem chega: "quais folhas
+           existem?") e o editor aparece quando se cria ou se abre uma folha.
+           =================================================================== -->
+      <div id="freq-editor" hidden>
       <div class="card">
         <p class="freq-projeto">Projeto Socioassistencial "Movimento para a Vida Ativa" — Frequência Aula de Hidroginástica</p>
         <div class="freq-controles">
@@ -652,14 +663,27 @@
           <tbody id="freq-tbody"></tbody>
         </table>
       </div>
+      </div><!-- /freq-editor -->
       <p class="ajuda" id="freq-status"></p>
 
-      <!-- As folhas já registradas. Clicar numa linha abre a folha em cima,
-           para conferir ou atualizar — é a mesma tela, no mesmo lugar. -->
+      <!-- As folhas já registradas. O menu de cada linha tem as ações; clicar
+           na linha abre a folha no editor acima. -->
       <h2 class="freq-sub">Folhas registradas</h2>
+      <div class="card" style="padding:.7rem .9rem">
+        <div class="freq-filtros">
+          <div><label>Mês</label><select id="ff-mes" onchange="pintarListaFolhas()"></select></div>
+          <div><label>Turma</label><select id="ff-turma" onchange="pintarListaFolhas()"></select></div>
+          <div><label>Buscar pessoa na folha</label>
+            <input type="text" id="ff-busca" placeholder="Nome de quem está na folha…"
+                   oninput="pintarListaFolhas()"></div>
+          <div style="display:flex;align-items:flex-end">
+            <button class="btn btn-ghost btn-sm" onclick="limparFiltroFolhas()">Limpar</button>
+          </div>
+        </div>
+      </div>
       <div class="card" style="padding:0;overflow:auto">
         <table>
-          <thead><tr><th>Mês</th><th>Turma</th><th>Aulas</th><th>Participantes</th><th></th></tr></thead>
+          <thead><tr><th>Mês</th><th>Turma</th><th>Aulas</th><th>Participantes</th><th style="width:2.6rem"></th></tr></thead>
           <tbody id="freq-lista"></tbody>
         </table>
       </div>
@@ -2960,7 +2984,70 @@ function freqMesesOpcoes(){
 async function abrirFrequencia(){
   try{ FREQ_LISTA = await api("frequencias"); }catch{ FREQ_LISTA = []; }
   montarSeletoresFreq();
-  novaFolha(true);
+  /* A tela ABRE NA LISTA. Quem entra em Frequência quer ver o que existe;
+     criar é uma decisão que vem depois, e vem por um botão. */
+  fecharFolha();
+}
+
+/* Mostra ou esconde o editor conforme haja folha aberta. Um único lugar
+   decidindo isso — espalhado, sobraria um botão Salvar visível sem folha. */
+function pintarModoFolha(){
+  const temFolha = !!FREQ;
+  $("#freq-editor").hidden = !temFolha;
+  $("#freq-salvar").hidden = !temFolha;
+  $("#freq-fechar").hidden = !temFolha;
+}
+
+function fecharFolha(){
+  if(FREQ && FREQ_SUJO && folhaTemConteudo() &&
+     !confirm("Há alterações não salvas nesta folha. Fechar mesmo assim?")) return;
+  FREQ = null; FREQ_SUJO = false; FREQ_SEL.clear();
+  $("#freq-status").textContent = "";
+  pintarModoFolha();
+  pintarListaFolhas();
+}
+
+/* ==========================================================================
+   NOVA FOLHA — um formulário, e não o editor em branco
+
+   Turma e mês são a identidade prática da folha (o que a equipe procura na
+   lista), então perguntá-los ANTES evita a folha montada com trinta nomes e
+   o mês errado — que só se descobre no papel, depois de impressa.
+   ========================================================================== */
+function modalNovaFolha(){
+  if(FREQ && FREQ_SUJO && folhaTemConteudo() &&
+     !confirm("Há alterações não salvas na folha aberta. Começar outra mesmo assim?")) return;
+  const meses = freqMesesOpcoes();
+  const host=$("#modal-host")||(()=>{const d=document.createElement("div");d.id="modal-host";document.body.appendChild(d);return d;})();
+  host.innerHTML=`<div class="modal-bg"><div class="modal" style="width:min(560px,96vw)">
+    <h2>Nova folha de frequência</h2>
+    <div class="modal-corpo">
+      <div class="formgrid">
+        <div><label>Turma</label><select id="nf-turma">
+          ${FREQ_TURMAS.map((t)=>`<option>${t}</option>`).join("")}</select></div>
+        <div><label>Mês</label><select id="nf-mes">
+          ${meses.map((m)=>`<option value="${m}">${escA(freqMesLabel(m))}</option>`).join("")}</select></div>
+      </div>
+      <p class="ajuda" style="margin:.6rem 0 0">Depois de criar, você escolhe os dias das aulas
+        e vai acrescentando os usuários. Nada é gravado até clicar em <b>Salvar</b>.</p>
+    </div>
+    <div class="acoes">
+      <button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-navy" onclick="criarFolhaDoForm()">Criar folha</button>
+    </div>
+  </div></div>`;
+}
+
+function criarFolhaDoForm(){
+  const turma=$("#nf-turma").value, mes=$("#nf-mes").value;
+  fecharModal();
+  montarSeletoresFreq();
+  $("#freq-turma").value=turma; $("#freq-mes").value=mes;
+  FREQ={ id:0, turma, mes, datas:[], participantes:[] };
+  FREQ_SUJO=false; FREQ_SEL.clear();
+  $("#freq-status").textContent="";
+  pintarModoFolha(); pintarFrequencia(); pintarListaFolhas();
+  $("#pane-freq").scrollIntoView({ block:"start" });
 }
 function montarSeletoresFreq(){
   const selT=$("#freq-turma"), selM=$("#freq-mes");
@@ -2974,14 +3061,7 @@ function montarSeletoresFreq(){
    nova nasce em branco aqui, e folha existente se abre pela LISTA. */
 const folhaTemConteudo=()=> !!FREQ && (FREQ.participantes.length>0 || freqDatas().length>0);
 
-function novaFolha(semPergunta){
-  if(semPergunta!==true && FREQ_SUJO && folhaTemConteudo() &&
-     !confirm("Há alterações não salvas na folha aberta. Começar outra mesmo assim?")) return;
-  FREQ={ id:0, turma:$("#freq-turma").value, mes:$("#freq-mes").value, datas:[], participantes:[] };
-  FREQ_SUJO=false; $("#freq-status").textContent="";
-  pintarFrequencia();
-  pintarListaFolhas();
-}
+
 
 /* Trocar turma ou mês só muda o CAMPO da folha aberta — nada é carregado. */
 function trocarFolha(){
@@ -3087,8 +3167,11 @@ async function salvarFrequencia(){
     /* Salvar FECHA a folha: o editor volta em branco, pronto para a próxima
        turma, e a que acabou de ser salva aparece na lista logo abaixo. */
     montarSeletoresFreq();
-    novaFolha(true);
-    $("#freq-status").textContent=`Folha salva — turma ${salva.turma}, ${freqMesLabel(salva.mes)}. Ela está na lista abaixo; o editor está pronto para a próxima.`;
+    /* Salvar FECHA a folha e volta à lista — é lá que se confere o que foi
+       registrado, e é de lá que sai a próxima ação. */
+    FREQ=null; FREQ_SUJO=false; FREQ_SEL.clear();
+    pintarModoFolha(); pintarListaFolhas();
+    $("#freq-status").textContent=`Folha salva — turma ${salva.turma}, ${freqMesLabel(salva.mes)}. Ela está na lista abaixo.`;
   }catch(e){ $("#freq-status").textContent="Não salvou: "+e.message; }
   btn.disabled=false;
 }
@@ -3098,25 +3181,105 @@ async function salvarFrequencia(){
    Clicar numa linha traz a folha para o editor em cima: escolher e abrir são
    a mesma coisa, pelo mesmo caminho que os selects já usam.
    ========================================================================== */
+/* ==========================================================================
+   O FILTRO DA LISTA
+
+   Três perguntas reais de quem procura uma folha: "de que mês?", "de que
+   turma?" e "em qual folha está a Fulana?". A busca por PESSOA é a que não dá
+   para fazer de outro jeito — a folha guarda ids, e ninguém decora id.
+
+   Os seletores são montados a partir do que EXISTE na lista, não do catálogo
+   inteiro: oferecer 13 turmas quando só duas têm folha faz procurar em opções
+   que nunca vão dar resultado.
+   ========================================================================== */
+function montarFiltrosFolhas(){
+  const selM=$("#ff-mes"), selT=$("#ff-turma");
+  if(!selM||!selT) return;
+  const meses=[...new Set(FREQ_LISTA.map((f)=>f.mes))].sort().reverse();
+  const turmas=[...new Set(FREQ_LISTA.map((f)=>f.turma))].sort();
+  const guardaM=selM.value, guardaT=selT.value;
+  selM.innerHTML=`<option value="">Todos</option>`+meses.map((m)=>`<option value="${m}">${escA(freqMesLabel(m))}</option>`).join("");
+  selT.innerHTML=`<option value="">Todas</option>`+turmas.map((t)=>`<option value="${escA(t)}">${escA(t)}</option>`).join("");
+  if(meses.includes(guardaM)) selM.value=guardaM;
+  if(turmas.includes(guardaT)) selT.value=guardaT;
+}
+function limparFiltroFolhas(){
+  $("#ff-mes").value=""; $("#ff-turma").value=""; $("#ff-busca").value="";
+  reiniciarPagina("freq"); pintarListaFolhas();
+}
+function folhasFiltradas(){
+  const mes=($("#ff-mes")||{}).value||"", turma=($("#ff-turma")||{}).value||"";
+  const termo=(($("#ff-busca")||{}).value||"").trim().toLowerCase();
+  return FREQ_LISTA.filter((f)=>{
+    if(mes && f.mes!==mes) return false;
+    if(turma && f.turma!==turma) return false;
+    if(termo){
+      /* Procura o NOME dentro dos participantes — resolvendo cada id no
+         cache. Sem cache (recepção que não carregou pacientes), a busca não
+         encontra em vez de mentir dizendo que a folha não tem ninguém. */
+      const nomes=freqArr(f.participantes).map((id)=>String(freqPessoa(id).nome||"").toLowerCase());
+      if(!nomes.some((n)=>n.includes(termo))) return false;
+    }
+    return true;
+  });
+}
+
+/* O menu de ações da linha, no MESMO desenho dos três pontinhos do resto do
+   sistema (`acao-menu`) — assim a lista de folhas se comporta como todas as
+   outras listas, sem uma gramática própria só dela. */
+function menuFolha(f){
+  const itens=[
+    ["Abrir", `abrirFolhaSalva(${f.id})`],
+    ["Imprimir", `imprimirFolha(${f.id})`],
+    ["Duplicar", `duplicarFolha(${f.id})`],
+    ["Remover", `removerFolha(${f.id})`],
+  ];
+  return `<div class="acao-menu">
+    <button type="button" class="acao-trigger" aria-haspopup="true" aria-expanded="false"
+            title="Ações" aria-label="Ações desta folha" onclick="event.stopPropagation();abrirMenuLinha(this,event)">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>
+    </button>
+    <div class="acao-lista" role="menu">${
+      itens.map(([rot,fn])=>`<button type="button" role="menuitem" onclick="event.stopPropagation();${escA(fn)}">${escA(rot)}</button>`).join("")
+    }</div></div>`;
+}
+
+async function removerFolha(id){
+  const f=FREQ_LISTA.find((x)=>x.id===id); if(!f) return;
+  const gente=freqArr(f.participantes).length;
+  if(!confirm(`Remover a folha de ${freqMesLabel(f.mes)}, turma ${f.turma}?\n\n` +
+      `Ela tem ${gente} participante(s) e some do sistema — quem já assinou no papel não é afetado, ` +
+      `mas a folha em si não volta.`)) return;
+  try{ await api("frequencias/"+id,"DELETE"); }
+  catch(e){ return toast(e.message,true); }
+  /* Se a folha aberta era essa, o editor fecha: continuar editando uma folha
+     que não existe mais criaria uma cópia ao salvar, sem ninguém pedir. */
+  if(FREQ && FREQ.id===id){ FREQ=null; FREQ_SUJO=false; FREQ_SEL.clear(); pintarModoFolha(); }
+  try{ FREQ_LISTA = await api("frequencias"); }catch{}
+  montarSeletoresFreq(); montarFiltrosFolhas(); pintarListaFolhas();
+  toast("Folha removida.");
+}
+
 function pintarListaFolhas(){
-  const lista=[...FREQ_LISTA].sort((a,b)=> String(b.mes).localeCompare(String(a.mes)) || String(a.turma).localeCompare(String(b.turma)));
+  montarFiltrosFolhas();
+  const lista=folhasFiltradas()
+    .sort((a,b)=> String(b.mes).localeCompare(String(a.mes)) || String(a.turma).localeCompare(String(b.turma)));
   const info=fatiar("freq", lista);
   barraPaginacao("freq-paginacao","freq",info);
+  const filtrando = !!(($("#ff-mes")||{}).value || ($("#ff-turma")||{}).value || (($("#ff-busca")||{}).value||"").trim());
   $("#freq-lista").innerHTML = info.itens.length
     ? info.itens.map((f)=>{
         const aulas=freqArr(f.datas).length, gente=freqArr(f.participantes).length;
         const aberta=FREQ && FREQ.id===f.id;
         return `<tr class="freq-linha${aberta?" on":""}" onclick="abrirFolhaSalva(${f.id})" title="Abrir esta folha">
-          <td>${escA(freqMesLabel(f.mes))}</td><td>${escA(f.turma)}</td>
+          <td>${escA(freqMesLabel(f.mes))}${aberta?' <span class="tag tag-Ativo" style="font-size:.66rem">aberta</span>':""}</td>
+          <td>${escA(f.turma)}</td>
           <td>${aulas}</td><td>${gente}</td>
-          <td style="text-align:right;color:var(--muted,#6b7280);font-size:.8rem">
-            <button class="freq-acao" onclick="event.stopPropagation();duplicarFolha(${f.id})"
-              title="Copia os nomes desta folha para uma folha NOVA — escolha o mês e salve">⧉ duplicar</button>
-            <button class="freq-acao" onclick="event.stopPropagation();imprimirFolha(${f.id})"
-              title="Imprime esta folha, como está salva">🖨 imprimir</button>
-            ${aberta?"aberta acima":"abrir ›"}</td></tr>`;
+          <td style="text-align:right">${menuFolha(f)}</td></tr>`;
       }).join("")
-    : `<tr><td class="vazio" colspan="5">Nenhuma folha registrada ainda — monte a primeira acima e clique em Salvar.</td></tr>`;
+    : `<tr><td class="vazio" colspan="5">${filtrando
+        ? "Nenhuma folha com esse filtro."
+        : "Nenhuma folha registrada ainda — clique em <b>+ Nova folha</b> para criar a primeira."}</td></tr>`;
 }
 /* Duplicar: os MESMOS nomes (e os dias, como ponto de partida) numa folha
    NOVA, sem id — a original não é tocada. O uso típico é virar o mês: escolhe
@@ -3129,7 +3292,8 @@ function duplicarFolha(id){
   $("#freq-turma").value=f.turma; $("#freq-mes").value=f.mes;
   FREQ={ id:0, turma:f.turma, mes:f.mes, datas:freqArr(f.datas), participantes:freqArr(f.participantes) };
   FREQ_SEL.clear();
-  FREQ_SUJO=true;      // é uma folha nova com conteúdo — sair sem salvar perde
+  FREQ_SUJO=true;
+  pintarModoFolha();      // é uma folha nova com conteúdo — sair sem salvar perde
   $("#freq-status").textContent=`Cópia da folha de ${freqMesLabel(f.mes)} (${f.turma}) — escolha o mês, ajuste os dias e clique em Salvar para registrar a nova.`;
   pintarFrequencia();
   pintarListaFolhas();
@@ -3145,6 +3309,7 @@ function abrirFolhaSalva(id){
   FREQ={ id:f.id, turma:f.turma, mes:f.mes, datas:freqArr(f.datas), participantes:freqArr(f.participantes) };
   FREQ_SEL.clear();
   FREQ_SUJO=false; $("#freq-status").textContent="";
+  pintarModoFolha();
   pintarFrequencia();
   pintarListaFolhas();
   $("#pane-freq").scrollIntoView({ block:"start" });
