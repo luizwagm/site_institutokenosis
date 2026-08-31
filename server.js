@@ -36,6 +36,21 @@ const conectorChat = require("./lachat");
 const CARGO_POR_PERFIL = {
   admin: "Administração", secretaria: "Secretaria", profissional: "Profissional",
 };
+
+/* ==========================================================================
+   QUEM PODE ABRIR REUNIÃO POR LINK
+
+   É uma CAPACIDADE, e não um papel. No chat só existem `membro` e `admin`, e
+   isso é deliberado: promover o profissional a `admin` do chat para ele poder
+   criar sala lhe daria junto a auditoria e a administração do chat inteiro.
+
+   Quem decide é o SITE, que conhece os próprios perfis. O chat só obedece — e
+   recusa a criação para quem chegar sem a capacidade, mesmo com passe válido.
+
+   Secretaria fica de fora: ela agenda e recebe, não conduz atendimento.
+   ========================================================================== */
+const PERFIS_COM_REUNIAO = new Set(["admin", "profissional"]);
+const podeCriarReuniao = (perfil) => PERFIS_COM_REUNIAO.has(String(perfil || ""));
 const chat = conectorChat({
   url: process.env.CHAT_URL || "http://127.0.0.1:5197",
   segredo: process.env.CHAT_SEGREDO_PASSE,
@@ -58,6 +73,11 @@ const chat = conectorChat({
       nome: s.nome,
       cargo: CARGO_POR_PERFIL[s.perfil] || "Equipe",
       papel: s.perfil === "admin" ? "admin" : "membro",
+      /* PRECISA ESTAR NOS DOIS LUGARES — aqui e no elenco. O passe carrega a
+         capacidade a cada login; o elenco a mantém para quem já existe. Faltando
+         num deles, a aba de reuniões aparece e some conforme o caminho por onde
+         a pessoa entrou, e ninguém entende por quê. */
+      podeSala: podeCriarReuniao(s.perfil),
     };
   },
 });
@@ -74,7 +94,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "2.11.0";
+const APP_VERSION = "2.11.1";
 
 /* ==========================================================================
    CONSULTA DE CEP
@@ -847,6 +867,77 @@ function limparRicos(tabela, obj) {
   return obj;
 }
 
+/* ==========================================================================
+   O TEXTO DO PAINEL CHEGANDO NA PÁGINA
+
+   Os campos com editor guardam HTML no banco (o htmlLimpo já tirou o que é
+   perigoso). Quem imprimir esse valor com esc() mostra a MARCAÇÃO na tela — foi
+   exatamente o que aconteceu com a bio da diretoria: a home e o /institucional
+   exibiam "<p>Professor, Terapeuta…</p>" e o "&nbsp;" que veio colado do Word,
+   em vez do texto.
+
+   O destino manda, e são dois:
+
+   · textoRico → dentro da página, onde formatação faz sentido. Aceita também o
+     conteúdo ANTIGO, que é texto puro: sem bloco nenhum ele mesmo embrulha num
+     <p> e transforma a quebra de linha em <br>.
+
+   · soTexto → onde tag nenhuma pode entrar: <meta name="description">, JSON-LD,
+     alt de imagem, índice da busca. Ali a tag não fica só feia, ela aparece
+     crua no resultado do Google. Decodifica as entidades comuns do "colar do
+     Word" (&nbsp;, &amp;) — senão o esc() do destino as mostraria escritas.
+
+   Escapar continua sendo o padrão: só passa por aqui campo que o painel edita
+   com editor. Nome, cargo, título e URL seguem no esc(), como sempre.
+   ========================================================================== */
+const TEM_BLOCO = /<(p|div|ul|ol|h[1-6]|blockquote|table|pre|hr)\b/i;
+/* O texto colado do Word chega cheio de entidade: "Cl&iacute;nico", "&nbsp;".
+   Dentro da página o navegador resolve sozinho; no índice da busca e no
+   <meta description> não — ali sai escrito "Cl&iacute;nico" mesmo.
+
+   As acentuadas são REGULARES: os nomes da tabela Latin-1 seguem exatamente a
+   ordem dos códigos 192…255, então são gerados em vez de digitados um a um
+   (70 linhas a menos, e nenhuma chance de errar um código). O resto — sinais e
+   pontuação — vai à mão. */
+/* Sem protótipo de propósito: com um objeto comum, "&constructor;" acharia a
+   função herdada e ela iria parar dentro do texto da página. */
+const ENTIDADES = Object.assign(Object.create(null), { nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'",
+  ndash: "–", mdash: "—", hellip: "…", lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”",
+  bull: "•", middot: "·", deg: "°", ordm: "º", ordf: "ª", laquo: "«", raquo: "»",
+  euro: "€", trade: "™", copy: "©", reg: "®", frac12: "½", frac14: "¼" });
+("Agrave Aacute Acirc Atilde Auml Aring AElig Ccedil Egrave Eacute Ecirc Euml Igrave Iacute Icirc Iuml "
+ + "ETH Ntilde Ograve Oacute Ocirc Otilde Ouml times Oslash Ugrave Uacute Ucirc Uuml Yacute THORN szlig "
+ + "agrave aacute acirc atilde auml aring aelig ccedil egrave eacute ecirc euml igrave iacute icirc iuml "
+ + "eth ntilde ograve oacute ocirc otilde ouml divide oslash ugrave uacute ucirc uuml yacute thorn yuml")
+  .split(" ").forEach((nome, i) => { ENTIDADES[nome] = String.fromCharCode(192 + i); });
+
+function textoRico(valor, classe) {
+  const s = String(valor ?? "").trim();
+  if (!s) return "";
+  const cls = classe ? ` class="${classe}"` : "";
+  // Sem sinal de marcação é texto puro: escapa (pode ter & ou <) e vira um <p>.
+  if (!/<[a-z!\/]/i.test(s)) return `<p${cls}>${esc(s).replace(/\n/g, "<br>")}</p>`;
+  const html = htmlLimpo(s);                 // de novo: linha antiga do banco pode não ter passado por aqui
+  return TEM_BLOCO.test(html) ? `<div${cls}>${html}</div>` : `<p${cls}>${html}</p>`;
+}
+
+function soTexto(valor) {
+  return String(valor ?? "")
+    /* O conteúdo destas some junto com a tag; tirar só a tag deixaria o código
+       do script solto como texto visível. */
+    .replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, " ")
+    /* Bloco vira ESPAÇO, não vazio: "<p>um</p><p>dois</p>" tem de virar
+       "um dois", e não "umdois". */
+    .replace(/<\/?(p|div|br|li|tr|h[1-6]|blockquote|table)\b[^>]*>/gi, " ")
+    .replace(/<[^>]*>/g, "")
+    /* O que não estiver na tabela fica como está: melhor um "&sect;" visível do
+       que engolir o texto por causa de um nome que ninguém previu. */
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]*);/gi, (m, e) =>
+      e[0] === "#" ? String.fromCodePoint(Number(e[1] === "x" || e[1] === "X" ? "0" + e.slice(1) : e.slice(1)))
+                   : (ENTIDADES[e] ?? ENTIDADES[e.toLowerCase()] ?? m))
+    .replace(/\s+/g, " ").trim();
+}
+
 /* Um bloco de texto do painel, pronto para entrar na página.
 
    Convive com os dois formatos porque o conteúdo antigo é TEXTO PURO com
@@ -1037,7 +1128,7 @@ async function publish() {
             <span class="projeto__sigla">${esc(p.sigla || "•")}</span>
             <span>
               <span class="projeto__nome">${esc(p.title)}</span>
-              <span class="projeto__desc">${esc(p.resumo || "")}</span>
+              <span class="projeto__desc">${esc(soTexto(p.resumo))}</span>
             </span>
             <span class="etiqueta etiqueta--${/execu/i.test(p.status || "") ? "ativo" : "planejado"}">${esc(p.status || "")}</span>
           </a>`;
@@ -1048,7 +1139,7 @@ async function publish() {
   const cartaoProjeto = (p, i) => `<a class="cartao proj-cartao" href="/projetos/${esc(p.slug)}/" data-revela${i % 3 ? ` data-revela-atraso="${i % 3}"` : ""}>
             <span class="etiqueta etiqueta--${/execu/i.test(p.status || "") ? "ativo" : "planejado"}">${esc(p.status || "")}</span>
             <h3 class="cartao__titulo" style="margin-top:.8rem">${esc(p.title)}</h3>
-            <p class="cartao__texto">${esc(p.resumo || "")}</p>
+            <p class="cartao__texto">${esc(soTexto(p.resumo))}</p>
           </a>`;
   const projetosHome = projetos.slice(0, 3).map(cartaoProjeto).join("\n          ");
 
@@ -1057,7 +1148,7 @@ async function publish() {
             ${ICONE_DOC}
             <span>
               <span class="doc__nome">${esc(d.title)}</span><br>
-              <span class="doc__meta">${esc([d.tipo, d.ano].filter(Boolean).join(" · "))}</span>
+              <span class="doc__meta">${esc([soTexto(d.tipo), d.ano].filter(Boolean).join(" · "))}</span>
             </span>
           </a>`;
   // Estado vazio: sem isto a seção fica com um buraco e parece quebrada.
@@ -1081,7 +1172,7 @@ async function publish() {
             ${m.photo ? `<figure class="pessoa__foto"><img src="${esc(m.photo)}" alt="${esc(m.name)} — ${esc(m.role)}" loading="lazy" decoding="async" width="120" height="120"></figure>` : ""}
             <h3 class="cartao__titulo">${esc(m.name)}</h3>
             <p class="rotulo" style="margin:.2rem 0 .7rem">${esc(m.role)}</p>
-            ${m.bio ? `<p class="cartao__texto">${esc(m.bio)}</p>` : ""}
+            ${textoRico(m.bio, "cartao__texto")}
           </article>`;
   const diretoriaHome = diretoria.filter((m) => Number(m.na_home) === 1).map(cartaoPessoa).join("\n          ");
   const diretoriaTodos = diretoria.map(cartaoPessoa).join("\n          ");
@@ -1284,9 +1375,14 @@ async function publish() {
       TITULO: esc(p.title), SLUG: esc(p.slug), SIGLA: esc(p.sigla || ""),
       TITLE_TAG: esc(tituloSeo(p.title)),
       STATUS: esc(p.status || ""), CLASSE_STATUS: /execu/i.test(p.status || "") ? "ativo" : "planejado",
-      RESUMO: esc(p.resumo || ""), PUBLICO: esc(p.publico || ""), CONTEUDO: marcado(p.content),
+      RESUMO: esc(soTexto(p.resumo)),
+      /* O RESUMO vira <meta description> e JSON-LD, então é texto e só. O
+         PÚBLICO fica dentro da página: vem da gestão em várias linhas, com
+         tópicos, e imprimi-lo como texto corrido emendava a lista toda numa
+         frase só. Por isso ele traz o próprio <p> — o molde não embrulha mais. */
+      PUBLICO: textoRico(p.publico, "cartao__texto"), CONTEUDO: marcado(p.content),
       JSONLD: jsonldTag({ "@context": "https://schema.org", "@graph": [
-        { "@type": "Project", name: p.title, alternateName: p.sigla, description: p.resumo,
+        { "@type": "Project", name: p.title, alternateName: p.sigla, description: soTexto(p.resumo),
           url: `${SITE}/projetos/${p.slug}/`, parentOrganization: { "@id": `${SITE}/#org` } },
         { "@type": "BreadcrumbList", itemListElement: [
           { "@type": "ListItem", position: 1, name: "Início", item: `${SITE}/` },
@@ -1305,7 +1401,7 @@ async function publish() {
     PARCEIROS: "        " + (parceiros.map((p, i) => `<article class="cartao" data-revela${i % 3 ? ` data-revela-atraso="${i % 3}"` : ""}>
             ${p.image ? `<img src="${esc(p.image)}" alt="${esc(p.title)}" loading="lazy" style="height:52px;width:auto;margin-bottom:1rem">` : ""}
             <h3 class="cartao__titulo">${esc(p.title)}</h3>
-            <p class="cartao__texto">${esc(p.subtitle || "")}</p>
+            ${textoRico(p.subtitle, "cartao__texto")}
           </article>`).join("\n          ") || '<p class="sub-secao">Parcerias em cadastramento.</p>'),
     JSONLD: jsonldTag({ "@context": "https://schema.org", "@graph": [migalha("Institucional", "/institucional/"),
       { "@type": "AboutPage", name: "Institucional — Instituto Kenósis", url: `${SITE}/institucional/`, about: { "@id": `${SITE}/#org` } }] }),
@@ -1415,20 +1511,19 @@ async function publish() {
 
   gravar("busca", base("busca.html", { JSONLD: "" }));
 
-  const limpo = (t) => String(t || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   const indice = [
-    { t: "Início — Instituto Kenósis", u: "/", tipo: "Página", d: limpo(S.hero_texto) },
-    { t: "A instituição", u: "/institucional/", tipo: "Institucional", d: limpo(S.sec_inst_texto) },
-    { t: "Transparência e prestação de contas", u: "/transparencia/", tipo: "Institucional", d: limpo(S.sec_transp_sub) },
-    { t: "Seja voluntário", u: "/voluntariado/", tipo: "Participe", d: limpo(S.pg_vol_conteudo).slice(0, 300) },
-    { t: "Banco de talentos", u: "/banco-de-talentos/", tipo: "Participe", d: limpo(S.pg_talentos_conteudo).slice(0, 300) },
-    { t: "Editais e chamamentos", u: "/editais/", tipo: "Participe", d: limpo(S.pg_editais_conteudo).slice(0, 300) },
+    { t: "Início — Instituto Kenósis", u: "/", tipo: "Página", d: soTexto(S.hero_texto) },
+    { t: "A instituição", u: "/institucional/", tipo: "Institucional", d: soTexto(S.sec_inst_texto) },
+    { t: "Transparência e prestação de contas", u: "/transparencia/", tipo: "Institucional", d: soTexto(S.sec_transp_sub) },
+    { t: "Seja voluntário", u: "/voluntariado/", tipo: "Participe", d: soTexto(S.pg_vol_conteudo).slice(0, 300) },
+    { t: "Banco de talentos", u: "/banco-de-talentos/", tipo: "Participe", d: soTexto(S.pg_talentos_conteudo).slice(0, 300) },
+    { t: "Editais e chamamentos", u: "/editais/", tipo: "Participe", d: soTexto(S.pg_editais_conteudo).slice(0, 300) },
     { t: "Política de Privacidade", u: "/privacidade/", tipo: "Institucional", d: "Como tratamos os seus dados pessoais, conforme a LGPD." },
-    ...servicos.map((s) => ({ t: s.title, u: "/servicos/", tipo: "Serviço", d: limpo(s.categoria) })),
-    ...projetos.map((p) => ({ t: p.title, u: `/projetos/${p.slug}/`, tipo: "Projeto", d: limpo(p.resumo) + " " + limpo(p.content).slice(0, 300) })),
-    ...posts.map((p) => ({ t: p.title, u: `/memoria/${p.slug}/`, tipo: "Memória", d: limpo(p.excerpt) + " " + limpo(p.content).slice(0, 300) })),
-    ...feed.map((p) => ({ t: p.title, u: `/feed/${p.slug}/`, tipo: "Feed", d: limpo(p.excerpt) + " " + limpo(p.content).slice(0, 300) })),
-    ...diretoria.map((m) => ({ t: m.name, u: "/institucional/#diretoria", tipo: "Diretoria", d: `${limpo(m.role)}. ${limpo(m.bio)}` })),
+    ...servicos.map((s) => ({ t: s.title, u: "/servicos/", tipo: "Serviço", d: soTexto(s.categoria) })),
+    ...projetos.map((p) => ({ t: p.title, u: `/projetos/${p.slug}/`, tipo: "Projeto", d: soTexto(p.resumo) + " " + soTexto(p.content).slice(0, 300) })),
+    ...posts.map((p) => ({ t: p.title, u: `/memoria/${p.slug}/`, tipo: "Memória", d: soTexto(p.excerpt) + " " + soTexto(p.content).slice(0, 300) })),
+    ...feed.map((p) => ({ t: p.title, u: `/feed/${p.slug}/`, tipo: "Feed", d: soTexto(p.excerpt) + " " + soTexto(p.content).slice(0, 300) })),
+    ...diretoria.map((m) => ({ t: m.name, u: "/institucional/#diretoria", tipo: "Diretoria", d: `${soTexto(m.role)}. ${soTexto(m.bio)}` })),
   ];
   fs.mkdirSync(path.join(ROOT, "assets", "data"), { recursive: true });
   fs.writeFileSync(path.join(ROOT, "assets", "data", "search-index.json"), JSON.stringify(indice));
@@ -2331,6 +2426,7 @@ async function sincronizarElencoDoChat(motivo = "boot") {
          ("admin"), não um endereço — no chat viraria contato falso. */
       cargo: CARGO_POR_PERFIL[u.perfil] || "Equipe",
       papel: u.perfil === "admin" ? "admin" : "membro",
+      podeSala: podeCriarReuniao(u.perfil),
       /* A foto vai como CAMINHO RELATIVO (/restrito/arquivos/…): resolve na
          origem da página, o navegador de quem está no sistema leva o cookie
          do /restrito e a imagem chega autenticada — sem rota pública e sem

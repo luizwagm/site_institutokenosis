@@ -898,7 +898,7 @@ const TDEFS = {
   documentos: [
     ["title", "Título do documento", "input"],
     ["ano", "Ano", "input"],
-    ["tipo", "Descrição (aparece abaixo do título)", "textarea"],
+    ["tipo", "Descrição (aparece abaixo do título)", "simples"],
     ["url", "Link do arquivo (Google Drive, PDF…)", "input"],
   ],
   team: [
@@ -977,6 +977,11 @@ function renderTable(t) {
         if (kind === "slug") return `<label>${lab}</label>
           <input ${dados} value="${escA(r[f])}" oninput="this.dataset.tocado='1'">
           <p class="hint">Vem sozinha do título, tudo minúsculo e separado por hífen. Só é preenchida quando está vazia — trocar a URL de uma página já publicada quebraria o link e o que o Google indexou.</p>`;
+        /* Campo de UMA LINHA no site: a descrição do documento sai grudada no
+           ano, dentro de um <span>. Dar editor aqui gravaria <p> no banco, e o
+           site imprimiria a tag na tela — foi o que aconteceu com a bio. */
+        if (kind === "simples") return `<label>${lab}</label><textarea ${dados}>${escA(r[f])}</textarea>
+          <p class="hint">Texto simples, sem formatação — sai numa linha só, ao lado do ano.</p>`;
         if (kind === "textarea") return `<label>${lab}</label>${editorRico(dados, r[f])}`;
         if (kind === "image") {
           /* Feed e Memória aceitam VÍDEO na capa; as outras listas (parceiros,

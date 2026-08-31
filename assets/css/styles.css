@@ -269,6 +269,16 @@ h1, h2, h3, h4 {
 .cartao__icone svg { width: 26px; height: 26px; }
 .cartao__titulo { font-size: 1.2rem; margin-bottom: .5rem; }
 .cartao__texto { font-size: .95rem; color: var(--tinta-suave); }
+
+/* O texto do card pode chegar FORMATADO do painel (a bio da diretoria, a
+   descrição do parceiro): nesse caso ele é uma <div> com parágrafos e listas
+   dentro, em vez de um <p> solto. O reset global zera toda margem, então o
+   respiro entre os blocos precisa ser declarado aqui — sem isto dois parágrafos
+   ficam grudados e se leem como um bloco só. */
+.cartao__texto > * + * { margin-top: .7rem; }
+.cartao__texto ul, .cartao__texto ol { padding-left: 1.15rem; }
+.cartao__texto li + li { margin-top: .25rem; }
+.cartao__texto a { color: var(--celeste); }
 .cartao__mais {
   display: inline-flex; align-items: center; gap: .35rem; margin-top: 1rem;
   font-size: .88rem; font-weight: 700; color: var(--celeste); text-decoration: none;
