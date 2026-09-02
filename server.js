@@ -94,7 +94,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "2.11.1";
+const APP_VERSION = "2.12.0";
 
 /* ==========================================================================
    CONSULTA DE CEP
@@ -170,7 +170,18 @@ fs.mkdirSync(path.join(ROOT, "data"), { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 fs.mkdirSync(VIDEO_DIR, { recursive: true });
 
-const db = abrirBanco(path.join(ROOT, "data", "site.db"));
+/* ==========================================================================
+   ONDE MORA O BANCO DO SITE
+
+   `SITE_DB` é uma válvula para TESTE, e só para isso: sem ela, qualquer prova
+   que suba uma cópia do servidor abre o banco de verdade — o mesmo que o
+   cliente está usando. Ler já é desconfortável; um teste que um dia escreva
+   passa a mexer no conteúdo do site sem ninguém ver.
+
+   Em produção a variável não existe e nada muda. Ver [[dados-de-teste-em-banco-do-cliente]].
+   ========================================================================== */
+const CAMINHO_BANCO = process.env.SITE_DB || path.join(ROOT, "data", "site.db");
+const db = abrirBanco(CAMINHO_BANCO);
 db.exec(`
   CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS services (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, text TEXT, sort INTEGER DEFAULT 0);
@@ -1888,7 +1899,7 @@ function slug(s) { return String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toL
    ========================================================================== */
 const BACKUP_CFG = {
   destino: path.join(ROOT, "backups"),
-  bancos: [path.join(ROOT, "data", "site.db")],
+  bancos: [CAMINHO_BANCO],
   postgres: require("./pg").config(),
   intervaloHoras: Number(process.env.BACKUP_HORAS) || 24,
   manter: Number(process.env.BACKUP_MANTER) || 30,
@@ -1938,7 +1949,27 @@ const servidor = http.createServer(async (req, res) => {
   res.setHeader("X-Content-Type-Options", "nosniff");        // barra MIME sniffing
   res.setHeader("X-Frame-Options", "SAMEORIGIN");            // impede clickjacking no painel
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), interest-cohort=()");
+  /* ==========================================================================
+     CÂMERA E MICROFONE SÓ NO /restrito
+
+     `getUserMedia` e a partilha de tela obedecem à política da PÁGINA, e não
+     à do script. Com `camera=()` valendo para tudo, o navegador recusa ANTES
+     de perguntar ao usuário: nenhuma janela de permissão aparece, nenhum erro
+     vai para o console do chat, e o botão de vídeo simplesmente não faz nada.
+     É a falha mais silenciosa desta pilha — ligar `CHAT_VIDEO=1` no servidor
+     do chat não adianta enquanto esta linha estiver fechada.
+
+     O `/restrito` é onde o chat da equipe vive, onde a chamada de vídeo
+     acontece e — porque o conector repassa `/restrito/chat/*` — também onde
+     mora a sala da reunião por link (`/restrito/chat/call/<codigo>`). Uma
+     regra só, ancorada no prefixo, cobre os três.
+
+     O site público e o /admin continuam fechados: ali não há razão para pedir
+     câmera, e política fechada é a que não precisa de explicação.
+     ========================================================================== */
+  res.setHeader("Permissions-Policy", p.startsWith("/restrito")
+    ? "camera=(self), microphone=(self), display-capture=(self), geolocation=(), interest-cohort=()"
+    : "camera=(), microphone=(), geolocation=(), interest-cohort=()");
   // HSTS: uma vez servido por HTTPS, o navegador nunca mais tenta HTTP (evita
   // downgrade/MITM na 1ª visita). Só faz sentido — e só é honrado — sob HTTPS.
   if (req.headers["x-forwarded-proto"] === "https")

@@ -110,6 +110,18 @@ Medido em 24/08/2026: o Instituto servia 122.286 bytes de cliente; o BemEstar,
   Secretaria não — ela agenda e recebe, não conduz atendimento. A capacidade vai
   nos DOIS lugares (o passe do login e o elenco); faltando num deles, a aba de
   reuniões aparece e some conforme o caminho por onde a pessoa entrou.
+* **`Permissions-Policy` aberta no `/restrito`** (2.12.0). Este item faltava, e
+  ele sozinho segurava tudo: com `camera=()` valendo para o site inteiro, o
+  navegador RECUSA `getUserMedia` antes de perguntar ao usuário. Não aparece
+  janela de permissão, não vai erro para o console do chat, não fica registro no
+  servidor — o botão de vídeo simplesmente não faz nada, e a busca do defeito
+  começa pelo lugar errado (`CHAT_VIDEO`, a instância, o coturn).
+
+  A regra é por prefixo: `camera=(self), microphone=(self), display-capture=(self)`
+  sob `/restrito`, e fechado no resto. O prefixo cobre também
+  `/restrito/chat/call/<codigo>`, que é a página da reunião por link — uma regra
+  por caminho exato deixaria o convidado de fora numa sala sem câmera.
+  Provado por `node testar-cabecalhos.js` (15 casos, 6 sabotagens pegas).
 
 ### 2. No servidor — `/etc/lachat-kenosis.env`
 
@@ -128,11 +140,27 @@ CHAT_TURN=<o mesmo valor de /etc/lachat-bemestar.env>
 CHAT_TURN_SEGREDO=<o mesmo valor de /etc/lachat-bemestar.env>
 ```
 
-> **Sem TURN o vídeo não fica "pior", fica QUEBRADO para a reunião por link.**
-> Ela força `iceTransportPolicy: relay` para o convidado não ver o IP de quem
-> está dentro — e sem servidor de relay o navegador descarta todo candidato e
-> não sobra nenhum. Entre colegas na mesma rede a chamada ainda funciona; o
-> link, não.
+> **O que o TURN custa e o que ele compra** — conferido no código em 01/09/2026,
+> corrigindo o que esta seção dizia antes.
+>
+> A sala por link PEDE `iceTransportPolicy: relay`, para o convidado de fora não
+> ver o IP de quem está dentro. Mas o pedido é condicional:
+> `(soRelay || (aberta && salaRelay)) && temTurn ? "relay" : "all"`
+> (`src/infra/seguranca/turn.js`). **Sem TURN a política cai para `all`** — e a
+> reunião por link CONECTA.
+>
+> Então o preço de subir sem relay não é "o link não funciona". É:
+>
+> * **de 15% a 20% das chamadas não fecham**, concentradas em rede corporativa e
+>   em operadora móvel com NAT restrito — o sintoma é "às vezes não conecta",
+>   intermitente e impossível de diagnosticar por telefone;
+> * **os participantes veem o IP uns dos outros**, inclusive o convidado de fora
+>   que só recebeu um link. Numa OSC que atende família em situação de
+>   vulnerabilidade, isso não é detalhe técnico.
+>
+> O serviço sobe assim mesmo e grita `⚠ VÍDEO LIGADO SEM TURN` no log. O conserto
+> é um `criar-relay.sh` que roda **uma vez por servidor** e serve todas as
+> instâncias — BemEstar incluso, que está no mesmo barco hoje.
 
 Conferir que `CHAT_ORIGENS` já tem `https://institutokenosis.com` — é de lá que
 a página do convidado faz os pedidos dela.
