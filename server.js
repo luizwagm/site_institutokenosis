@@ -94,7 +94,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "2.12.0";
+const APP_VERSION = "2.13.0";
 
 /* ==========================================================================
    CONSULTA DE CEP
@@ -2033,7 +2033,8 @@ const servidor = http.createServer(async (req, res) => {
   /* `gestaoNoAr()` tenta religar antes de desistir. É o que transforma uma
      queda de banco em soluço em vez de interrupção: quem chega depois que o
      PostgreSQL voltou já entra normalmente, sem ninguém mexer no servidor. */
-  if (ERRO_GESTAO && (p === "/restrito" || p.startsWith("/restrito/") || p === "/externo" || p.startsWith("/externo/"))
+  if ((ERRO_GESTAO || subindoGestao)
+      && (p === "/restrito" || p.startsWith("/restrito/") || p === "/externo" || p.startsWith("/externo/"))
       && !(await gestaoNoAr())) {
     const api = p.includes("/api/");
     res.writeHead(503, {
@@ -2405,6 +2406,10 @@ let ERRO_GESTAO = null;
    reconexões; a espera mínima, para não martelar um banco que está mesmo fora.
    Ninguém precisa reiniciar serviço: quem religa é o próprio processo.
    ========================================================================== */
+/* A PRIMEIRA subida, guardada como promessa. Enquanto ela não resolve, a
+   gestão não está no ar nem está quebrada: está SUBINDO — e é um terceiro
+   estado, que `ERRO_GESTAO` sozinho não sabe representar. */
+let subindoGestao = null;
 let religando = null;               // tentativa em curso (promessa compartilhada)
 let proximaTentativa = 0;           // não tenta de novo antes disto
 const ESPERA_ENTRE_TENTATIVAS = 15_000;
@@ -2489,6 +2494,14 @@ function agendarElencoDoChat(motivo) {
 
 /* true se a gestão está no ar — religando antes, se for a hora de tentar. */
 async function gestaoNoAr() {
+  /* AINDA SUBINDO: espera, em vez de deixar passar. Quem chega no primeiro
+     segundo depois do deploy prefere meio segundo de espera a um "Erro
+     interno" que o faz perder o que digitou. O teto existe para o caso do
+     banco estar mesmo fora: aí a espera vira o 503 explicativo em vez de
+     segurar a requisição por trinta segundos. */
+  if (subindoGestao) {
+    await Promise.race([subindoGestao, new Promise((r) => setTimeout(r, 6000))]);
+  }
   if (!ERRO_GESTAO) return true;
   if (Date.now() < proximaTentativa) return false;
   if (!religando) {
@@ -2508,7 +2521,7 @@ async function gestaoNoAr() {
    chamar o listen — e com o banco fora o SITE PÚBLICO ficava 30 segundos sem
    responder. Seria trocar um problema por outro pior: o site do instituto não
    depende do PostgreSQL, e não pode ficar refém dele nem por um instante. */
-(async () => {
+subindoGestao = (async () => {
   /* No boot vale insistir: o serviço sobe junto com o resto da máquina, e o
      PostgreSQL pode ainda estar abrindo. As esperas somam ~30s — bem mais que
      os 5 segundos de um upgrade. */
@@ -2522,6 +2535,9 @@ async function gestaoNoAr() {
       await new Promise((r) => setTimeout(r, ESPERAS[i]));
     }
   }
+  /* Acabou a primeira subida — deu certo ou desistiu. Daqui para a frente
+     quem manda é `ERRO_GESTAO`, e quem religa é o `gestaoNoAr()`. */
+  subindoGestao = null;
   if (!ERRO_GESTAO) return;
   {
     const e = ERRO_GESTAO;

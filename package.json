@@ -1,11 +1,12 @@
 {
   "name": "instituto-kenosis",
-  "version": "2.12.0",
+  "version": "2.13.0",
   "private": true,
   "description": "Site, painel administrativo (/admin, SQLite) e sistema de gestão (/restrito, PostgreSQL) do Instituto Kenósis.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "testar": "node testar-cabecalhos.js && node testar-texto.js && node testar-limitador.js && node testar-frequencia.js",
     "publicar": "node server.js --publicar",
     "backup": "node server.js --backup",
     "backup:status": "node server.js --backup-status",

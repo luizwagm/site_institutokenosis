@@ -1,0 +1,35 @@
+-- ============================================================================
+-- FREQUÊNCIA: título próprio e local da atividade
+--
+-- ---------------------------------------------------------------------------
+-- O TÍTULO ERA FIXO NO CÓDIGO
+--
+-- A folha nasceu para a hidroginástica, e o cabeçalho da impressão trazia o
+-- nome do projeto escrito dentro do JavaScript. Isso valeu enquanto havia uma
+-- atividade só. Com o Instituto usando a mesma folha para outras — e a mesma
+-- turma acontecendo em lugares diferentes — o título passou a ser DADO da
+-- folha, e não decoração da tela.
+--
+-- Fica vazio no que já existe, e o vazio continua imprimindo o texto padrão da
+-- hidroginástica: as folhas antigas saem exatamente como sempre saíram, sem
+-- ninguém precisar reabrir uma por uma para preencher.
+--
+-- ---------------------------------------------------------------------------
+-- O LOCAL É O QUE DISTINGUE DUAS FOLHAS IGUAIS
+--
+-- Desde a 010 pode haver mais de uma folha da mesma turma no mesmo mês. Só que
+-- na lista as duas apareciam como linhas idênticas — mesmo mês, mesma turma —
+-- e escolher qual abrir virava adivinhação.
+--
+-- `local` é o campo que faltava para essa decisão fazer sentido: a mesma
+-- atividade, no mesmo horário, no mesmo mês, em dois lugares. Ele entra na
+-- lista, no filtro e no cabeçalho da impressão — porque é no papel, na mão de
+-- quem colhe a assinatura, que a confusão custa caro.
+--
+-- Continua SEM índice único: nada impede duas folhas do mesmo lugar. A folha é
+-- identificada pelo id, e a equipe às vezes precisa mesmo de uma segunda —
+-- turma que dobrou, folha que encheu. O sistema não deve ter opinião sobre
+-- isso.
+-- ============================================================================
+ALTER TABLE frequencias ADD COLUMN IF NOT EXISTS titulo TEXT NOT NULL DEFAULT '';
+ALTER TABLE frequencias ADD COLUMN IF NOT EXISTS local  TEXT NOT NULL DEFAULT '';

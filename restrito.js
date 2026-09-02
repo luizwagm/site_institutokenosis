@@ -24,7 +24,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.32.0";
+const SISTEMA_VERSION = "1.33.0";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -198,6 +198,18 @@ function proteger(tabela, obj) {
    que as entregou.
    ========================================================================== */
 const HISTORICO_VERSOES = [
+  { versao: "1.33.0", data: "2026-09-02", titulo: "Frequência com título próprio, e o sistema no celular", mudancas: [
+    "A folha de frequência tem TÍTULO próprio, digitado na abertura e corrigível depois",
+    "É esse título que sai no cabeçalho da folha impressa — antes era um texto fixo do sistema",
+    "Folha antiga, sem título, continua imprimindo o texto de sempre: nada precisa ser refeito",
+    "Novo campo LOCAL: a mesma turma, no mesmo mês, em lugares diferentes",
+    "O local aparece na lista, no filtro e no cabeçalho da impressão, ao lado da turma",
+    "O sistema inteiro passou a funcionar no celular: menu em gaveta, campos que não dão zoom",
+    "Tabelas rolam para o lado dentro do cartão, com a coluna de ações sempre à vista",
+    "Formulários viram folha que sobe do rodapé, com Salvar grudado no pé da tela",
+    "No calendário do celular, cada atendimento vira uma marca colorida em vez de texto cortado",
+    "Salvar no instante em que o sistema reinicia deixa de dar \"Erro interno\": agora avisa e espera",
+  ] },
   { versao: "1.19.0", data: "2026-08-09", titulo: "Arquivar usuário e prontuário", mudancas: [
     "Arquivar tira o usuário da lista de Usuários sem apagar nada",
     "Arquivar tira o prontuário da tela de Prontuários, com o acompanhamento inteiro guardado",
@@ -534,7 +546,11 @@ const TAB = {
   documentos_gestao: ["paciente_id", "tipo", "titulo", "arquivo", "data"],
   /* A folha de frequência guarda ids de pacientes, nunca nome/CPF — o cadastro
      é a fonte e a folha imprime o que está nele hoje (migration 008). */
-  frequencias: ["turma", "mes", "datas", "participantes"],
+  /* `titulo` e `local` entraram na 011. O título era fixo no código e virou
+     dado da folha; o local é o que distingue duas folhas da mesma turma no
+     mesmo mês — sem ele, a lista mostra duas linhas idênticas e escolher qual
+     abrir vira adivinhação. */
+  frequencias: ["turma", "mes", "local", "titulo", "datas", "participantes"],
 };
 
 const UPLOAD_DIR = path.join(ROOT, "restrito", "arquivos");
@@ -1794,6 +1810,12 @@ async function rotaApi(req, res, p) {
       if (tabela === "frequencias") {
         b.turma = String(b.turma || "").trim();
         b.mes = String(b.mes || "").trim();
+        /* Título e local com TETO. São campos livres que vão para o cabeçalho da
+           impressão — um texto de mil caracteres não é título, é uma folha
+           desmontada, e o corte tem de acontecer aqui e não na tela: a tela
+           qualquer um contorna. */
+        b.titulo = String(b.titulo || "").trim().slice(0, 200);
+        b.local = String(b.local || "").trim().slice(0, 120);
         if (!b.turma) return json(res, 400, { error: "Escolha a turma." });
         if (!/^\d{4}-\d{2}$/.test(b.mes)) return json(res, 400, { error: "Escolha o mês." });
       }
@@ -1906,6 +1928,12 @@ async function rotaApi(req, res, p) {
          aparecendo para o profissional anterior e sumido para o novo. */
       if (tabela === "prontuario" && donoCol === null && b.profissional !== undefined) {
         b.profissional_id = await idDoProfissional(b.profissional);
+      }
+      /* O mesmo teto do cadastro. Um limite que só existe no POST é um limite
+         que se contorna editando — e o título vai para o cabeçalho impresso. */
+      if (tabela === "frequencias") {
+        if (b.titulo !== undefined) b.titulo = String(b.titulo || "").trim().slice(0, 200);
+        if (b.local !== undefined) b.local = String(b.local || "").trim().slice(0, 120);
       }
       if (tabela === "atendimentos") {
         const at = await Q.get("SELECT profissional_id,data,hora FROM atendimentos WHERE id=?", id) || {};

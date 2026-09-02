@@ -194,10 +194,11 @@ Aplicação **independente** do painel do site, para a operação interna da ONG
 `https://institutokenosis.com/restrito/`, com link discreto no rodapé do site.
 
 - **Código:** `restrito.js` + `restrito/app.html` — não se mistura com `server.js`/`admin`.
-- **Banco próprio:** `data/gestao.db` (nunca toca no `site.db`). Guarda dado
-  pessoal sensível (CPF, endereço, prontuário) — por isso é ignorado pelo git,
-  o `deploy.sh` o protege igual ao `site.db`, e os arquivos de pacientes ficam
-  em `restrito/arquivos/` (também fora do git).
+- **Banco próprio: PostgreSQL** (`kenosis_gestao`), nunca o `site.db`. Guarda
+  dado pessoal sensível — CPF, endereço, anamnese e prontuário ficam **cifrados
+  na coluna**, com a chave em `DADOS_CHAVE`, fora do git e fora do banco. Os
+  arquivos de pacientes ficam em `restrito/arquivos/` (também fora do git).
+  O esquema é aplicado sozinho no boot, a partir de `migrations/*.sql`.
 - **Login próprio:** cookie de sessão `rid`, separado do `sid` do admin. Uma
   sessão não abre o outro sistema. Senha inicial: `admin` / `kenosis-gestao`
   (troque em Minha conta; o `verificar.sh` avisa enquanto for a padrão).
@@ -208,6 +209,17 @@ Prontuário, Benefícios, Eventos, Documentos e Relatórios**. Os formulários
 têm máscara e validação de CPF (com dígito verificador), telefone, e-mail,
 NIS e Cartão SUS; a agenda e o prontuário referenciam paciente/profissional
 por seleção. Relatórios trazem indicadores, gráficos e exportação CSV.
+
+### No celular
+
+O `/restrito` e o `/admin` funcionam inteiros no telefone — é de lá que a
+equipe técnica lança o atendimento na sala e fecha a frequência na beira da
+piscina. Abaixo de 860px o menu lateral vira **gaveta** (o botão de três
+traços, no canto de cima); as tabelas rolam para o lado **dentro do cartão**,
+com a coluna de ações presa na borda direita; os formulários viram folha que
+sobe do rodapé, com o Salvar grudado no pé da tela; e todo campo tem 16px, o
+mínimo que impede o iPhone de ampliar a página sozinho quando o dedo entra no
+campo — e não voltar mais.
 
 ## Tela de manutenção — duas camadas
 
@@ -234,7 +246,24 @@ nginx/criar-site.sh   vhost + certificado
 nginx/kenosis.service unit do systemd
 importar.js        baixa o conteúdo do site antigo (Google Sites)
 aplicar-original.js grava no banco o texto original, sem paráfrase
+testar-*.js        as provas (veja abaixo)
 ```
+
+### As provas
+
+Cada uma sobe uma cópia do site numa porta própria e derruba no fim.
+
+| Comando | O que guarda |
+|---|---|
+| `node testar-cabecalhos.js` | os cabeçalhos que o navegador obedece — inclusive a `Permissions-Policy` aberta no `/restrito`, sem a qual a câmera da reunião é recusada em silêncio |
+| `node testar-texto.js` | o texto do painel chega à tela sem tag e sem `&nbsp;` |
+| `node testar-limitador.js` | a trava de tentativas de senha |
+| `node testar-frequencia.js` | o título e o local da folha de frequência, e o 503 (nunca 500) enquanto a gestão está subindo |
+
+> `testar-frequencia.js` é a única que fala com o **PostgreSQL de verdade** —
+> não existe banco descartável para ele. Ela só cria registros próprios,
+> marcados `ZZ QA`, e os apaga **pelo id** no fim. Interrompida no meio, ela
+> imprime os ids que sobraram.
 
 ## Backup
 

@@ -27,6 +27,10 @@ assets/video/
 # Dumps SQL gerados pelo botão "Backup do banco" do painel.
 dumps/
 
+# Configuracao local da ferramenta de desenvolvimento (launch.json do preview).
+# Barra na frente: sem ela, a regra casaria com qualquer .claude/ aninhada.
+/.claude/
+
 # Sistema / editor
 Thumbs.db
 .DS_Store

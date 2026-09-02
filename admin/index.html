@@ -111,25 +111,6 @@
     .st-table td{padding:.4rem 0;border-bottom:1px solid var(--line)}
     .st-table td:last-child{text-align:right;font-weight:700;color:var(--violet);width:70px}
     .st-table tr:last-child td{border-bottom:0}
-    @media(max-width:820px){
-      .app{grid-template-columns:1fr}
-      /* No celular a barra deixa de ser coluna fixa e vira faixa no topo, que
-         cresce conforme o conteúdo — `height:auto` mais `position:static`. Os
-         botões soltos se espalham em linha; cada GRUPO ocupa a largura toda,
-         senão o submenu abriria dentro de uma coluna de dois dedos. */
-      aside{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:.3rem;overflow:visible}
-      aside>.navbtn{width:auto}
-      .navgrupo{flex:1 0 100%}
-      /* Sem `display` aqui: quem esconde o grupo fechado é a regra geral
-         (`.navsub{display:none}`), e repetir `display:flex` neste ponto a
-         anulava — no celular todos os grupos apareciam abertos ao mesmo tempo,
-         que é justamente o menu comprido de antes. Só o grupo aberto vira
-         flex, na regra logo abaixo. */
-      .navsub{flex-wrap:wrap;gap:.3rem;margin-left:.4rem}
-      .navtopo[aria-expanded="true"]+.navsub{display:flex}
-      .navsub .navbtn{width:auto}
-      main{padding:1.2rem}
-    }
     /* ---------------------- Editor de texto formatado ------------------- */
     .ed-caixa{border:1.5px solid var(--line2);border-radius:9px;overflow:hidden;background:#fff}
     .ed-caixa:focus-within{border-color:var(--celeste);box-shadow:0 0 0 3px rgba(30,161,228,.16)}
@@ -159,6 +140,66 @@
     .ed-area h2,.ed-area h3{margin:.8rem 0 .4rem;color:var(--marinho);font-size:1.05rem}
     .ed-area blockquote{margin:.6rem 0;padding-left:.8rem;border-left:3px solid var(--line2);color:var(--muted)}
     .ed-area a{color:var(--celeste)}
+
+    /* ====================================================================
+       O GERENCIADOR NO CELULAR
+
+       A faixa de menu no topo, que era a solução anterior, resolvia o
+       empilhamento mas cobrava caro: quinze botões em cima de TODA tela, em
+       toda rolagem. Aqui a lateral vira gaveta — o mesmo gesto, o mesmo
+       desenho e o mesmo código do /restrito, porque é a mesma pessoa que passa
+       de um para o outro no mesmo aparelho.
+       ==================================================================== */
+    .admbar{display:none}
+    .nav-abrir{display:none}
+    .nav-veu{display:none}
+
+    @media(max-width:860px){
+      .app{grid-template-columns:1fr}
+      main{padding:1.1rem 1rem;max-width:none;padding-top:calc(52px + 1rem)}
+
+      .admbar{display:flex;align-items:center;gap:.6rem;position:fixed;top:0;left:0;right:0;
+        height:52px;padding:0 .7rem;z-index:60;background:var(--surface);
+        border-bottom:1px solid var(--line)}
+      .admbar-tit{font-weight:700;color:var(--violet)}
+      .nav-abrir{display:inline-flex;align-items:center;justify-content:center;
+        width:42px;height:42px;border:1px solid transparent;border-radius:10px;
+        background:none;color:var(--violet)}
+      .nav-abrir:hover{background:#f2f0ec}
+      .nav-abrir:focus-visible{outline:2px solid var(--violet2);outline-offset:2px}
+
+      aside{position:fixed;top:0;left:0;bottom:0;height:100dvh;width:min(272px,84vw);
+        z-index:70;transform:translateX(-100%);transition:transform .22s ease;
+        box-shadow:6px 0 40px rgba(20,25,60,.4);padding:1rem .9rem}
+      body.nav-aberta aside{transform:none}
+      .nav-veu{position:fixed;inset:0;z-index:65;background:rgba(20,25,60,.5);
+        opacity:0;pointer-events:none;transition:opacity .22s ease}
+      body.nav-aberta .nav-veu{display:block;opacity:1;pointer-events:auto}
+      body.nav-aberta{overflow:hidden}
+
+      /* Mesma razão do /restrito: campo com menos de 16px faz o Safari
+         ampliar a página no foco, e ela não volta sozinha. A raiz conserta
+         todos de uma vez, inclusive os que ainda serão escritos. */
+      body{font-size:16px}
+      .gal-card input{font-size:16px}
+      .row{grid-template-columns:1fr}
+      .stat-two{grid-template-columns:1fr}
+      .galeria-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.7rem}
+      .topbar{margin-bottom:1.1rem}
+      .topbar h1{font-size:1.35rem}
+      .navbtn,.navtopo{padding:.7rem .8rem}
+      .btn{padding:.65rem 1.15rem}
+      .btn-sm{padding:.45rem .8rem;font-size:.85rem}
+      .card{padding:1rem .9rem}
+      /* A tabela de acessos rola dentro do cartão; a página nunca de lado. */
+      .card{overflow-x:auto}
+      /* A barra do editor tem quinze botões de 28px em fila. No mouse é
+         confortável; no dedo é loteria. 34px cabem os mesmos quinze em duas
+         linhas, e a barra já quebra sozinha (`flex-wrap`). */
+      .ed-bt{min-width:34px;height:34px}
+      .ed-area,.ed-fonte{max-height:46vh}
+    }
+
   </style>
 </head>
 <body>
@@ -175,7 +216,21 @@
 </div>
 
 <div class="app" id="app" hidden>
-  <aside>
+  <!-- A BARRA DO CELULAR. Não existe no computador (o CSS a esconde acima de
+       860px), onde a lateral está sempre à vista. Aqui ela é o único lugar de
+       onde se chega ao menu — por isso é `fixed`: rolar uma página longa de
+       textos não pode deixar a pessoa sem navegação. -->
+  <header class="admbar">
+    <button type="button" class="nav-abrir" id="nav-abrir" onclick="alternarNav()"
+            aria-label="Abrir o menu" aria-controls="nav-lateral" aria-expanded="false">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <span class="admbar-tit">Gerenciador</span>
+  </header>
+  <div class="nav-veu" id="nav-veu" onclick="fecharNav()" aria-hidden="true"></div>
+  <aside id="nav-lateral">
     <span class="logo"><img src="/assets/img/favicon.svg" alt="" style="border-radius:10px"> Kenósis</span>
     <!-- MENU EM GRUPOS.
 
@@ -661,8 +716,33 @@ function revelarGrupoAtivo() {
   if (ativo) abrirGrupo(ativo.closest(".navgrupo").querySelector(".navtopo"), true);
 }
 
+/* ==========================================================================
+   A GAVETA DO CELULAR — o mesmo desenho do /restrito.
+
+   Acima de 860px nada disto acontece: a lateral fica onde sempre esteve. A
+   classe vai no <body> (e não `hidden` no <aside>) porque a lateral precisa
+   DESLIZAR, e o que está escondido não anima.
+   ========================================================================== */
+function navEstreito(){ return window.matchMedia("(max-width:860px)").matches; }
+function abrirNav(){
+  document.body.classList.add("nav-aberta");
+  const b = document.getElementById("nav-abrir"); if (b) b.setAttribute("aria-expanded", "true");
+}
+function fecharNav(){
+  document.body.classList.remove("nav-aberta");
+  const b = document.getElementById("nav-abrir"); if (b) b.setAttribute("aria-expanded", "false");
+}
+function alternarNav(){ document.body.classList.contains("nav-aberta") ? fecharNav() : abrirNav(); }
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharNav(); });
+/* Voltar ao computador com a gaveta aberta deixaria o <body> travado em
+   `overflow:hidden` e o véu por cima de tudo. */
+window.addEventListener("resize", () => { if (!navEstreito()) fecharNav(); });
+
 document.querySelectorAll(".navbtn[data-p]").forEach((b) =>
   b.addEventListener("click", async () => {
+    /* Escolher uma tela fecha a gaveta: no celular ela cobre justamente o que
+       a pessoa acabou de pedir. */
+    if (navEstreito()) fecharNav();
     /* Antes de trocar de tela, a que está saindo se despede: o cadastro que
        ficou em branco vai embora agora, e não na próxima visita. */
     const saindo = document.querySelector(".navbtn[data-p].on");

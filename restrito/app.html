@@ -139,10 +139,23 @@
     .filtro-chip{display:inline-flex;align-items:center;gap:.5rem;background:#eaf1fb;color:#2a5bbd;font-weight:600;font-size:.85rem;padding:.35rem .8rem;border-radius:999px;margin-bottom:1rem}
     /* Frequência: a tela é a própria folha — cabeçalho de coluna é campo,
        célula fica em branco (assinatura é no papel). */
-    .freq-projeto{font-weight:700;color:var(--navy,#253282);margin:0 0 .8rem}
+    /* O titulo da folha ganha o peso que o paragrafo fixo tinha: continua sendo
+       a primeira coisa que se le, mas agora e editavel. */
+    .freq-titulo-campo{display:block;font-size:.8rem;color:var(--muted,#6b7280);margin:0 0 .9rem}
+    /* `font-size:1rem` explícito: com `font:inherit` o campo herdava os .8rem
+       do proprio rotulo e o titulo da folha — o texto mais importante da tela,
+       e o que sai no cabecalho impresso — ficava menor que o corpo do texto. */
+    .freq-titulo-campo input{display:block;width:100%;margin-top:.25rem;font:inherit;
+      font-size:1rem;font-weight:700;color:var(--navy,#253282);padding:.5rem .65rem;
+      border:1.5px solid #cfd8e8;border-radius:8px;background:#fff}
     .freq-controles{display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end}
     .freq-controles label{display:block;font-size:.8rem;color:var(--muted,#6b7280);margin-bottom:.25rem}
-    .freq-controles select{font:inherit;padding:.4rem .6rem;border:1.5px solid #cfd8e8;border-radius:8px;background:#fff}
+    /* Pelo ID, e nao por `.freq-controles input[type=text]`: a caixa de buscar
+       usuario ao lado tambem e um input de texto, e ja tem estilo proprio
+       (`.cbx-inp`) que uma regra por tipo venceria por especificidade. */
+    .freq-controles select,.freq-controles #freq-local{font:inherit;padding:.4rem .6rem;
+      border:1.5px solid #cfd8e8;border-radius:8px;background:#fff}
+    .freq-controles #freq-local{min-width:11rem}
     .freq-add-wrap select{min-width:16rem}
     .freq-tab th,.freq-tab td{border-right:1px solid #eef1f7}
     .freq-tab th:last-child,.freq-tab td:last-child{border-right:0}
@@ -162,7 +175,10 @@
     .freq-linha.on td{background:#eaf3fb;font-weight:600}
     .filtro-chip button{border:0;background:#2a5bbd;color:#fff;width:18px;height:18px;border-radius:50%;font-size:.7rem;line-height:1;cursor:pointer}
     .modal-bg{position:fixed;inset:0;background:rgba(20,28,60,.45);display:grid;place-items:start center;padding:2rem 1rem;overflow:auto;z-index:40}
-    .modal{width:min(760px,96vw);background:#fff;border-radius:16px;padding:1.4rem 1.5rem;box-shadow:0 30px 70px rgba(20,30,80,.3)}
+    /* A largura de cada modal chega em `--modal-larg` (760px é o padrão de
+       quem não pede nada). Como variável, e não como `style="width:…"`: o
+       inline venceria a regra do celular, que precisa ocupar a tela inteira. */
+    .modal{width:min(var(--modal-larg,760px),96vw);background:#fff;border-radius:16px;padding:1.4rem 1.5rem;box-shadow:0 30px 70px rgba(20,30,80,.3)}
     .modal h2{margin-bottom:1rem}
     .formgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 1.1rem}
     .formgrid .full{grid-column:1/-1}
@@ -181,8 +197,6 @@
     .barra .n{width:34px;text-align:right;font-weight:700;color:var(--marinho)}
     .toast{position:fixed;bottom:1.2rem;left:50%;transform:translate(-50%,150%);background:var(--marinho);color:#fff;padding:.7rem 1.2rem;border-radius:999px;font-weight:600;transition:transform .3s;z-index:60}
     .toast.on{transform:translate(-50%,0)}.toast.err{background:var(--red)}
-    @media(max-width:820px){.app{grid-template-columns:1fr}aside{position:static;height:auto}main{padding:1.1rem}.formgrid,.rel-cols{grid-template-columns:1fr}}
-    @media print{aside,.appbar,.topbar .btn,.navbtn{display:none}.app{grid-template-columns:1fr}}
     /* ------------------------ Mini editor de texto ---------------------- */
     .ed-caixa{border:1px solid var(--line2);border-radius:10px;overflow:hidden;background:#fff}
     .ed-caixa:focus-within{border-color:var(--celeste);box-shadow:0 0 0 3px rgba(30,161,228,.16)}
@@ -429,6 +443,202 @@
     .tl th{text-align:left;padding:.35rem .5rem;border-bottom:1px solid var(--line);color:var(--muted);font-size:.76rem}
     .tl td{padding:.45rem .5rem;border-bottom:1px solid var(--line);vertical-align:top}
     .tl .quando{white-space:nowrap;color:var(--muted);font-variant-numeric:tabular-nums}
+
+    /* ====================================================================
+       O SISTEMA NO CELULAR
+
+       O gerenciador nasceu para o computador da recepção. Mas a assistente
+       social lança atendimento na sala, a professora fecha a frequência na
+       beira da piscina e a coordenação confere o relatório no ônibus — e
+       nenhum deles carrega notebook. Estas regras não "encolhem" a tela: elas
+       trocam o que muda de forma no toque.
+
+       Um breakpoint só, em 860px, pega o tablet em pé junto com o celular. Um
+       segundo, em 560px, cuida do que só aperta de verdade no aparelho
+       pequeno. Mais faixas do que isso viram manutenção sem dono.
+       ==================================================================== */
+    .nav-abrir{display:none}
+    .nav-veu{display:none}
+
+    @media(max-width:860px){
+      .app{grid-template-columns:1fr}
+      main{padding:1.1rem 1rem}
+      .formgrid,.rel-cols{grid-template-columns:1fr}
+
+      /* --- a gaveta -------------------------------------------------- */
+      /* `fixed` + `translateX`, e não `display:none`: o que está escondido não
+         desliza, e o deslizar é o que informa DE ONDE o menu veio. */
+      aside{position:fixed;top:0;left:0;bottom:0;height:100dvh;width:min(282px,84vw);
+        z-index:70;transform:translateX(-100%);transition:transform .22s ease;
+        box-shadow:6px 0 40px rgba(12,18,45,.38);padding-top:.9rem}
+      body.nav-aberta aside{transform:none}
+      .nav-veu{position:fixed;inset:0;z-index:65;background:rgba(14,20,48,.5);
+        opacity:0;pointer-events:none;transition:opacity .22s ease}
+      body.nav-aberta .nav-veu{display:block;opacity:1;pointer-events:auto}
+      /* Travar o fundo enquanto a gaveta está aberta. Sem isto o dedo que
+         tenta rolar o menu rola a página atrás, e a gaveta parece emperrada. */
+      body.nav-aberta{overflow:hidden}
+
+      .nav-abrir{display:inline-flex;align-items:center;justify-content:center;
+        width:42px;height:42px;margin-right:auto;border:1px solid transparent;
+        border-radius:10px;background:none;color:var(--marinho)}
+      .nav-abrir:hover{background:#f0f3f8}
+      .nav-abrir:focus-visible{outline:2px solid var(--celeste);outline-offset:2px}
+      /* O botão já empurra o resto para a direita; o `margin-left:auto` dos
+         atalhos, somado, criaria um vão duplo no meio da barra. */
+      .ap-drop{margin-left:0}
+      .appbar{padding:.4rem .8rem;gap:.35rem}
+
+      /* --- toque ----------------------------------------------------- */
+      /* 40px é o mínimo que a mão acerta sem mirar. No computador estes
+         controles têm 32px e estão certos — lá o ponteiro tem 1px. */
+      .acao-trigger,.acao-lupa{width:40px;height:40px}
+      .navbtn,.side-head{padding:.7rem .8rem}
+      .btn{padding:.62rem 1.15rem}
+      .btn-sm{padding:.45rem .8rem}
+
+      /* --- o teclado do iPhone --------------------------------------- */
+      /* Campo com menos de 16px faz o Safari AMPLIAR a página ao receber o
+         foco, e ela não volta sozinha: a pessoa digita o telefone e o resto do
+         formulário fica fora da tela.
+
+         O ajuste é na RAIZ, e não campo a campo. Quase todo campo do sistema
+         usa `font:inherit` — inclusive os das seções que redefinem o estilo
+         (`.freq-filtros input`, `.freq-controles select`). Subir o corpo do
+         texto conserta todos de uma vez, e conserta também o que ainda for
+         escrito amanhã. A alternativa era uma lista de seletores que precisaria
+         crescer a cada tela nova, e que quebraria em silêncio quando alguém
+         esquecesse de acrescentar o dela.
+
+         Os tamanhos em `rem` não se movem (a raiz continua 16px): o que sobe é
+         só o texto corrido e os campos — que é exatamente o que se lê de perto,
+         no aparelho, com o braço estendido. */
+      body{font-size:16px}
+      .busca,.freq-filtros input,.freq-filtros select,.freq-controles select,
+      .freq-controles #freq-local{max-width:none;min-width:0;width:100%}
+      .freq-filtros>div,.freq-controles>div,.freq-add-wrap{flex:1 1 100%}
+      /* Os dois campos que NÃO herdam o corpo do texto — eles declaram
+         `font-size` em rem, e a raiz não mudou. Ficam de fora da regra geral
+         acima e precisavam ser nomeados: são justamente os dois em que o dedo
+         encosta mais (quantos por página, e o período do filtro). */
+      .pgsel,.filtro-data input[type=date]{font-size:16px;padding:.42rem .6rem}
+      /* Os dias da folha herdam o `th`, que é .72rem: 11px, e o Safari amplia
+         a página inteira quando o dedo entra no campo. A tabela já rola dentro
+         do cartão, então alargar a coluna não custa nada a ninguém. */
+      .freq-dia input{font-size:16px;width:3.4rem}
+      /* O período em coluna: dois campos de data lado a lado em 375px sobram
+         12px cada, e a data fica cortada no meio. */
+      .filtro-data{gap:.4rem .6rem}
+      .filtro-data input[type=date]{flex:1 1 auto;min-width:0}
+
+      /* --- tabelas --------------------------------------------------- */
+      /* Nenhuma tabela do sistema cabe em 375px, e espremer coluna a torna
+         ilegível. Elas rolam na horizontal DENTRO do cartão — a página em si
+         nunca rola de lado, que é o que dá a sensação de site quebrado. */
+      .card{overflow-x:auto}
+      table{min-width:max-content}
+      /* O cartão de formulário não é tabela: `max-content` ali criaria
+         rolagem lateral em cima de campos que já cabem. */
+      .card:not(:has(table)){overflow-x:visible}
+
+      /* A DICA DE QUE HÁ MAIS PARA O LADO.
+         Rolagem escondida é rolagem que não existe: sem nenhuma marca na
+         borda, a pessoa lê as três primeiras colunas e conclui que o sistema
+         perdeu o resto. As duas sombras coladas nas bordas aparecem só quando
+         há o que rolar — os dois gradientes brancos viajam com o conteúdo
+         (`background-attachment:local`) e cobrem a sombra quando a ponta
+         correspondente já está à vista. Nenhuma linha de JavaScript. */
+      .card:has(table){
+        background-image:
+          linear-gradient(to right,var(--surface) 30%,rgba(255,255,255,0)),
+          linear-gradient(to left,var(--surface) 30%,rgba(255,255,255,0)),
+          radial-gradient(farthest-side at 0 50%,rgba(20,30,80,.16),rgba(20,30,80,0)),
+          radial-gradient(farthest-side at 100% 50%,rgba(20,30,80,.16),rgba(20,30,80,0));
+        background-position:0 0,100% 0,0 0,100% 0;
+        background-repeat:no-repeat;
+        background-size:34px 100%,34px 100%,13px 100%,13px 100%;
+        background-attachment:local,local,scroll,scroll;
+      }
+
+      /* A COLUNA DE AÇÕES FICA PRESA NA BORDA DIREITA.
+         Ela é a última da tabela — justamente a que sai da tela quando o
+         conteúdo rola. Sem isto, para abrir o menu de uma linha era preciso
+         rolar a tabela até o fim, linha por linha. Presa, ela acompanha: a
+         pessoa lê as colunas que quiser e o botão está sempre ali.
+
+         A sombra à esquerda é o que diz que existe conteúdo passando por
+         baixo; sem ela, a coluna parece o fim da tabela. */
+      .col-acoes{position:sticky;right:0;z-index:1;background:var(--surface);
+        box-shadow:-9px 0 11px -9px rgba(20,30,80,.28)}
+      th.col-acoes{background:var(--surface)}
+
+      /* --- alvos que ainda estavam abaixo do dedo --------------------- */
+      /* A barra do editor tem quinze botões de 28px em fila. No mouse é
+         confortável; no dedo é loteria. 34px cabem os mesmos quinze em duas
+         linhas, e a barra já quebra sozinha (`flex-wrap`). */
+      .ed-bt{min-width:34px;height:34px}
+      .vbtn{padding:.5rem 1.05rem}
+      .pgbtn{min-width:38px;padding:.45rem .6rem;font-size:.9rem}
+
+      /* --- calendário ------------------------------------------------- */
+      .cal{gap:4px}
+      .cal .dia{min-height:66px;padding:.22rem;font-size:.74rem}
+      .cal .ev{font-size:.62rem;padding:0 3px}
+      .cal-cab h3{min-width:0;font-size:1rem}
+
+      /* --- relatórios e listas ---------------------------------------- */
+      .topbar{margin-bottom:1rem}
+      .topbar h1{font-size:1.35rem}
+      .stat b{font-size:1.7rem}
+    }
+
+    @media(max-width:560px){
+      main{padding:.9rem .75rem}
+      .card{padding:.9rem .85rem}
+      .stat-grid{grid-template-columns:1fr 1fr;gap:.6rem}
+
+      /* O CALENDÁRIO VIRA MARCAS, NÃO TEXTO.
+         Sete colunas em 375px dão 42px por dia, e sobram 33px dentro da
+         célula. Medido: "08:00 Maria da Conceição" precisa de 125px — cabem
+         cinco caracteres. Texto cortado em cinco caracteres não é informação
+         reduzida, é ruído que ainda ocupa altura.
+
+         Cada atendimento vira uma barra da cor da situação: dá para ver num
+         relance quantos são e como estão. O nome está a um toque de distância
+         — o dia já era clicável antes disto. */
+      .cal .ev{font-size:0;line-height:0;height:5px;margin-top:3px;border-left:0;
+        border-radius:3px;padding:0}
+      .ev-Agendado{background:#2a5bbd}.ev-Confirmado,.ev-Atendido{background:var(--verde)}
+      .ev-Faltou{background:var(--red)}.ev-Remarcado{background:var(--ambar)}
+      .cal .dia{min-height:58px}
+      .cal .dia .num{font-size:.8rem}
+
+      /* --- modal vira folha que sobe do rodapé ------------------------ */
+      /* Centralizada, ela sobra em cima e falta embaixo: as ações ficam fora
+         da tela e é preciso rolar para encontrar o Salvar. Ancorada no rodapé,
+         o botão nasce onde o polegar já está. */
+      .modal-bg{padding:0;place-items:end center}
+      .modal{width:100%;max-height:94dvh;overflow:auto;border-radius:18px 18px 0 0;
+        padding:1.1rem 1rem calc(1rem + env(safe-area-inset-bottom))}
+      .modal h2{font-size:1.15rem;margin-bottom:.7rem}
+      /* As ações grudam no pé da folha: rolar o formulário longo não pode
+         esconder o Salvar. */
+      .modal .acoes{position:sticky;bottom:calc(-1rem - env(safe-area-inset-bottom));
+        background:#fff;margin:1rem -1rem calc(-1rem - env(safe-area-inset-bottom));
+        padding:.8rem 1rem calc(.8rem + env(safe-area-inset-bottom));
+        border-top:1px solid var(--line);justify-content:stretch}
+      .modal .acoes .btn{flex:1;justify-content:center}
+
+      /* Um menu de 210px com 12px de folga cabe; sem teto ele encosta na
+         borda quando o rótulo é longo. */
+      .acao-lista{min-width:0;width:min(240px,calc(100vw - 24px))}
+      .ap-painel{grid-template-columns:repeat(2,minmax(0,1fr));width:min(300px,calc(100vw - 20px))}
+      .tn-panel{min-width:min(236px,calc(100vw - 20px))}
+      .toast{left:.7rem;right:.7rem;transform:translateY(150%);text-align:center}
+      .toast.on{transform:translateY(0)}
+    }
+    @media print{aside,.appbar,.topbar .btn,.navbtn,.nav-veu,.nav-abrir{display:none}.app{grid-template-columns:1fr}}
+
   </style>
 </head>
 <body>
@@ -446,7 +656,12 @@
 </div>
 
 <div class="app" id="app" hidden>
-  <aside>
+  <!-- O VÉU DA GAVETA. Só existe no celular (o CSS o esconde acima de 860px).
+       Serve a duas coisas ao mesmo tempo: escurecer o conteúdo, para ficar
+       claro que ele está inerte, e ser o alvo grande de "fechar" — no toque,
+       acertar um X de 20px é pior do que tocar em qualquer lugar da tela. -->
+  <div class="nav-veu" id="nav-veu" onclick="fecharNav()" aria-hidden="true"></div>
+  <aside id="nav-lateral">
     <span class="marca"><img src="/assets/img/favicon.svg" alt=""> Gestão</span>
     <button class="navbtn on" data-nav="painel">Painel</button>
     <div class="side-sec">
@@ -480,6 +695,17 @@
 
   <div class="conteudo">
     <header class="appbar">
+      <!-- ABRIR O MENU. Primeiro filho da barra de propósito: no celular o
+           polegar alcança o canto esquerdo de cima com dificuldade, mas é ali
+           que todo aplicativo põe o menu — contrariar isso custa mais do que
+           ganha. Fica escondido no computador, onde a lateral está sempre à
+           vista. -->
+      <button type="button" class="nav-abrir" id="nav-abrir" onclick="alternarNav()"
+              aria-label="Abrir o menu" aria-controls="nav-lateral" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
       <!-- Atalhos para os outros sistemas. À ESQUERDA do menu da conta.
            O painel do site só aparece para o administrador. -->
       <div class="ap-drop" id="ap-drop">
@@ -637,10 +863,24 @@
            =================================================================== -->
       <div id="freq-editor" hidden>
       <div class="card">
-        <p class="freq-projeto">Projeto Socioassistencial "Movimento para a Vida Ativa" — Frequência Aula de Hidroginástica</p>
+        <!-- ================================================================
+             O TÍTULO ERA UM PARÁGRAFO FIXO AQUI
+
+             Escrito no código, valia enquanto havia uma atividade só. Virou
+             campo porque é ele que sai no cabeçalho da impressão — e a folha
+             impressa é o documento que circula, assinado, fora do sistema.
+             ================================================================= -->
+        <label class="freq-titulo-campo">Título da folha
+          <input type="text" id="freq-titulo" maxlength="200" oninput="trocarFolha()"
+                 placeholder="Ex.: Projeto Socioassistencial … — Frequência Aula de Hidroginástica">
+        </label>
         <div class="freq-controles">
           <div><label>Turma</label><select id="freq-turma" onchange="trocarFolha()"></select></div>
           <div><label>Mês</label><select id="freq-mes" onchange="trocarFolha()"></select></div>
+          <!-- O LOCAL é o que distingue duas folhas da mesma turma no mesmo mês.
+               Sem ele a lista mostra linhas idênticas e escolher vira palpite. -->
+          <div><label>Local</label><input type="text" id="freq-local" maxlength="120"
+               placeholder="Onde acontece" oninput="trocarFolha()"></div>
           <div class="freq-add-wrap"><label>Adicionar usuário</label>
             <!-- combobox com busca (o mesmo cbx da agenda): digitar filtra,
                  escolher acrescenta a linha na hora -->
@@ -673,6 +913,7 @@
         <div class="freq-filtros">
           <div><label>Mês</label><select id="ff-mes" onchange="pintarListaFolhas()"></select></div>
           <div><label>Turma</label><select id="ff-turma" onchange="pintarListaFolhas()"></select></div>
+          <div><label>Local</label><select id="ff-local" onchange="pintarListaFolhas()"></select></div>
           <div><label>Buscar pessoa na folha</label>
             <input type="text" id="ff-busca" placeholder="Nome de quem está na folha…"
                    oninput="pintarListaFolhas()"></div>
@@ -683,7 +924,7 @@
       </div>
       <div class="card" style="padding:0;overflow:auto">
         <table>
-          <thead><tr><th>Mês</th><th>Turma</th><th>Aulas</th><th>Participantes</th><th style="width:2.6rem"></th></tr></thead>
+          <thead><tr><th>Mês</th><th>Turma</th><th>Local</th><th>Aulas</th><th>Participantes</th><th class="col-acoes" style="width:2.6rem"></th></tr></thead>
           <tbody id="freq-lista"></tbody>
         </table>
       </div>
@@ -1489,7 +1730,7 @@ function limparAuditoria(){
    30 linhas da tabela quando o usuário vai olhar uma. */
 async function verDetalheAuditoria(id){
   const host = $("#modal-host");
-  host.innerHTML = `<div class="modal-bg"><div class="modal" style="width:min(820px,96vw)">
+  host.innerHTML = `<div class="modal-bg"><div class="modal" style="--modal-larg:820px">
     <h2>Detalhe da ação</h2><div class="modal-corpo"><p class="vazio">Carregando…</p></div></div></div>`;
   try{
     const d = await api("auditoria/"+id);
@@ -1704,8 +1945,41 @@ async function iniciarApp(me){
   else { const primeiro=[...document.querySelectorAll(".navbtn[data-nav]")].find((b)=>b.style.display!=="none" && b.dataset.nav!=="conta"); if(primeiro) primeiro.click(); }
 }
 
+/* ==========================================================================
+   A GAVETA DO CELULAR
+
+   Acima de 860px nada disto acontece: a lateral fica onde sempre esteve. O
+   antigo `@media` só trocava o grid para uma coluna, e o resultado era a
+   lateral inteira EMPILHADA no topo — dezesseis botões que a pessoa tinha de
+   rolar para chegar ao conteúdo, em toda tela, o tempo todo.
+
+   `classList` no <body>, e não `hidden` no <aside>: a lateral precisa deslizar
+   (transição de `transform`), e um elemento escondido não anima. Assim o
+   mesmo HTML serve aos dois tamanhos, sem duplicar menu.
+   ========================================================================== */
+function navEstreito(){ return window.matchMedia("(max-width:860px)").matches; }
+function abrirNav(){
+  document.body.classList.add("nav-aberta");
+  const b=document.getElementById("nav-abrir"); if(b) b.setAttribute("aria-expanded","true");
+}
+function fecharNav(){
+  document.body.classList.remove("nav-aberta");
+  const b=document.getElementById("nav-abrir"); if(b) b.setAttribute("aria-expanded","false");
+}
+function alternarNav(){ document.body.classList.contains("nav-aberta") ? fecharNav() : abrirNav(); }
+/* Esc fecha — quem usa teclado num tablet com capa espera isso. */
+document.addEventListener("keydown",(e)=>{ if(e.key==="Escape") fecharNav(); });
+/* Voltar ao computador com a gaveta aberta deixaria o <body> travado em
+   `overflow:hidden` e o véu por cima de tudo. Some junto com o breakpoint. */
+window.addEventListener("resize",()=>{ if(!navEstreito()) fecharNav(); });
+
 /* ---------------------------- navegação -------------------------------- */
 document.querySelectorAll(".navbtn[data-nav]").forEach((b)=>b.addEventListener("click",()=>{
+  /* Escolher um item FECHA a gaveta: no celular ela cobre o conteúdo, e
+     deixá-la aberta esconderia justamente a tela que a pessoa acabou de pedir.
+     Vale só para os itens da lateral — os do menu da conta, no topo, não
+     abrem gaveta nenhuma, e `fecharNav` neles é inofensivo. */
+  if(navEstreito()) fecharNav();
   document.querySelectorAll(".navbtn[data-nav]").forEach((x)=>x.classList.remove("on"));
   b.classList.add("on");
   const nav=b.dataset.nav;
@@ -2003,7 +2277,9 @@ function mostrarModulo(){
   $("#mod-relacao").hidden = MOD !== "pacientes";
   $("#mod-periodo").innerHTML = COM_PERIODO.has(MOD) ? periodoHTML(MOD) : "";
   if(COM_PERIODO.has(MOD)) renderPeriodoInfo();
-  $("#mod-thead").innerHTML="<tr>"+m.colunas.map(([,lab])=>`<th>${lab}</th>`).join("")+"<th></th></tr>";
+  /* A última coluna leva a MESMA classe do <td>: é por ela que o celular
+     prende a coluna de ações na borda direita (ver `.col-acoes` no CSS). */
+  $("#mod-thead").innerHTML="<tr>"+m.colunas.map(([,lab])=>`<th>${lab}</th>`).join("")+`<th class="col-acoes"></th></tr>`;
   const ehAgenda = MOD==="atendimentos";
   $("#mod-vistas").hidden=!ehAgenda;
   $("#mod-imprimir").hidden=!ehAgenda;
@@ -2193,7 +2469,7 @@ async function escolherAtendimentoParaVincular(prontId){
         <td style="text-align:right"><button type="button" class="btn btn-navy btn-sm" onclick="vincularAtendimento(${prontId},${a.id})">Vincular</button></td>
       </tr>`).join("")+`</table>`
     : '<p class="hint" style="color:var(--dim)">Este usuário não tem agendamento fora de prontuário.</p>';
-  host.innerHTML=`<div class="modal-bg" style="z-index:70"><div class="modal" style="width:min(820px,96vw)">
+  host.innerHTML=`<div class="modal-bg" style="z-index:70"><div class="modal" style="--modal-larg:820px">
     <h2>Vincular agendamento</h2>
     <div class="modal-corpo">
       <p class="hint" style="color:var(--dim);margin:0 0 .6rem">Agendamentos deste usuário que ainda não estão em nenhum prontuário.</p>
@@ -2219,7 +2495,7 @@ const fecharLancamento = () => { const h=$("#modal-host2"); if(h) h.innerHTML=""
 function editorLancamento({ id, tipo, prontId, reg }){
   const rot=(TIPOS_PRONT.find((t)=>t[0]===tipo)||["","Lançamento"])[1];
   const arquivado=reg&&Number(reg.arquivado);
-  segundoModal().innerHTML=`<div class="modal-bg" style="z-index:70"><div class="modal" style="width:min(860px,96vw)">
+  segundoModal().innerHTML=`<div class="modal-bg" style="z-index:70"><div class="modal" style="--modal-larg:860px">
     <h2>${id?"":"Novo "}${escA(rot)}${PASTA?` · ${escA(PASTA.numero||"")}`:""}</h2>
     <div class="modal-corpo">
       ${arquivado?'<p class="aviso-hist">Este lançamento está arquivado. Restaure-o para voltar a editá-lo.</p>':""}
@@ -2298,7 +2574,7 @@ async function reabrirPasta(){
 /* Linha do tempo da pasta (ou da pessoa). */
 async function verHistorico(entidade, id, titulo){
   let h=[]; try{ h=await api(`historico/${entidade}/${id}`); }catch(e){ return toast(e.message,true); }
-  segundoModal().innerHTML=`<div class="modal-bg" style="z-index:70"><div class="modal" style="width:min(820px,96vw)">
+  segundoModal().innerHTML=`<div class="modal-bg" style="z-index:70"><div class="modal" style="--modal-larg:820px">
     <h2>Histórico${titulo?" · "+escA(titulo):""}</h2>
     <div class="modal-corpo">${h.length
       ? `<table class="tl"><tr><th style="width:150px">Quando</th><th>O que aconteceu</th><th style="width:150px">Quem</th></tr>`+
@@ -2957,11 +3233,18 @@ async function excluirReg(id){
    (editor em branco para a próxima) e folha existente se abre pela lista.
    Nada é gravado sem o Salvar.
    ========================================================================== */
-const FREQ_TITULO = 'Projeto Socioassistencial "Movimento para a Vida Ativa" — Frequência Aula de Hidroginástica';
+/* O título PADRÃO, e não mais o título. Ele preenche o campo da folha nova e
+   cobre as folhas antigas, que nasceram sem título próprio — elas continuam
+   imprimindo exatamente o que sempre imprimiram, sem ninguém reabrir uma por
+   uma para preencher. */
+const FREQ_TITULO_PADRAO = 'Projeto Socioassistencial "Movimento para a Vida Ativa" — Frequência Aula de Hidroginástica';
+/* O título de UMA folha: o dela, ou o padrão quando ela não tem. Num lugar só,
+   porque a mesma pergunta aparece na impressão, na lista e no editor. */
+const freqTitulo = (f)=> (String((f&&f.titulo)||"").trim() || FREQ_TITULO_PADRAO);
 /* As turmas são de hora em hora, das 07h às 20h — 13 opções fixas. */
 const FREQ_TURMAS = Array.from({length:13},(_,i)=>`${String(7+i).padStart(2,"0")}h às ${String(8+i).padStart(2,"0")}h`);
 const FREQ_COLS = 10;      // duas aulas por semana: 8 a 10 dias conforme o mês
-let FREQ = null;           // a folha aberta {id, turma, mes, datas[], participantes[]}
+let FREQ = null;           // a folha aberta {id, turma, mes, titulo, local, datas[], participantes[]}
 let FREQ_LISTA = [];       // as folhas salvas (para carregar ao trocar os selects)
 let FREQ_SUJO = false;     // alteração ainda não salva
 
@@ -3019,17 +3302,29 @@ function modalNovaFolha(){
      !confirm("Há alterações não salvas na folha aberta. Começar outra mesmo assim?")) return;
   const meses = freqMesesOpcoes();
   const host=$("#modal-host")||(()=>{const d=document.createElement("div");d.id="modal-host";document.body.appendChild(d);return d;})();
-  host.innerHTML=`<div class="modal-bg"><div class="modal" style="width:min(560px,96vw)">
+  host.innerHTML=`<div class="modal-bg"><div class="modal" style="--modal-larg:560px">
     <h2>Nova folha de frequência</h2>
     <div class="modal-corpo">
+      <label class="freq-titulo-campo">Título da folha
+        <input type="text" id="nf-titulo" maxlength="200" value="${escA(FREQ_TITULO_PADRAO)}">
+      </label>
       <div class="formgrid">
         <div><label>Turma</label><select id="nf-turma">
           ${FREQ_TURMAS.map((t)=>`<option>${t}</option>`).join("")}</select></div>
         <div><label>Mês</label><select id="nf-mes">
           ${meses.map((m)=>`<option value="${m}">${escA(freqMesLabel(m))}</option>`).join("")}</select></div>
+        <div><label>Local</label><input type="text" id="nf-local" maxlength="120"
+             placeholder="Onde acontece" list="nf-locais">
+          <datalist id="nf-locais">${
+            [...new Set(FREQ_LISTA.map((f)=>String(f.local||"").trim()).filter(Boolean))]
+              .sort().map((l)=>`<option value="${escA(l)}">`).join("")
+          }</datalist></div>
       </div>
-      <p class="ajuda" style="margin:.6rem 0 0">Depois de criar, você escolhe os dias das aulas
-        e vai acrescentando os usuários. Nada é gravado até clicar em <b>Salvar</b>.</p>
+      <p class="ajuda" style="margin:.6rem 0 0">O título é o que sai no <b>cabeçalho da
+        impressão</b>, e dá para mudar depois. O <b>local</b> é o que separa duas folhas da
+        mesma turma no mesmo mês — preencha quando houver mais de um lugar.<br>
+        Depois de criar, você escolhe os dias das aulas e vai acrescentando os usuários.
+        Nada é gravado até clicar em <b>Salvar</b>.</p>
     </div>
     <div class="acoes">
       <button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button>
@@ -3040,10 +3335,12 @@ function modalNovaFolha(){
 
 function criarFolhaDoForm(){
   const turma=$("#nf-turma").value, mes=$("#nf-mes").value;
+  const titulo=($("#nf-titulo").value||"").trim(), local=($("#nf-local").value||"").trim();
   fecharModal();
   montarSeletoresFreq();
   $("#freq-turma").value=turma; $("#freq-mes").value=mes;
-  FREQ={ id:0, turma, mes, datas:[], participantes:[] };
+  $("#freq-titulo").value=titulo; $("#freq-local").value=local;
+  FREQ={ id:0, turma, mes, titulo, local, datas:[], participantes:[] };
   FREQ_SUJO=false; FREQ_SEL.clear();
   $("#freq-status").textContent="";
   pintarModoFolha(); pintarFrequencia(); pintarListaFolhas();
@@ -3067,6 +3364,8 @@ const folhaTemConteudo=()=> !!FREQ && (FREQ.participantes.length>0 || freqDatas(
 function trocarFolha(){
   if(!FREQ) return;
   FREQ.turma=$("#freq-turma").value; FREQ.mes=$("#freq-mes").value;
+  FREQ.titulo=($("#freq-titulo").value||"").trim();
+  FREQ.local=($("#freq-local").value||"").trim();
   if(FREQ.id || folhaTemConteudo()) FREQ_SUJO=true;
 }
 
@@ -3157,12 +3456,13 @@ function removerSelecionadosFreq(){
 async function salvarFrequencia(){
   const btn=$("#freq-salvar");
   const corpo={ turma:FREQ.turma, mes:FREQ.mes,
+    titulo:FREQ.titulo||"", local:FREQ.local||"",
     datas:JSON.stringify(freqDatas()), participantes:JSON.stringify(FREQ.participantes) };
   btn.disabled=true;
   try{
     if(FREQ.id) await api("frequencias/"+FREQ.id,"PUT",corpo);
     else await api("frequencias","POST",corpo);
-    const salva={ turma:FREQ.turma, mes:FREQ.mes };
+    const salva={ turma:FREQ.turma, mes:FREQ.mes, local:FREQ.local||"" };
     try{ FREQ_LISTA = await api("frequencias"); }catch{}
     /* Salvar FECHA a folha: o editor volta em branco, pronto para a próxima
        turma, e a que acabou de ser salva aparece na lista logo abaixo. */
@@ -3171,7 +3471,8 @@ async function salvarFrequencia(){
        registrado, e é de lá que sai a próxima ação. */
     FREQ=null; FREQ_SUJO=false; FREQ_SEL.clear();
     pintarModoFolha(); pintarListaFolhas();
-    $("#freq-status").textContent=`Folha salva — turma ${salva.turma}, ${freqMesLabel(salva.mes)}. Ela está na lista abaixo.`;
+    $("#freq-status").textContent=`Folha salva — turma ${salva.turma}${salva.local?" · "+salva.local:""}, `
+      + `${freqMesLabel(salva.mes)}. Ela está na lista abaixo.`;
   }catch(e){ $("#freq-status").textContent="Não salvou: "+e.message; }
   btn.disabled=false;
 }
@@ -3193,26 +3494,36 @@ async function salvarFrequencia(){
    que nunca vão dar resultado.
    ========================================================================== */
 function montarFiltrosFolhas(){
-  const selM=$("#ff-mes"), selT=$("#ff-turma");
+  const selM=$("#ff-mes"), selT=$("#ff-turma"), selL=$("#ff-local");
   if(!selM||!selT) return;
   const meses=[...new Set(FREQ_LISTA.map((f)=>f.mes))].sort().reverse();
   const turmas=[...new Set(FREQ_LISTA.map((f)=>f.turma))].sort();
-  const guardaM=selM.value, guardaT=selT.value;
+  /* Os locais saem do que EXISTE, não de uma lista fixa: quem digita um lugar
+     novo o vê no filtro na hora seguinte, sem ninguém cadastrar nada antes. */
+  const locais=[...new Set(FREQ_LISTA.map((f)=>String(f.local||"").trim()).filter(Boolean))].sort();
+  const guardaM=selM.value, guardaT=selT.value, guardaL=selL?selL.value:"";
   selM.innerHTML=`<option value="">Todos</option>`+meses.map((m)=>`<option value="${m}">${escA(freqMesLabel(m))}</option>`).join("");
   selT.innerHTML=`<option value="">Todas</option>`+turmas.map((t)=>`<option value="${escA(t)}">${escA(t)}</option>`).join("");
   if(meses.includes(guardaM)) selM.value=guardaM;
   if(turmas.includes(guardaT)) selT.value=guardaT;
+  if(selL){
+    selL.innerHTML=`<option value="">Todos</option>`+locais.map((l)=>`<option value="${escA(l)}">${escA(l)}</option>`).join("");
+    if(locais.includes(guardaL)) selL.value=guardaL;
+  }
 }
 function limparFiltroFolhas(){
   $("#ff-mes").value=""; $("#ff-turma").value=""; $("#ff-busca").value="";
+  if($("#ff-local")) $("#ff-local").value="";
   reiniciarPagina("freq"); pintarListaFolhas();
 }
 function folhasFiltradas(){
   const mes=($("#ff-mes")||{}).value||"", turma=($("#ff-turma")||{}).value||"";
+  const local=($("#ff-local")||{}).value||"";
   const termo=(($("#ff-busca")||{}).value||"").trim().toLowerCase();
   return FREQ_LISTA.filter((f)=>{
     if(mes && f.mes!==mes) return false;
     if(turma && f.turma!==turma) return false;
+    if(local && String(f.local||"").trim()!==local) return false;
     if(termo){
       /* Procura o NOME dentro dos participantes — resolvendo cada id no
          cache. Sem cache (recepção que não carregou pacientes), a busca não
@@ -3263,10 +3574,13 @@ async function removerFolha(id){
 function pintarListaFolhas(){
   montarFiltrosFolhas();
   const lista=folhasFiltradas()
-    .sort((a,b)=> String(b.mes).localeCompare(String(a.mes)) || String(a.turma).localeCompare(String(b.turma)));
+    .sort((a,b)=> String(b.mes).localeCompare(String(a.mes))
+               || String(a.turma).localeCompare(String(b.turma))
+               || String(a.local||"").localeCompare(String(b.local||"")));
   const info=fatiar("freq", lista);
   barraPaginacao("freq-paginacao","freq",info);
-  const filtrando = !!(($("#ff-mes")||{}).value || ($("#ff-turma")||{}).value || (($("#ff-busca")||{}).value||"").trim());
+  const filtrando = !!(($("#ff-mes")||{}).value || ($("#ff-turma")||{}).value
+    || ($("#ff-local")||{}).value || (($("#ff-busca")||{}).value||"").trim());
   $("#freq-lista").innerHTML = info.itens.length
     ? info.itens.map((f)=>{
         const aulas=freqArr(f.datas).length, gente=freqArr(f.participantes).length;
@@ -3274,10 +3588,11 @@ function pintarListaFolhas(){
         return `<tr class="freq-linha${aberta?" on":""}" onclick="abrirFolhaSalva(${f.id})" title="Abrir esta folha">
           <td>${escA(freqMesLabel(f.mes))}${aberta?' <span class="tag tag-Ativo" style="font-size:.66rem">aberta</span>':""}</td>
           <td>${escA(f.turma)}</td>
+          <td>${String(f.local||"").trim() ? escA(f.local) : '<span class="ajuda">—</span>'}</td>
           <td>${aulas}</td><td>${gente}</td>
-          <td style="text-align:right">${menuFolha(f)}</td></tr>`;
+          <td class="col-acoes">${menuFolha(f)}</td></tr>`;
       }).join("")
-    : `<tr><td class="vazio" colspan="5">${filtrando
+    : `<tr><td class="vazio" colspan="6">${filtrando
         ? "Nenhuma folha com esse filtro."
         : "Nenhuma folha registrada ainda — clique em <b>+ Nova folha</b> para criar a primeira."}</td></tr>`;
 }
@@ -3290,7 +3605,9 @@ function duplicarFolha(id){
   if(FREQ_SUJO && folhaTemConteudo() && !confirm("Há alterações não salvas na folha aberta. Trocar mesmo assim?")) return;
   montarSeletoresFreq();
   $("#freq-turma").value=f.turma; $("#freq-mes").value=f.mes;
-  FREQ={ id:0, turma:f.turma, mes:f.mes, datas:freqArr(f.datas), participantes:freqArr(f.participantes) };
+  $("#freq-titulo").value=f.titulo||""; $("#freq-local").value=f.local||"";
+  FREQ={ id:0, turma:f.turma, mes:f.mes, titulo:f.titulo||"", local:f.local||"",
+         datas:freqArr(f.datas), participantes:freqArr(f.participantes) };
   FREQ_SEL.clear();
   FREQ_SUJO=true;
   pintarModoFolha();      // é uma folha nova com conteúdo — sair sem salvar perde
@@ -3306,7 +3623,9 @@ function abrirFolhaSalva(id){
   if(FREQ_SUJO && folhaTemConteudo() && !confirm("Há alterações não salvas na folha aberta. Trocar mesmo assim?")) return;
   montarSeletoresFreq();               // garante o mês da folha no seletor
   $("#freq-turma").value=f.turma; $("#freq-mes").value=f.mes;
-  FREQ={ id:f.id, turma:f.turma, mes:f.mes, datas:freqArr(f.datas), participantes:freqArr(f.participantes) };
+  $("#freq-titulo").value=f.titulo||""; $("#freq-local").value=f.local||"";
+  FREQ={ id:f.id, turma:f.turma, mes:f.mes, titulo:f.titulo||"", local:f.local||"",
+         datas:freqArr(f.datas), participantes:freqArr(f.participantes) };
   FREQ_SEL.clear();
   FREQ_SUJO=false; $("#freq-status").textContent="";
   pintarModoFolha();
@@ -3322,7 +3641,8 @@ function abrirFolhaSalva(id){
 function imprimirFolha(id){
   const f=FREQ_LISTA.find((x)=>x.id===id);
   if(!f) return;
-  imprimirFrequencia({ turma:f.turma, mes:f.mes, datas:freqArr(f.datas), participantes:freqArr(f.participantes) });
+  imprimirFrequencia({ turma:f.turma, mes:f.mes, local:f.local, titulo:f.titulo,
+                       datas:freqArr(f.datas), participantes:freqArr(f.participantes) });
 }
 function imprimirFrequencia(folha){
   const dias=normalizarDias(folha.datas);
@@ -3347,8 +3667,14 @@ function imprimirFrequencia(folha){
      desmontaria a tabela inteira. */
   const nCols=3+dias.length;
   const colgroup=`<colgroup><col style="width:${nomeW}%"><col style="width:${cpfW}%"><col style="width:${numW}%">${`<col style="width:${diaW}%">`.repeat(dias.length)}</colgroup>`;
+  /* O SUBTÍTULO carrega turma e local. Antes a turma vinha grudada no título;
+     com o título agora digitado pela equipe, emendar as duas coisas numa linha
+     só produziria cabeçalho de três linhas em folha paisagem. Separados, o
+     título é o documento e a linha de baixo é a identificação da folha. */
+  const ondeQuando = "Turma " + folha.turma + (String(folha.local||"").trim() ? " · " + folha.local : "");
   const cabecalhoFolha=
-    `<tr><th colspan="${nCols}" style="border:0;text-align:center;font-size:1rem;color:#253282;font-weight:700;padding:.1rem 0 .35rem;white-space:normal">${escA(FREQ_TITULO+" — Turma "+folha.turma)}</th></tr>`+
+    `<tr><th colspan="${nCols}" style="border:0;text-align:center;font-size:1rem;color:#253282;font-weight:700;padding:.1rem 0 .2rem;white-space:normal">${escA(freqTitulo(folha))}</th></tr>`+
+    `<tr><th colspan="${nCols}" style="border:0;text-align:center;font-weight:700;padding:0 0 .25rem">${escA(ondeQuando)}</th></tr>`+
     `<tr><th colspan="${nCols}" style="border:0;text-align:center;font-weight:700;padding:0 0 .6rem">DATAS — MÊS ${escA(freqMesLabel(folha.mes))}</th></tr>`;
   /* Linhas mais baixas que as do cabeçalho, de propósito: a meta é 25+ nomes
      por folha em paisagem SEM mexer no tamanho da fonte — o aperto é todo de
@@ -3361,7 +3687,7 @@ function imprimirFrequencia(folha){
   /* Sem título no corpo (ele já mora no thead); o da janela continua. */
   abrirImpressao("",
     `<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:.82rem">${colgroup}<thead>${cabecalhoFolha}${cab}</thead><tbody>${corpo}</tbody></table>`,
-    { paisagem:true, tituloJanela:FREQ_TITULO+" — Turma "+folha.turma });
+    { paisagem:true, tituloJanela:freqTitulo(folha)+" — "+ondeQuando });
 }
 
 function timbreHTML(titulo, corpo, op){
