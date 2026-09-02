@@ -69,16 +69,47 @@ verde()   { printf "\033[1;32m%s\033[0m\n" "$1"; }
 amarelo() { printf "\033[1;33m%s\033[0m\n" "$1"; }
 vermelho(){ printf "\033[1;31m%s\033[0m\n" "$1"; }
 
-# Conta o que existe no banco — serve para provar, no fim, que nada sumiu
+# Conta o que existe no banco — serve para provar, no fim, que nada sumiu.
+#
+# CADA TABELA É CONTADA POR SI. Antes era uma linha só dentro de um try: a
+# PRIMEIRA tabela ausente derrubava o inventário inteiro, que virava a string
+# "BANCO ILEGÍVEL: ...". E aí vinha o estrago de verdade — o passo 8 compara o
+# antes com o depois para restaurar o banco se o conteúdo sumir, e os dois
+# lados devolviam a MESMA mensagem de erro. Iguais, a comparação passava: a
+# rede de segurança do deploy estava cega, e um banco esvaziado passaria por
+# "tudo certo".
+#
+# Foi o que aconteceu na entrega de 02/09/2026: o deploy.sh veio do BemEstar e
+# contava `testimonials`, uma tabela de depoimentos que ESTE site nunca teve —
+# o `server.js` não a cria em lugar nenhum.
+#
+# `visits` fica por último de propósito: o passo 8 corta o último campo para
+# ignorar a contagem de acessos, que muda sozinha entre o antes e o depois.
 inventario() {
   [ -f data/site.db ] || { echo "SEM BANCO"; return; }
   node -e '
     const { abrirBanco } = require("./db");
-    try {
-      const db = abrirBanco("data/site.db");
-      const n = (t) => db.prepare(`SELECT COUNT(*) c FROM ${t}`).get().c;
-      console.log(`${n("services")} especialidades · ${n("team")} profissionais · ${n("posts")} matérias · ${n("portfolio")} fotos · ${n("testimonials")} depoimentos · ${n("settings")} textos · ${n("visits")} visitas`);
-    } catch (e) { console.log("BANCO ILEGÍVEL: " + e.message); }
+    let db;
+    try { db = abrirBanco("data/site.db"); }
+    catch (e) { console.log("BANCO ILEGÍVEL: " + e.message); process.exit(0); }
+    const TABELAS = [
+      ["services", "especialidades"], ["team", "profissionais"],
+      ["posts", "matérias"], ["feed", "publicações"], ["projetos", "projetos"],
+      ["portfolio", "fotos"], ["galeria", "galeria"], ["documentos", "documentos"],
+      ["settings", "textos"], ["visits", "visitas"],
+    ];
+    let lidas = 0;
+    const partes = TABELAS.map(([t, rotulo]) => {
+      try {
+        const c = db.prepare(`SELECT COUNT(*) c FROM ${t}`).get().c;
+        lidas++;
+        return `${c} ${rotulo}`;
+      } catch { return `— ${rotulo}`; }   /* tabela que este site não tem */
+    });
+    /* Nenhuma tabela legível num arquivo que existe é corrupção, não ausência
+       de conteúdo — e precisa gritar em vez de virar uma contagem de zeros. */
+    if (!lidas) { console.log("BANCO ILEGÍVEL: nenhuma tabela conhecida"); process.exit(0); }
+    console.log(partes.join(" · "));
   ' 2>/dev/null
 }
 
@@ -92,7 +123,16 @@ restaurar_e_sair() {
     mkdir -p data && cp "$BACKUP" data/site.db
     amarelo "Banco restaurado do backup: $BACKUP"
   fi
-  $SC start "$SERVICO" 2>/dev/null
+  # RELIGAR EM VOZ ALTA. O `2>/dev/null` sozinho fazia o log terminar sem dizer
+  # se o site voltou — e este é justamente o momento em que isso é a única coisa
+  # que importa: o serviço foi parado no passo 3 e a entrega abortou. Quem lê o
+  # log ficava sem saber se o Instituto estava no ar ou fora.
+  if $SC start "$SERVICO" 2>/dev/null; then
+    verde "Serviço religado — o site voltou ao ar na versão anterior."
+  else
+    vermelho "ATENÇÃO: NÃO CONSEGUI RELIGAR O SERVIÇO. O SITE ESTÁ FORA DO AR."
+    vermelho "  Suba à mão:  sudo systemctl start $SERVICO"
+  fi
   rm -rf "$COFRE"
   exit 1
 }
@@ -174,7 +214,19 @@ fi
 
 azul "5/8  Baixando a versão nova"
 DE=$(git rev-parse --short HEAD)
-if ! git pull --ff-only; then
+# GIT_TERMINAL_PROMPT=0: aqui NÃO HÁ TECLADO. A entrega chega por SSH presa a
+# um `command=`, sem terminal — então um `git` que resolva pedir usuário fica
+# esperando alguém que nunca vai digitar, e o erro sai como "could not read
+# Username", que parece falta de permissão e não falta de terminal.
+#
+# E a mensagem de falha passa a dizer PARA ONDE ele estava olhando. Sem isso, o
+# log da entrega de 02/09/2026 informava que o pull falhou e não informava a
+# URL — que é justamente o que decide entre "credencial vencida", "repositório
+# renomeado" e "remote apontando para o lugar errado".
+if ! GIT_TERMINAL_PROMPT=0 git pull --ff-only; then
+  vermelho "     origem configurada: $(git remote get-url origin 2>/dev/null || echo '(sem remote origin)')"
+  vermelho "     branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')"
+  vermelho "     Confira se essa URL abre sem login e se o nome do repositório está certo."
   restaurar_e_sair "     git pull falhou — nada foi alterado."
 fi
 PARA=$(git rev-parse --short HEAD)
