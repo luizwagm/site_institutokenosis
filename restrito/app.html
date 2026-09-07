@@ -145,7 +145,11 @@
     /* `font-size:1rem` explícito: com `font:inherit` o campo herdava os .8rem
        do proprio rotulo e o titulo da folha — o texto mais importante da tela,
        e o que sai no cabecalho impresso — ficava menor que o corpo do texto. */
-    .freq-titulo-campo input{display:block;width:100%;margin-top:.25rem;font:inherit;
+    /* `input, select`: o campo virou lista de projetos, e a regra valia só para
+       input — sem isto o título perdia o peso e a cor e virava um select
+       cinza de sistema, no lugar mais importante da tela. */
+    .freq-titulo-campo input, .freq-titulo-campo select{
+      display:block;width:100%;margin-top:.25rem;font:inherit;
       font-size:1rem;font-weight:700;color:var(--navy,#253282);padding:.5rem .65rem;
       border:1.5px solid #cfd8e8;border-radius:8px;background:#fff}
     .freq-controles{display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end}
@@ -870,9 +874,11 @@
              campo porque é ele que sai no cabeçalho da impressão — e a folha
              impressa é o documento que circula, assinado, fora do sistema.
              ================================================================= -->
+        <!-- Lista, e não digitação: o título sai do módulo Projetos. As opções
+             são montadas em `freqTituloOpcoes` quando a folha abre, porque
+             dependem do CACHE e do valor atual da folha. -->
         <label class="freq-titulo-campo">Título da folha
-          <input type="text" id="freq-titulo" maxlength="200" oninput="trocarFolha()"
-                 placeholder="Ex.: Projeto Socioassistencial … — Frequência Aula de Hidroginástica">
+          <select id="freq-titulo" onchange="trocarFolha()"></select>
         </label>
         <div class="freq-controles">
           <div><label>Turma</label><select id="freq-turma" onchange="trocarFolha()"></select></div>
@@ -3241,6 +3247,44 @@ const FREQ_TITULO_PADRAO = 'Projeto Socioassistencial "Movimento para a Vida Ati
 /* O título de UMA folha: o dela, ou o padrão quando ela não tem. Num lugar só,
    porque a mesma pergunta aparece na impressão, na lista e no editor. */
 const freqTitulo = (f)=> (String((f&&f.titulo)||"").trim() || FREQ_TITULO_PADRAO);
+
+/* ==========================================================================
+   AS OPÇÕES DO TÍTULO — os projetos cadastrados
+
+   O título sai do módulo Projetos, e não da digitação: a folha impressa é o
+   documento que circula assinado, e duas grafias do mesmo projeto viram duas
+   coisas diferentes na prestação de contas.
+
+   ⚠ O VALOR ATUAL ENTRA NA LISTA quando não é um projeto. As folhas antigas
+   têm título livre — a que existe hoje se chama 'Projeto Socioassistencial
+   "Movimento para a Vida Ativa" — Frequência…', e o projeto cadastrado é só
+   "Movimento para a Vida". Sem esta parte, abrir uma folha antiga trocaria o
+   título dela em silêncio, e bastaria salvar para o documento mudar de nome.
+   ========================================================================== */
+function freqTituloOpcoes(atual){
+  const titulos = (CACHE.projetos||[])
+    .map((p)=>String(p.title||"").trim()).filter(Boolean);
+  /* Ordem alfabética: a lista é para achar, não para lembrar em que ordem foi
+     cadastrado. */
+  titulos.sort((a,b)=>a.localeCompare(b,"pt-BR"));
+
+  const atualTxt = String(atual||"").trim();
+  const partes = [];
+
+  if(!titulos.length){
+    /* Sem projeto cadastrado a lista fica vazia e ninguém entende por quê —
+       a opção explica e diz onde resolver. */
+    partes.push(`<option value="">— nenhum projeto cadastrado (veja Cadastros › Projetos) —</option>`);
+  }
+  if(atualTxt && !titulos.includes(atualTxt)){
+    partes.push(`<option value="${escA(atualTxt)}" selected>${escA(atualTxt)}</option>`);
+    if(titulos.length) partes.push(`<option disabled>──────────</option>`);
+  }
+  for(const t of titulos){
+    partes.push(`<option value="${escA(t)}"${t===atualTxt?" selected":""}>${escA(t)}</option>`);
+  }
+  return partes.join("");
+}
 /* As turmas são de hora em hora, das 07h às 20h — 13 opções fixas. */
 const FREQ_TURMAS = Array.from({length:13},(_,i)=>`${String(7+i).padStart(2,"0")}h às ${String(8+i).padStart(2,"0")}h`);
 const FREQ_COLS = 10;      // duas aulas por semana: 8 a 10 dias conforme o mês
@@ -3306,7 +3350,7 @@ function modalNovaFolha(){
     <h2>Nova folha de frequência</h2>
     <div class="modal-corpo">
       <label class="freq-titulo-campo">Título da folha
-        <input type="text" id="nf-titulo" maxlength="200" value="${escA(FREQ_TITULO_PADRAO)}">
+        <select id="nf-titulo">${freqTituloOpcoes("")}</select>
       </label>
       <div class="formgrid">
         <div><label>Turma</label><select id="nf-turma">
@@ -3320,8 +3364,9 @@ function modalNovaFolha(){
               .sort().map((l)=>`<option value="${escA(l)}">`).join("")
           }</datalist></div>
       </div>
-      <p class="ajuda" style="margin:.6rem 0 0">O título é o que sai no <b>cabeçalho da
-        impressão</b>, e dá para mudar depois. O <b>local</b> é o que separa duas folhas da
+      <p class="ajuda" style="margin:.6rem 0 0">O título é o <b>projeto</b>, escolhido na
+        lista de <b>Cadastros › Projetos</b> — é ele que sai no <b>cabeçalho da
+        impressão</b>, e dá para trocar depois. O <b>local</b> é o que separa duas folhas da
         mesma turma no mesmo mês — preencha quando houver mais de um lugar.<br>
         Depois de criar, você escolhe os dias das aulas e vai acrescentando os usuários.
         Nada é gravado até clicar em <b>Salvar</b>.</p>
@@ -3339,6 +3384,10 @@ function criarFolhaDoForm(){
   fecharModal();
   montarSeletoresFreq();
   $("#freq-turma").value=turma; $("#freq-mes").value=mes;
+  /* As opções ANTES do valor: `select.value` só pega se a <option> existir, e
+     o título de uma folha antiga não é um projeto. Sem isto ele cairia no
+     primeiro item da lista, em silêncio. */
+  $("#freq-titulo").innerHTML=freqTituloOpcoes(titulo);
   $("#freq-titulo").value=titulo; $("#freq-local").value=local;
   FREQ={ id:0, turma, mes, titulo, local, datas:[], participantes:[] };
   FREQ_SUJO=false; FREQ_SEL.clear();
@@ -3605,6 +3654,7 @@ function duplicarFolha(id){
   if(FREQ_SUJO && folhaTemConteudo() && !confirm("Há alterações não salvas na folha aberta. Trocar mesmo assim?")) return;
   montarSeletoresFreq();
   $("#freq-turma").value=f.turma; $("#freq-mes").value=f.mes;
+  $("#freq-titulo").innerHTML=freqTituloOpcoes(f.titulo||"");
   $("#freq-titulo").value=f.titulo||""; $("#freq-local").value=f.local||"";
   FREQ={ id:0, turma:f.turma, mes:f.mes, titulo:f.titulo||"", local:f.local||"",
          datas:freqArr(f.datas), participantes:freqArr(f.participantes) };
@@ -3623,6 +3673,7 @@ function abrirFolhaSalva(id){
   if(FREQ_SUJO && folhaTemConteudo() && !confirm("Há alterações não salvas na folha aberta. Trocar mesmo assim?")) return;
   montarSeletoresFreq();               // garante o mês da folha no seletor
   $("#freq-turma").value=f.turma; $("#freq-mes").value=f.mes;
+  $("#freq-titulo").innerHTML=freqTituloOpcoes(f.titulo||"");
   $("#freq-titulo").value=f.titulo||""; $("#freq-local").value=f.local||"";
   FREQ={ id:f.id, turma:f.turma, mes:f.mes, titulo:f.titulo||"", local:f.local||"",
          datas:freqArr(f.datas), participantes:freqArr(f.participantes) };

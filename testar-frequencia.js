@@ -34,7 +34,11 @@ const http = require("node:http");
 const os = require("node:os");
 const path = require("node:path");
 
-const PORTA = Number(process.env.PORTA_TESTE_FREQ) || 5298;
+/* 5288, e nao 5298: a secao 7 sobe um SEGUNDO servidor em PORTA+1, e 5299 e a
+   porta do testar-cabecalhos.js. Duas suites do mesmo projeto disputando a
+   mesma porta so quebram quando alguem as roda em paralelo — que e o pior
+   momento para descobrir. */
+const PORTA = Number(process.env.PORTA_TESTE_FREQ) || 5288;
 const BANCO = path.join(os.tmpdir(), `kenosis-frequencia-${process.pid}.db`);
 const MARCA = `ZZ QA freq ${process.pid}`;
 
@@ -295,6 +299,69 @@ function pedir(caminho, metodo = "GET", corpo = null) {
       filho2.kill();
       try { require("node:fs").rmSync(BANCO + ".2", { force: true }); } catch {}
     }
+    /* ====================================================================
+       8. O TÍTULO VEM DA LISTA DE PROJETOS
+
+       O campo era texto livre; virou escolha entre os projetos cadastrados,
+       porque a folha impressa é o documento que circula assinado e duas
+       grafias do mesmo projeto viram duas coisas diferentes na prestação de
+       contas.
+
+       `freqTituloOpcoes` é função PURA: dá para exercitá-la extraindo do
+       app.html, sem subir o sistema e sem login — o mesmo caminho do
+       `timbreHTML`.
+       ==================================================================== */
+    {
+      const fs = require("node:fs");
+      const html = fs.readFileSync(path.join(__dirname, "restrito", "app.html"), "utf8");
+      const corpo = /function freqTituloOpcoes\(atual\)\{([\s\S]*?)\n\}/.exec(html);
+      verdade("a montagem das opções existe no app", !!corpo);
+
+      /* O ambiente mínimo de que ela precisa: o CACHE e o escape. */
+      const montar = new Function("CACHE", "escA", "atual",
+        "function freqTituloOpcoes(atual){" + corpo[1] + "\n}\nreturn freqTituloOpcoes(atual);");
+      const escA = (x) => String(x ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+      const COM = { projetos: [{ title: "Movimento para a Vida" },
+                               { title: "Serviço de Assistência Social à Família" }] };
+
+      const lista = montar(COM, escA, "");
+      verdade("os projetos entram na lista", lista.includes("Movimento para a Vida"));
+      verdade("todos eles", lista.includes("Serviço de Assistência Social à Família"));
+      /* Ordem alfabética: a lista é para achar, não para lembrar em que ordem
+         foi cadastrado. */
+      verdade("em ordem alfabética",
+        lista.indexOf("Movimento") < lista.indexOf("Serviço de Assistência"));
+
+      /* ---- O QUE MAIS IMPORTA: a folha antiga não perde o título ---- */
+      const antigo = 'Projeto Socioassistencial "Movimento para a Vida Ativa" — Frequência Aula de Hidroginástica';
+      const comAntigo = montar(COM, escA, antigo);
+      verdade("o título de uma folha antiga continua na lista",
+        comAntigo.includes(escA(antigo)));
+      verdade("e vem marcado como o escolhido",
+        new RegExp('value="' + escA(antigo).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + '" selected')
+          .test(comAntigo));
+
+      /* Um projeto escolhido também vem marcado — senão o select abre no
+         primeiro e a folha muda de nome ao salvar. */
+      const escolhido = montar(COM, escA, "Movimento para a Vida");
+      verdade("o projeto já escolhido vem marcado",
+        /value="Movimento para a Vida" selected/.test(escolhido));
+      ok("e ele não é duplicado na lista",
+         (escolhido.match(/Movimento para a Vida<\/option>/g) || []).length, 1);
+
+      /* Sem projeto cadastrado a lista fica vazia e ninguém entende por quê. */
+      const vazio = montar({ projetos: [] }, escA, "");
+      verdade("sem projeto, a lista explica em vez de ficar vazia",
+        /nenhum projeto cadastrado/i.test(vazio));
+
+      /* Aspas no nome do projeto quebrariam o atributo `value` e comeriam o
+         resto da lista. */
+      const aspas = montar({ projetos: [{ title: 'Projeto "Vida" & Cia' }] }, escA, "");
+      ok("aspas no nome do projeto não quebram a lista",
+         /value="Projeto "Vida"/.test(aspas), false);
+      verdade("e o nome continua legível", aspas.includes("&quot;Vida&quot;"));
+    }
+
   } catch (e) {
     falhou++;
     console.log(`\n    ✖ a suíte parou: ${e.message}`);

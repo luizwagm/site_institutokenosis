@@ -24,7 +24,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.33.0";
+const SISTEMA_VERSION = "1.34.0";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -198,6 +198,14 @@ function proteger(tabela, obj) {
    que as entregou.
    ========================================================================== */
 const HISTORICO_VERSOES = [
+  { versao: "1.34.0", data: "2026-09-07", titulo: "O título da folha de frequência vem da lista de projetos", mudancas: [
+    "O título da folha deixou de ser digitado: agora é escolhido na lista dos projetos cadastrados",
+    "Vale na criação da folha e na edição — o mesmo campo, nos dois lugares",
+    "Assim o nome que sai na folha impressa é sempre igual ao do projeto, sem variação de grafia",
+    "Mudar o nome de um projeto em Cadastros passa a valer para as folhas novas, sem reescrever nada",
+    "Folha antiga não perde o título: ele continua na lista, marcado, e só muda se você escolher outro",
+    "Sem projeto cadastrado, a lista explica onde cadastrar em vez de aparecer vazia",
+  ] },
   { versao: "1.33.0", data: "2026-09-02", titulo: "Frequência com título próprio, e o sistema no celular", mudancas: [
     "A folha de frequência tem TÍTULO próprio, digitado na abertura e corrigível depois",
     "É esse título que sai no cabeçalho da folha impressa — antes era um texto fixo do sistema",

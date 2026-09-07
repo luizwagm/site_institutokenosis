@@ -94,7 +94,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "2.13.1";
+const APP_VERSION = "2.13.2";
 
 /* ==========================================================================
    CONSULTA DE CEP
@@ -753,8 +753,29 @@ function seed() {
 }
 
 seed();
-// migração leve: garante chaves novas em bancos já existentes
-if (!getS("cnpj") || getS("cnpj") === "00.000.000/0001-00") setS("cnpj", "02.192.745/0001-25");
+
+/* --------------------------------------------------------------------------
+   MIGRAÇÃO LEVE — chaves novas em bancos que já existem
+
+   ⚠ ESTA LINHA GRAVAVA O CNPJ DO BEMESTARCLINIC (02.192.745/0001-25), que veio
+   junto no clone. Ela não chegou a disparar em produção, porque o `seed()`
+   grava o CNPJ certo na instalação e a condição nunca foi verdadeira — mas ela
+   roda a cada boot, e bastava o campo ficar vazio para o CNPJ de outro cliente
+   entrar no rodapé, no JSON-LD e no TIMBRE de toda impressão do /restrito
+   (ficha, relatório, agenda).
+
+   Numa organização que presta contas à sociedade, CNPJ errado em documento
+   impresso não é detalhe de layout.
+
+   O número correto do Instituto está no cartão do CNPJ e no selo de OSC do
+   próprio site: 63.991.397/0001-40.
+   -------------------------------------------------------------------------- */
+const CNPJ_INSTITUTO = "63.991.397/0001-40";
+if (!getS("cnpj") || getS("cnpj") === "00.000.000/0001-00"
+    /* e conserta quem já pegou o número errado antes desta correção */
+    || getS("cnpj") === "02.192.745/0001-25") {
+  setS("cnpj", CNPJ_INSTITUTO);
+}
 
 /* ------------------------------ Sessões ---------------------------------- */
 /* ------------------------- Sessão e força bruta --------------------------- */
