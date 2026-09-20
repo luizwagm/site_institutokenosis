@@ -6,7 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "testar": "node testar-cabecalhos.js && node testar-texto.js && node testar-limitador.js && node testar-frequencia.js",
+    "testar": "node testar-cabecalhos.js && node testar-texto.js && node testar-limitador.js && node testar-frequencia.js && node testar-ata.js",
     "publicar": "node server.js --publicar",
     "backup": "node server.js --backup",
     "backup:status": "node server.js --backup-status",

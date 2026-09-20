@@ -157,9 +157,12 @@
     /* Pelo ID, e nao por `.freq-controles input[type=text]`: a caixa de buscar
        usuario ao lado tambem e um input de texto, e ja tem estilo proprio
        (`.cbx-inp`) que uma regra por tipo venceria por especificidade. */
-    .freq-controles select,.freq-controles #freq-local{font:inherit;padding:.4rem .6rem;
+    .freq-controles select,.freq-controles #freq-local,
+    .freq-controles #ata-local,.freq-controles #ata-convidado,
+    .freq-controles input[type=date],.freq-controles input[type=time]{font:inherit;padding:.4rem .6rem;
       border:1.5px solid #cfd8e8;border-radius:8px;background:#fff}
-    .freq-controles #freq-local{min-width:11rem}
+    .freq-controles #freq-local,.freq-controles #ata-local,
+    .freq-controles #ata-convidado{min-width:11rem}
     .freq-add-wrap select{min-width:16rem}
     .freq-tab th,.freq-tab td{border-right:1px solid #eef1f7}
     .freq-tab th:last-child,.freq-tab td:last-child{border-right:0}
@@ -518,8 +521,14 @@
          só o texto corrido e os campos — que é exatamente o que se lê de perto,
          no aparelho, com o braço estendido. */
       body{font-size:16px}
+      /* Os campos de texto da folha aparecem aqui pelo ID porque a regra geral
+         pega `select`, não `input[type=text]` — e a caixa de BUSCA do
+         combobox, que é irmã deles, tem tamanho próprio. São três: o local da
+         frequência e o local e o convidado da ata. */
       .busca,.freq-filtros input,.freq-filtros select,.freq-controles select,
-      .freq-controles #freq-local{max-width:none;min-width:0;width:100%}
+      .freq-controles #freq-local,.freq-controles #ata-local,
+      .freq-controles #ata-convidado,.freq-controles input[type=date],
+      .freq-controles input[type=time]{max-width:none;min-width:0;width:100%}
       .freq-filtros>div,.freq-controles>div,.freq-add-wrap{flex:1 1 100%}
       /* Os dois campos que NÃO herdam o corpo do texto — eles declaram
          `font-size` em rem, e a raiz não mudou. Ficam de fora da regra geral
@@ -682,6 +691,9 @@
     </div>
     <button class="navbtn" data-nav="atendimentos">Agendamento</button>
     <button class="navbtn" data-nav="frequencia">Frequência</button>
+    <!-- Ata fica colada na Frequência: são as duas folhas que o sistema monta
+         para serem assinadas NO PAPEL. Quem procura uma procura a outra. -->
+    <button class="navbtn" data-nav="atas">Atas</button>
     <!-- Prontuário fica no menu principal, fora de Cadastros: não é cadastro, é
          o acompanhamento do atendimento — e é para onde a equipe técnica vai o
          dia inteiro. Enterrá-lo num accordion custa dois cliques por consulta. -->
@@ -935,6 +947,103 @@
         </table>
       </div>
       <div id="freq-paginacao" class="paginacao"></div>
+    </section>
+
+    <!-- ====================================================================
+         ATAS — a lista de presença de uma reunião, assinada no papel
+
+         Irmã da Frequência, e de propósito: mesma tela, mesmos gestos (a lista
+         primeiro, o editor quando se abre uma, o menu de três pontos na linha,
+         a impressão timbrada). Quem sabe usar uma sabe usar a outra.
+
+         O que muda é a identidade. A frequência é de um MÊS e tem uma coluna
+         por aula — a mesma pessoa assina oito vezes na mesma folha. A ata é de
+         UMA reunião: dia, hora, lugar, e uma assinatura por presente. Por isso
+         a coluna de dias dá lugar a uma coluna ASSINATURA, larga, que sai em
+         branco no papel.
+
+         Presentes vêm do cadastro de usuários (ids, nunca cópia de nome) e,
+         para quem não está em cadastro nenhum, como CONVIDADO — só o nome
+         digitado, que é o único registro que vai existir dessa pessoa.
+
+         As classes de CSS são as mesmas da Frequência (`freq-*`) de propósito:
+         são duas folhas com o mesmo desenho, e a regra de celular, que vive num
+         @media único no fim do arquivo, já cobre as duas.
+         ==================================================================== -->
+    <section class="panel" id="pane-ata">
+      <div class="topbar">
+        <h1>Atas</h1>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-navy btn-sm" onclick="modalNovaAta()">＋ Nova ata</button>
+          <button class="btn btn-navy btn-sm" id="ata-salvar" onclick="salvarAta()" hidden>Salvar</button>
+          <button class="btn btn-ghost btn-sm" id="ata-fechar" onclick="fecharAta()" hidden>Fechar ata</button>
+        </div>
+      </div>
+
+      <div id="ata-editor" hidden>
+      <div class="card">
+        <!-- O título é o PROJETO, escolhido na mesma lista que a frequência usa:
+             a ata impressa vai para a prestação de contas, e duas grafias do
+             mesmo projeto viram duas coisas diferentes lá. -->
+        <label class="freq-titulo-campo">Título da ata
+          <select id="ata-titulo" onchange="trocarAta()"></select>
+        </label>
+        <div class="freq-controles">
+          <div><label>Data</label><input type="date" id="ata-data" onchange="trocarAta()"></div>
+          <div><label>Hora</label><input type="time" id="ata-hora" onchange="trocarAta()"></div>
+          <div><label>Local</label><input type="text" id="ata-local" maxlength="120"
+               placeholder="Onde foi a reunião" oninput="trocarAta()"></div>
+          <div class="freq-add-wrap"><label>Adicionar usuário</label>
+            <!-- o mesmo combobox com busca da agenda e da frequência -->
+            <div class="cbx" data-cbx data-tab="pacientes" data-valor="id" data-id="ata-add">
+              <input type="text" id="ata-add-txt" class="cbx-inp" autocomplete="off" placeholder="Digite para buscar…"
+                oninput="cbxFiltrar('ata-add')" onfocus="cbxFiltrar('ata-add')" onkeydown="cbxTecla(event,'ata-add')" onblur="cbxBlur('ata-add')">
+              <input type="hidden" id="ata-add" onchange="addNaAta(this.value)">
+              <div class="cbx-list" id="ata-add-list" hidden></div>
+            </div></div>
+          <!-- CONVIDADO: quem apareceu na reunião e não está em cadastro nenhum.
+               Vai só o nome — CPF aqui ficaria fora da cifragem do cadastro. -->
+          <div><label>Convidado (fora do cadastro)</label>
+            <input type="text" id="ata-convidado" maxlength="120" placeholder="Nome e Enter"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();addConvidadoAta();}"></div>
+          <div style="display:flex;align-items:flex-end">
+            <button class="btn btn-ghost btn-sm" onclick="addConvidadoAta()">Acrescentar convidado</button>
+          </div>
+        </div>
+        <p class="ajuda" style="margin:.7rem 0 0">A coluna <b>Assinatura</b> sai em branco na impressão —
+          é ela que cada presente assina, no papel. A lista sai em ordem alfabética e numerada.
+          Nada é gravado até clicar em <b>Salvar</b>.</p>
+      </div>
+      <div class="freq-selbar" id="ata-selbar"></div>
+      <div class="card" style="padding:0;overflow:auto">
+        <table class="freq-tab">
+          <thead id="ata-thead"></thead>
+          <tbody id="ata-tbody"></tbody>
+        </table>
+      </div>
+      </div><!-- /ata-editor -->
+      <p class="ajuda" id="ata-status"></p>
+
+      <h2 class="freq-sub">Atas registradas</h2>
+      <div class="card" style="padding:.7rem .9rem">
+        <div class="freq-filtros">
+          <div><label>Mês</label><select id="fa-mes" onchange="pintarListaAtas()"></select></div>
+          <div><label>Local</label><select id="fa-local" onchange="pintarListaAtas()"></select></div>
+          <div><label>Buscar pessoa na ata</label>
+            <input type="text" id="fa-busca" placeholder="Nome de quem esteve presente…"
+                   oninput="pintarListaAtas()"></div>
+          <div style="display:flex;align-items:flex-end">
+            <button class="btn btn-ghost btn-sm" onclick="limparFiltroAtas()">Limpar</button>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="padding:0;overflow:auto">
+        <table>
+          <thead><tr><th>Data</th><th>Hora</th><th>Título</th><th>Local</th><th>Presentes</th><th class="col-acoes" style="width:2.6rem"></th></tr></thead>
+          <tbody id="ata-lista"></tbody>
+        </table>
+      </div>
+      <div id="ata-paginacao" class="paginacao"></div>
     </section>
 
     <!-- ====================================================================
@@ -1359,7 +1468,7 @@ async function conferirArquivados(){
 
 const PERM_CLIENTE = {
   admin: null,
-  secretaria: new Set(["painel","pacientes","associados","profissionais","atendimentos","frequencia","servicos","projetos","documentos_gestao","beneficios","eventos","relatorios","relatorios_pacientes","conta"]),
+  secretaria: new Set(["painel","pacientes","associados","profissionais","atendimentos","frequencia","atas","servicos","projetos","documentos_gestao","beneficios","eventos","relatorios","relatorios_pacientes","conta"]),
   profissional: new Set(["atendimentos","prontuario","conta"]),   // SOMENTE a sua agenda e os seus prontuários
 };
 function aplicarPermissoes(perfil){
@@ -2000,6 +2109,7 @@ document.querySelectorAll(".navbtn[data-nav]").forEach((b)=>b.addEventListener("
   else if(nav==="relatorios"){ $("#pane-relatorios").classList.add("on"); carregarRelatorios(); }
   else if(nav==="relatorios_pacientes"){ $("#pane-relpac").classList.add("on"); carregarRelacaoPacientes(); }
   else if(nav==="frequencia"){ $("#pane-freq").classList.add("on"); abrirFrequencia(); }
+  else if(nav==="atas"){ $("#pane-ata").classList.add("on"); abrirAtas(); }
   else { MOD=nav; $("#pane-mod").classList.add("on"); mostrarModulo(); }
   fecharDropdowns(); marcarTriggers();
 }));
@@ -2193,6 +2303,7 @@ function barraPaginacao(alvo, chave, info){
 function repintarPagina(chave){
   if(chave === "relpac") return pintarRelpacTabela();
   if(chave === "freq") return pintarListaFolhas();
+  if(chave === "ata") return pintarListaAtas();
   /* Faltava: trocar de página nos Arquivados repintava a tabela de módulo
      (que nem está na tela) e a lista ficava parada na página 1. */
   if(chave === "arquivados") return carregarArquivados();
@@ -3739,6 +3850,433 @@ function imprimirFrequencia(folha){
   abrirImpressao("",
     `<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:.82rem">${colgroup}<thead>${cabecalhoFolha}${cab}</thead><tbody>${corpo}</tbody></table>`,
     { paisagem:true, tituloJanela:freqTitulo(folha)+" — "+ondeQuando });
+}
+
+/* ==========================================================================
+   ATA — a lista de presença de uma reunião, assinada no papel
+
+   Irmã da Frequência (acima), com a mesma gramática de tela: abre na LISTA,
+   o editor só existe com uma ata aberta, o menu de três pontos tem as ações
+   da linha e a impressão sai timbrada. Quem aprendeu uma não reaprende a
+   outra.
+
+   O QUE MUDA, e por que não é a mesma folha com outro nome: a frequência é de
+   um MÊS, com uma coluna por aula — a mesma pessoa assina oito vezes. A ata é
+   de UMA reunião: dia, hora, lugar, e uma assinatura por presente. A coluna de
+   dias dá lugar a uma coluna ASSINATURA, larga, em branco no papel.
+
+   POR QUE NÃO FOI FEITO UM MOTOR ÚNICO PARA AS DUAS: a Frequência está em uso
+   diário no Instituto, e transformá-la em caso particular de um motor novo
+   arriscaria a folha que já circula assinada — para economizar umas linhas de
+   uma tela que a equipe abre uma vez por reunião. O que é genuinamente comum
+   (combobox de busca, paginação, menu da linha, impressão timbrada, e o
+   seletor de projetos `freqTituloOpcoes`) já é compartilhado de verdade.
+   ========================================================================== */
+const ATA_TITULO_PADRAO = "Ata de reunião";
+/* O título de UMA ata: o dela, ou o padrão quando ela não tem — num lugar só,
+   porque a mesma pergunta aparece na lista, no editor e na impressão. */
+const ataTitulo = (a)=> (String((a&&a.titulo)||"").trim() || ATA_TITULO_PADRAO);
+
+let ATA = null;            // a ata aberta {id, titulo, data, hora, local, participantes[]}
+let ATA_LISTA = [];        // as atas salvas
+let ATA_SUJO = false;      // alteração ainda não salva
+let ATA_SEL = new Set();   // linhas marcadas para remover
+
+/* O mesmo parser tolerante da frequência: JSON quebrado vira lista vazia, e a
+   tela abre em vez de morrer com a ata inteira dentro. */
+const ataArr = freqArr;
+const ataDataLabel = (d)=>{ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d||"")); return m?`${m[3]}/${m[2]}/${m[1]}`:"—"; };
+const ataMes = (d)=>String(d||"").slice(0,7);
+
+/* ==========================================================================
+   QUEM ESTÁ NA LINHA
+
+   A lista mistura duas coisas, e é de propósito:
+     12                → id do cadastro de usuários (o nome vem de lá, sempre atual)
+     {"nome":"Fulano"} → convidado, que não existe em cadastro nenhum
+
+   `chave` é o que a seleção usa. Pelo id para cadastrado, pelo nome em
+   minúsculas para convidado — a ordem alfabética embaralha as posições a cada
+   repintura, então índice de array não serve de identidade.
+   ========================================================================== */
+function ataPessoa(item){
+  if(item && typeof item === "object"){
+    const nome=String(item.nome||"").trim();
+    return { chave:"c:"+nome.toLowerCase(), nome, cpf:"", convidado:true };
+  }
+  const p = CACHE.pacientes.find((x)=>String(x.id)===String(item));
+  return p
+    ? { chave:"p:"+p.id, nome:p.nome, cpf:p.cpf||"", convidado:false }
+    /* Cadastro que saiu do cache (inativado depois de entrar na ata): a linha
+       continua na folha, avisando — sumir em silêncio mudaria o documento. */
+    : { chave:"p:"+item, nome:"(cadastro não encontrado)", cpf:"", convidado:false };
+}
+const ataPessoas = ()=> (ATA ? ATA.participantes : []).map(ataPessoa);
+/* Ordem alfabética na tela e no papel, como em qualquer lista de presença. */
+const ataOrdenar = (lista)=> lista.slice().sort((a,b)=>String(a.nome).localeCompare(String(b.nome),"pt-BR"));
+
+async function abrirAtas(){
+  try{ ATA_LISTA = await api("atas"); }catch{ ATA_LISTA = []; }
+  fecharAta();
+}
+
+/* Um único lugar decide se o editor está na tela — espalhado, sobraria um
+   Salvar visível sem ata aberta. */
+function pintarModoAta(){
+  const tem = !!ATA;
+  $("#ata-editor").hidden = !tem;
+  $("#ata-salvar").hidden = !tem;
+  $("#ata-fechar").hidden = !tem;
+}
+const ataTemConteudo = ()=> !!ATA && ATA.participantes.length > 0;
+
+function fecharAta(){
+  if(ATA && ATA_SUJO && ataTemConteudo() &&
+     !confirm("Há alterações não salvas nesta ata. Fechar mesmo assim?")) return;
+  ATA = null; ATA_SUJO = false; ATA_SEL.clear();
+  $("#ata-status").textContent = "";
+  pintarModoAta();
+  pintarListaAtas();
+}
+
+/* NOVA ATA por formulário, e não editor em branco: data e local são a
+   identidade prática da ata (é o que se procura na lista), e perguntá-los
+   antes evita a folha com trinta nomes na data errada — que só se descobre
+   impressa, depois da reunião. */
+function modalNovaAta(){
+  if(ATA && ATA_SUJO && ataTemConteudo() &&
+     !confirm("Há alterações não salvas na ata aberta. Começar outra mesmo assim?")) return;
+  const hoje = new Date();
+  const hojeISO = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,"0")}-${String(hoje.getDate()).padStart(2,"0")}`;
+  const host=$("#modal-host")||(()=>{const d=document.createElement("div");d.id="modal-host";document.body.appendChild(d);return d;})();
+  host.innerHTML=`<div class="modal-bg"><div class="modal" style="--modal-larg:560px">
+    <h2>Nova ata</h2>
+    <div class="modal-corpo">
+      <label class="freq-titulo-campo">Título da ata
+        <select id="na-titulo">${freqTituloOpcoes("")}</select>
+      </label>
+      <div class="formgrid">
+        <div><label>Data</label><input type="date" id="na-data" value="${hojeISO}"></div>
+        <div><label>Hora</label><input type="time" id="na-hora"></div>
+        <div><label>Local</label><input type="text" id="na-local" maxlength="120"
+             placeholder="Onde foi a reunião" list="na-locais">
+          <datalist id="na-locais">${
+            [...new Set(ATA_LISTA.map((a)=>String(a.local||"").trim()).filter(Boolean))]
+              .sort().map((l)=>`<option value="${escA(l)}">`).join("")
+          }</datalist></div>
+      </div>
+      <p class="ajuda" style="margin:.6rem 0 0">O título é o <b>projeto</b>, escolhido na lista de
+        <b>Cadastros › Projetos</b> — é ele que sai no cabeçalho da ata impressa, e dá para trocar depois.
+        Depois de criar, você acrescenta os presentes (do cadastro ou como convidados).
+        Nada é gravado até clicar em <b>Salvar</b>.</p>
+    </div>
+    <div class="acoes">
+      <button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-navy" onclick="criarAtaDoForm()">Criar ata</button>
+    </div>
+  </div></div>`;
+}
+
+function criarAtaDoForm(){
+  const data=$("#na-data").value, hora=$("#na-hora").value;
+  const titulo=($("#na-titulo").value||"").trim(), local=($("#na-local").value||"").trim();
+  if(!data) return toast("Escolha a data da reunião.", true);
+  fecharModal();
+  /* As opções do título ANTES do valor: `select.value` só pega se a <option>
+     existir — senão o select cai no primeiro item, em silêncio (a mesma
+     armadilha da folha de frequência). */
+  $("#ata-titulo").innerHTML = freqTituloOpcoes(titulo);
+  $("#ata-titulo").value = titulo;
+  $("#ata-data").value = data; $("#ata-hora").value = hora; $("#ata-local").value = local;
+  ATA = { id:0, titulo, data, hora, local, participantes:[] };
+  ATA_SUJO = false; ATA_SEL.clear();
+  $("#ata-status").textContent = "";
+  pintarModoAta(); pintarAta(); pintarListaAtas();
+  $("#pane-ata").scrollIntoView({ block:"start" });
+}
+
+/* Trocar um campo só muda a ata ABERTA — nada é carregado nem gravado. */
+function trocarAta(){
+  if(!ATA) return;
+  ATA.titulo=($("#ata-titulo").value||"").trim();
+  ATA.data=$("#ata-data").value;
+  ATA.hora=$("#ata-hora").value;
+  ATA.local=($("#ata-local").value||"").trim();
+  if(ATA.id || ataTemConteudo()) ATA_SUJO=true;
+}
+
+function pintarAta(){
+  const linhas = ataOrdenar(ataPessoas());
+  $("#ata-thead").innerHTML =
+    `<tr><th style="text-align:left;min-width:220px">Nome</th><th>CPF</th><th>Nº</th>`+
+    `<th style="min-width:240px">Assinatura</th><th style="width:2.4rem"></th></tr>`;
+  /* A seleção sobrevive à repintura (acrescentar alguém não desmarca os já
+     marcados) e nunca guarda quem saiu da ata. */
+  const chaves = new Set(linhas.map((p)=>p.chave));
+  ATA_SEL = new Set([...ATA_SEL].filter((k)=>chaves.has(k)));
+  $("#ata-tbody").innerHTML = linhas.length
+    ? linhas.map((p,i)=>`<tr>
+        <td>${escA(p.nome)}${p.convidado?' <span class="tag tag-Inativo" style="font-size:.66rem">convidado</span>':""}</td>
+        <td>${escA(p.cpf||"—")}</td>
+        <td class="freq-num">${String(i+1).padStart(2,"0")}</td>
+        <td class="freq-cel"></td>
+        <td style="text-align:center"><input type="checkbox" class="freq-sel"${ATA_SEL.has(p.chave)?" checked":""}
+            onchange="ataMarcar('${escA(p.chave)}',this.checked)" title="Selecionar para remover"></td></tr>`).join("")
+    : `<tr><td class="vazio" colspan="5">Nenhum presente na ata — escolha em "Adicionar usuário" ou acrescente um convidado.</td></tr>`;
+  pintarSelecaoAta();
+}
+
+function addNaAta(id){
+  if(!id || !ATA) return;
+  /* Limpa o combobox ANTES de repintar: o blur dele valida o texto 160 ms
+     depois da escolha e redisparia o change com o mesmo id. */
+  const hid=$("#ata-add"), txt=$("#ata-add-txt");
+  if(hid) hid.value=""; if(txt) txt.value="";
+  if(ATA.participantes.some((x)=> typeof x !== "object" && String(x)===String(id))) return;  // já está na ata
+  ATA.participantes.push(Number(id)); ATA_SUJO=true;
+  pintarAta();
+}
+
+/* O CONVIDADO é a exceção necessária: não está em cadastro nenhum, então a ata
+   é o único registro dele. Guarda-se o nome e só — CPF aqui ficaria fora da
+   cifragem que protege o cadastro. */
+function addConvidadoAta(){
+  if(!ATA) return;
+  const campo=$("#ata-convidado");
+  const nome=String(campo.value||"").trim().slice(0,120);
+  if(!nome) return;
+  const ja = ATA.participantes.some((x)=> x && typeof x === "object" &&
+    String(x.nome||"").trim().toLowerCase() === nome.toLowerCase());
+  if(ja){ campo.value=""; return toast("Esse convidado já está na ata.", true); }
+  ATA.participantes.push({ nome }); ATA_SUJO=true;
+  campo.value="";
+  pintarAta();
+  campo.focus();
+}
+
+/* ------------------- seleção para remover (igual à frequência) ------------ */
+function pintarSelecaoAta(){
+  const barra=$("#ata-selbar"); if(!barra) return;
+  if(!ATA || !ATA.participantes.length){ barra.innerHTML=""; return; }
+  const n=ATA_SEL.size, total=ATA.participantes.length;
+  barra.innerHTML =
+    `<button class="btn btn-ghost btn-sm" onclick="ataSelTodos()">${n===total?"Desmarcar todos":"Selecionar todos"}</button>`+
+    (n?`<button class="btn btn-navy btn-sm" onclick="removerSelecionadosAta()">Remover selecionados (${n})</button>`:"")+
+    (n?`<span class="ajuda" style="margin:0">${n} de ${total} selecionado(s)</span>`:"");
+}
+function ataMarcar(chave, marcado){
+  if(marcado) ATA_SEL.add(chave); else ATA_SEL.delete(chave);
+  pintarSelecaoAta();
+}
+function ataSelTodos(){
+  const chaves = ataPessoas().map((p)=>p.chave);
+  if(ATA_SEL.size===chaves.length) ATA_SEL.clear(); else ATA_SEL=new Set(chaves);
+  pintarAta();
+}
+function removerSelecionadosAta(){
+  const n=ATA_SEL.size; if(!n) return;
+  if(!confirm(`Remover ${n} presente(s) desta ata?\n\nEles saem só da ata — o cadastro não é tocado. A remoção só vale depois do Salvar.`)) return;
+  ATA.participantes = ATA.participantes.filter((item)=> !ATA_SEL.has(ataPessoa(item).chave));
+  ATA_SEL.clear(); ATA_SUJO=true;
+  pintarAta();
+}
+
+async function salvarAta(){
+  const btn=$("#ata-salvar");
+  if(!ATA.data){ $("#ata-status").textContent="Escolha a data da reunião antes de salvar."; return; }
+  const corpo={ titulo:ATA.titulo||"", data:ATA.data, hora:ATA.hora||"", local:ATA.local||"",
+    participantes:JSON.stringify(ATA.participantes) };
+  btn.disabled=true;
+  try{
+    if(ATA.id) await api("atas/"+ATA.id,"PUT",corpo);
+    else await api("atas","POST",corpo);
+    const salva={ data:ATA.data, local:ATA.local||"" };
+    try{ ATA_LISTA = await api("atas"); }catch{}
+    /* Salvar FECHA a ata e volta à lista — é lá que se confere o que ficou
+       registrado, e é de lá que sai a próxima ação (imprimir). */
+    ATA=null; ATA_SUJO=false; ATA_SEL.clear();
+    pintarModoAta(); pintarListaAtas();
+    $("#ata-status").textContent=`Ata salva — ${ataDataLabel(salva.data)}${salva.local?" · "+salva.local:""}. `
+      + `Ela está na lista abaixo; imprima pelo menu da linha para colher as assinaturas.`;
+  }catch(e){ $("#ata-status").textContent="Não salvou: "+e.message; }
+  btn.disabled=false;
+}
+
+/* --------------------------- a lista de atas ------------------------------ */
+function montarFiltrosAtas(){
+  const selM=$("#fa-mes"), selL=$("#fa-local");
+  if(!selM) return;
+  const meses=[...new Set(ATA_LISTA.map((a)=>ataMes(a.data)).filter(Boolean))].sort().reverse();
+  const locais=[...new Set(ATA_LISTA.map((a)=>String(a.local||"").trim()).filter(Boolean))].sort();
+  const guardaM=selM.value, guardaL=selL?selL.value:"";
+  selM.innerHTML=`<option value="">Todos</option>`+meses.map((m)=>`<option value="${m}">${escA(freqMesLabel(m))}</option>`).join("");
+  if(meses.includes(guardaM)) selM.value=guardaM;
+  if(selL){
+    selL.innerHTML=`<option value="">Todos</option>`+locais.map((l)=>`<option value="${escA(l)}">${escA(l)}</option>`).join("");
+    if(locais.includes(guardaL)) selL.value=guardaL;
+  }
+}
+function limparFiltroAtas(){
+  $("#fa-mes").value=""; $("#fa-busca").value="";
+  if($("#fa-local")) $("#fa-local").value="";
+  reiniciarPagina("ata"); pintarListaAtas();
+}
+function atasFiltradas(){
+  const mes=($("#fa-mes")||{}).value||"", local=($("#fa-local")||{}).value||"";
+  const termo=(($("#fa-busca")||{}).value||"").trim().toLowerCase();
+  return ATA_LISTA.filter((a)=>{
+    if(mes && ataMes(a.data)!==mes) return false;
+    if(local && String(a.local||"").trim()!==local) return false;
+    if(termo){
+      /* Busca pelo NOME de quem esteve presente — resolvendo cada id no cache
+         e lendo o nome do convidado direto da ata. É a busca que não dá para
+         fazer de outro jeito: a ata guarda ids, e ninguém decora id. */
+      const nomes=ataArr(a.participantes).map((item)=>String(ataPessoa(item).nome||"").toLowerCase());
+      if(!nomes.some((n)=>n.includes(termo))) return false;
+    }
+    return true;
+  });
+}
+
+function menuAta(a){
+  const itens=[
+    ["Abrir", `abrirAtaSalva(${a.id})`],
+    ["Imprimir", `imprimirAtaPorId(${a.id})`],
+    ["Duplicar", `duplicarAta(${a.id})`],
+    ["Remover", `removerAta(${a.id})`],
+  ];
+  return `<div class="acao-menu">
+    <button type="button" class="acao-trigger" aria-haspopup="true" aria-expanded="false"
+            title="Ações" aria-label="Ações desta ata" onclick="event.stopPropagation();abrirMenuLinha(this,event)">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>
+    </button>
+    <div class="acao-lista" role="menu">${
+      itens.map(([rot,fn])=>`<button type="button" role="menuitem" onclick="event.stopPropagation();${escA(fn)}">${escA(rot)}</button>`).join("")
+    }</div></div>`;
+}
+
+async function removerAta(id){
+  const a=ATA_LISTA.find((x)=>x.id===id); if(!a) return;
+  const gente=ataArr(a.participantes).length;
+  if(!confirm(`Remover a ata de ${ataDataLabel(a.data)}${a.local?" ("+a.local+")":""}?\n\n`+
+      `Ela tem ${gente} presente(s) e some do sistema — a folha já assinada no papel não é afetada, `+
+      `mas a ata em si não volta.`)) return;
+  try{ await api("atas/"+id,"DELETE"); }
+  catch(e){ return toast(e.message,true); }
+  /* Se a ata aberta era essa, o editor fecha: continuar editando uma ata que
+     não existe mais criaria uma cópia ao salvar, sem ninguém pedir. */
+  if(ATA && ATA.id===id){ ATA=null; ATA_SUJO=false; ATA_SEL.clear(); pintarModoAta(); }
+  try{ ATA_LISTA = await api("atas"); }catch{}
+  montarFiltrosAtas(); pintarListaAtas();
+  toast("Ata removida.");
+}
+
+function pintarListaAtas(){
+  montarFiltrosAtas();
+  const lista=atasFiltradas()
+    .sort((a,b)=> String(b.data).localeCompare(String(a.data))
+               || String(b.hora||"").localeCompare(String(a.hora||""))
+               || String(a.local||"").localeCompare(String(b.local||"")));
+  const info=fatiar("ata", lista);
+  barraPaginacao("ata-paginacao","ata",info);
+  const filtrando = !!(($("#fa-mes")||{}).value || ($("#fa-local")||{}).value || (($("#fa-busca")||{}).value||"").trim());
+  $("#ata-lista").innerHTML = info.itens.length
+    ? info.itens.map((a)=>{
+        const gente=ataArr(a.participantes).length;
+        const aberta=ATA && ATA.id===a.id;
+        return `<tr class="freq-linha${aberta?" on":""}" onclick="abrirAtaSalva(${a.id})" title="Abrir esta ata">
+          <td>${escA(ataDataLabel(a.data))}${aberta?' <span class="tag tag-Ativo" style="font-size:.66rem">aberta</span>':""}</td>
+          <td>${String(a.hora||"").trim()||'<span class="ajuda">—</span>'}</td>
+          <td>${escA(ataTitulo(a))}</td>
+          <td>${String(a.local||"").trim()?escA(a.local):'<span class="ajuda">—</span>'}</td>
+          <td>${gente}</td>
+          <td class="col-acoes">${menuAta(a)}</td></tr>`;
+      }).join("")
+    : `<tr><td class="vazio" colspan="6">${filtrando
+        ? "Nenhuma ata com esse filtro."
+        : "Nenhuma ata registrada ainda — clique em <b>+ Nova ata</b> para criar a primeira."}</td></tr>`;
+}
+
+/* Duplicar: os MESMOS presentes numa ata NOVA, sem id — a original não é
+   tocada. O uso típico é a reunião que se repete: troca-se a data e salva. */
+function duplicarAta(id){
+  const a=ATA_LISTA.find((x)=>x.id===id); if(!a) return;
+  if(ATA_SUJO && ataTemConteudo() && !confirm("Há alterações não salvas na ata aberta. Trocar mesmo assim?")) return;
+  $("#ata-titulo").innerHTML=freqTituloOpcoes(a.titulo||"");
+  $("#ata-titulo").value=a.titulo||"";
+  $("#ata-data").value=a.data||""; $("#ata-hora").value=a.hora||""; $("#ata-local").value=a.local||"";
+  ATA={ id:0, titulo:a.titulo||"", data:a.data||"", hora:a.hora||"", local:a.local||"",
+        participantes:ataArr(a.participantes) };
+  ATA_SEL.clear(); ATA_SUJO=true;
+  pintarModoAta();
+  $("#ata-status").textContent=`Cópia da ata de ${ataDataLabel(a.data)} — troque a data e clique em Salvar para registrar a nova.`;
+  pintarAta(); pintarListaAtas();
+  $("#pane-ata").scrollIntoView({ block:"start" });
+}
+
+function abrirAtaSalva(id){
+  const a=ATA_LISTA.find((x)=>x.id===id); if(!a) return;
+  if(ATA_SUJO && ataTemConteudo() && !confirm("Há alterações não salvas na ata aberta. Trocar mesmo assim?")) return;
+  $("#ata-titulo").innerHTML=freqTituloOpcoes(a.titulo||"");
+  $("#ata-titulo").value=a.titulo||"";
+  $("#ata-data").value=a.data||""; $("#ata-hora").value=a.hora||""; $("#ata-local").value=a.local||"";
+  ATA={ id:a.id, titulo:a.titulo||"", data:a.data||"", hora:a.hora||"", local:a.local||"",
+        participantes:ataArr(a.participantes) };
+  ATA_SEL.clear(); ATA_SUJO=false; $("#ata-status").textContent="";
+  pintarModoAta(); pintarAta(); pintarListaAtas();
+  $("#pane-ata").scrollIntoView({ block:"start" });
+}
+
+/* ==========================================================================
+   A ATA IMPRESSA — o documento que circula e volta assinado
+
+   Sai do menu da LINHA, da ata salva, sem tocar o editor. Retrato (e não
+   paisagem como a frequência): aqui são quatro colunas, e a assinatura precisa
+   de largura, não a folha.
+
+   Cabeçalho dentro do <thead>, como na frequência: é o que o navegador repete
+   no alto de cada página, então a segunda folha nasce dizendo de que reunião
+   ela é — em vez de ser uma lista de nomes soltos.
+   ========================================================================== */
+function imprimirAtaPorId(id){
+  const a=ATA_LISTA.find((x)=>x.id===id);
+  if(!a) return;
+  imprimirAta({ titulo:a.titulo, data:a.data, hora:a.hora, local:a.local,
+                participantes:ataArr(a.participantes) });
+}
+function imprimirAta(ata){
+  const linhas = ataOrdenar((ata.participantes||[]).map(ataPessoa));
+  if(!linhas.length){ $("#ata-status").textContent="Esta ata está vazia — abra-a, acrescente os presentes e salve antes de imprimir."; return; }
+  /* TODAS as larguras declaradas, somando 100: no table-layout fixo do Chrome,
+     coluna sem largura não fica com a sobra — as outras é que são infladas, e
+     a coluna nua encolhe ao mínimo (a armadilha que comeu o Nome na folha de
+     frequência). A assinatura leva a maior fatia, que é a razão do papel. */
+  const numW=5, nomeW=40, cpfW=18, assW=37;
+  const bordas='border:1px solid #6b7280;padding:.28rem .45rem';
+  const negrito=bordas+';font-weight:700;color:#232733';
+  const colgroup=`<colgroup><col style="width:${numW}%"><col style="width:${nomeW}%"><col style="width:${cpfW}%"><col style="width:${assW}%"></colgroup>`;
+  const cab=`<tr><th style="${negrito};width:${numW}%">Nº</th><th style="${negrito};text-align:left;width:${nomeW}%">Nome</th>`+
+            `<th style="${negrito};width:${cpfW}%">CPF</th><th style="${negrito};width:${assW}%">Assinatura</th></tr>`;
+  /* A segunda linha do cabeçalho é a identificação da reunião: dia, hora e
+     lugar. Emendar isso no título produziria um cabeçalho de três linhas. */
+  const quando = ataDataLabel(ata.data)
+    + (String(ata.hora||"").trim() ? " · " + ata.hora : "")
+    + (String(ata.local||"").trim() ? " · " + ata.local : "");
+  const cabecalhoAta=
+    `<tr><th colspan="4" style="border:0;text-align:center;font-size:1rem;color:#253282;font-weight:700;padding:.1rem 0 .2rem;white-space:normal">${escA(ataTitulo(ata))}</th></tr>`+
+    `<tr><th colspan="4" style="border:0;text-align:center;font-weight:700;padding:0 0 .6rem">${escA(quando)}</th></tr>`;
+  /* Linha alta o bastante para caber uma assinatura de caneta (a da frequência
+     é apertada de propósito, para caber 25 nomes; aqui o que tem de caber é a
+     mão de quem assina). */
+  const celula='border:1px solid #6b7280;padding:.32rem .45rem;line-height:1.2;height:1.5rem';
+  const corpo=linhas.map((p,i)=>`<tr>`+
+    `<td style="${celula};text-align:center">${String(i+1).padStart(2,"0")}</td>`+
+    `<td style="${celula};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escA(p.nome)}${p.convidado?" (convidado)":""}</td>`+
+    `<td style="${celula};white-space:nowrap">${escA(p.cpf||"")}</td>`+
+    `<td style="${celula}"></td></tr>`).join("");
+  abrirImpressao("",
+    `<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:.86rem">${colgroup}<thead>${cabecalhoAta}${cab}</thead><tbody>${corpo}</tbody></table>`,
+    { tituloJanela:ataTitulo(ata)+" — "+quando });
 }
 
 function timbreHTML(titulo, corpo, op){

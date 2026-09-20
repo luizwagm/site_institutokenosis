@@ -24,7 +24,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.34.0";
+const SISTEMA_VERSION = "1.35.0";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -198,6 +198,15 @@ function proteger(tabela, obj) {
    que as entregou.
    ========================================================================== */
 const HISTORICO_VERSOES = [
+  { versao: "1.35.0", data: "2026-09-20", titulo: "Atas de reunião", mudancas: [
+    "Nova área ATAS, no menu ao lado de Frequência, com a mesma forma de trabalhar",
+    "Cada ata tem título (o projeto), data, hora e local, e é impressa para assinar no papel",
+    "A folha impressa sai com uma coluna ASSINATURA em branco, uma linha por presente",
+    "Os presentes vêm do cadastro de usuários — e quem não é cadastrado entra como convidado, pelo nome",
+    "A lista mostra as atas da mais nova para a mais velha, com filtro por mês, local e por pessoa presente",
+    "Cada ata tem o menu de ações da linha: abrir, imprimir, duplicar e remover",
+    "Duplicar copia os presentes para uma ata nova — a reunião que se repete não é digitada de novo",
+  ] },
   { versao: "1.34.0", data: "2026-09-07", titulo: "O título da folha de frequência vem da lista de projetos", mudancas: [
     "O título da folha deixou de ser digitado: agora é escolhido na lista dos projetos cadastrados",
     "Vale na criação da folha e na edição — o mesmo campo, nos dois lugares",
@@ -478,6 +487,67 @@ setInterval(() => limite.limpar(), 10 * 60_000).unref();
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const slugify = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
 
+/* ==========================================================================
+   ATA — o que chega da tela, conferido e aparado antes de virar documento
+
+   A ata é impressa e circula assinada fora do sistema. Tudo o que sai no
+   cabeçalho tem teto AQUI, no servidor, e não na tela: o `maxlength` do campo
+   qualquer um contorna mandando o POST à mão, e um título de mil caracteres
+   não é um título — é uma folha desmontada na mão de quem colhe assinatura.
+
+   `participantes` é a lista mista da folha:
+     12                → id do cadastro de usuários
+     {"nome":"Fulano"} → convidado, que não está em cadastro nenhum
+
+   Ela é RECONSTRUÍDA aqui, item a item: o que não é id nem nome cai fora. Sem
+   isto, um objeto qualquer gravado no JSON voltaria para a tela e para a
+   impressão como "[object Object]" — e o defeito só apareceria no papel.
+
+   Devolve a mensagem de erro, ou null quando está tudo certo.
+   ========================================================================== */
+const ATA_MAX_PRESENTES = 300;   // uma folha de reunião; acima disso é engano ou abuso
+function normalizarAta(b, { exigirData } = {}) {
+  if (b.titulo !== undefined) b.titulo = String(b.titulo || "").trim().slice(0, 200);
+  if (b.local !== undefined) b.local = String(b.local || "").trim().slice(0, 120);
+  if (b.hora !== undefined) {
+    b.hora = String(b.hora || "").trim();
+    if (b.hora && !/^([01]\d|2[0-3]):[0-5]\d$/.test(b.hora)) return "Horário inválido (use 14:30).";
+  }
+  if (b.data !== undefined || exigirData) {
+    b.data = String(b.data || "").trim();
+    /* Data de verdade, e não só quatro-dois-dois: "2026-02-31" passa na
+       expressão e o Date conserta para 3 de março — a ata sairia impressa com
+       um dia que ninguém marcou. */
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(b.data);
+    const d = m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null;
+    const real = d && d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3];
+    if (exigirData && !b.data) return "Escolha a data da reunião.";
+    if (b.data && !real) return "Data inválida.";
+  }
+  if (b.participantes !== undefined) {
+    let lista = b.participantes;
+    if (typeof lista === "string") { try { lista = JSON.parse(lista || "[]"); } catch { lista = []; } }
+    if (!Array.isArray(lista)) lista = [];
+    const limpa = [];
+    for (const item of lista) {
+      if (limpa.length >= ATA_MAX_PRESENTES) break;
+      if (item && typeof item === "object" && !Array.isArray(item)) {
+        const nome = String(item.nome || "").trim().slice(0, 120);
+        if (nome) limpa.push({ nome });                   // convidado: só o nome
+        continue;
+      }
+      /* Só número ou texto viram id. Sem esta linha, `[9]` entraria como 9 —
+         `Number([9])` é 9 —, e um array aninhado no JSON viraria presença de
+         alguém que ninguém acrescentou. */
+      if (typeof item !== "number" && typeof item !== "string") continue;
+      const n = Number(item);
+      if (Number.isInteger(n) && n > 0) limpa.push(n);    // cadastrado: só o id
+    }
+    b.participantes = JSON.stringify(limpa);
+  }
+  return null;
+}
+
 /* Regras de agenda: expediente 07h–12h e 14h–18h (intervalo 12h–14h), cada
    atendimento ocupa um bloco de 40 min, e o mesmo profissional não pode ter
    dois blocos que se sobreponham. Devolve a mensagem de erro ou null se ok. */
@@ -559,6 +629,13 @@ const TAB = {
      mesmo mês — sem ele, a lista mostra duas linhas idênticas e escolher qual
      abrir vira adivinhação. */
   frequencias: ["turma", "mes", "local", "titulo", "datas", "participantes"],
+  /* ATA — irmã da frequência (migration 012), e pela mesma razão de ser: o
+     sistema monta a folha, o papel recebe as assinaturas. A diferença está na
+     identidade: a frequência é de um MÊS com uma coluna por aula; a ata é de
+     UMA reunião, com dia, hora e uma assinatura por presente.
+     `participantes` aceita o id do cadastro OU {"nome":"…"} para o convidado,
+     que não existe em cadastro nenhum para ser referenciado. */
+  atas: ["titulo", "data", "hora", "local", "participantes"],
 };
 
 const UPLOAD_DIR = path.join(ROOT, "restrito", "arquivos");
@@ -573,7 +650,7 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 const PERFIS = ["admin", "secretaria", "profissional"];
 const PERM = {
   admin: "*",
-  secretaria: new Set(["pacientes", "associados", "profissionais", "atendimentos", "documentos_gestao", "beneficios", "eventos", "projetos", "servicos", "relatorios", "frequencias"]),
+  secretaria: new Set(["pacientes", "associados", "profissionais", "atendimentos", "documentos_gestao", "beneficios", "eventos", "projetos", "servicos", "relatorios", "frequencias", "atas"]),
   // profissional vê SOMENTE a sua agenda e os seus prontuários. Nada mais.
   // Lê pacientes/profissionais só como apoio (nomes nas telas e seletores),
   // sem menu próprio — ver PERM_LEITURA.
@@ -1827,6 +1904,13 @@ async function rotaApi(req, res, p) {
         if (!b.turma) return json(res, 400, { error: "Escolha a turma." });
         if (!/^\d{4}-\d{2}$/.test(b.mes)) return json(res, 400, { error: "Escolha o mês." });
       }
+      /* ATA: a DATA é o que identifica a reunião e é o que sai no cabeçalho
+         impresso — sem ela a ata não se acha na lista nem vale como documento.
+         O resto (hora, local, título) é opcional e apenas normalizado. */
+      if (tabela === "atas") {
+        const erro = normalizarAta(b, { exigirData: true });
+        if (erro) return json(res, 400, { error: erro });
+      }
       if (tabela === "prontuario") {
         b.usuario_id = s.userId;                                            // quem digitou
         /* Quem RESPONDE pelo registro. O profissional só lança para si — a
@@ -1942,6 +2026,14 @@ async function rotaApi(req, res, p) {
       if (tabela === "frequencias") {
         if (b.titulo !== undefined) b.titulo = String(b.titulo || "").trim().slice(0, 200);
         if (b.local !== undefined) b.local = String(b.local || "").trim().slice(0, 120);
+      }
+      /* A ata edita como cria. `exigirData` fica de fora porque o PUT pode
+         trazer só um campo — mas a data que VIER é conferida do mesmo jeito:
+         um limite que só existe na criação é um limite que se contorna
+         editando (a mesma lição do título da frequência). */
+      if (tabela === "atas") {
+        const erro = normalizarAta(b, { exigirData: false });
+        if (erro) return json(res, 400, { error: erro });
       }
       if (tabela === "atendimentos") {
         const at = await Q.get("SELECT profissional_id,data,hora FROM atendimentos WHERE id=?", id) || {};

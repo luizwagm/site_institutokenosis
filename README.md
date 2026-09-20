@@ -205,7 +205,11 @@ Aplicação **independente** do painel do site, para a operação interna da ONG
 - Compartilha só o processo Node e a porta — nada a mexer no nginx.
 
 Módulos (todos ativos): **Pacientes, Associados, Profissionais, Agenda,
-Prontuário, Benefícios, Eventos, Documentos e Relatórios**. Os formulários
+Frequência, Atas, Prontuário, Benefícios, Eventos, Documentos e
+Relatórios**. Frequência e Atas são as duas folhas que o sistema monta para
+serem assinadas **no papel**: a frequência é de um mês, com uma coluna por
+aula; a ata é de uma reunião, com dia, hora, lugar e uma coluna de assinatura
+por presente (e aceita convidado que não está em cadastro nenhum). Os formulários
 têm máscara e validação de CPF (com dígito verificador), telefone, e-mail,
 NIS e Cartão SUS; a agenda e o prontuário referenciam paciente/profissional
 por seleção. Relatórios trazem indicadores, gráficos e exportação CSV.
@@ -259,8 +263,9 @@ Cada uma sobe uma cópia do site numa porta própria e derruba no fim.
 | `node testar-texto.js` | o texto do painel chega à tela sem tag e sem `&nbsp;` |
 | `node testar-limitador.js` | a trava de tentativas de senha |
 | `node testar-frequencia.js` | o título e o local da folha de frequência, e o 503 (nunca 500) enquanto a gestão está subindo |
+| `node testar-ata.js` | a ata de reunião: data que existe no calendário, tetos no POST **e** no PUT, e a lista de presentes (id do cadastro × convidado) reconstruída no servidor |
 
-> `testar-frequencia.js` é a única que fala com o **PostgreSQL de verdade** —
+> `testar-frequencia.js` e `testar-ata.js` falam com o **PostgreSQL de verdade** —
 > não existe banco descartável para ele. Ela só cria registros próprios,
 > marcados `ZZ QA`, e os apaga **pelo id** no fim. Interrompida no meio, ela
 > imprime os ids que sobraram.
