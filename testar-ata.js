@@ -178,6 +178,17 @@ function pedir(caminho, metodo = "GET", corpo = null) {
     ok("a hora voltou inteira", a1 && a1.hora, "14:30");
     ok("o local voltou inteiro", a1 && a1.local, "ZZ QA Sede");
 
+    /* O título é TEXTO: a reunião que não é de projeto nenhum (assembleia,
+       diretoria) precisa caber nele. A lista de projetos é sugestão na tela,
+       nunca uma trava no servidor. */
+    const livre = await pedir("/restrito/api/atas", "POST", {
+      titulo: `${MARCA} — Assembleia geral extraordinária`, data: "2099-03-09", participantes: "[]" });
+    ok("um título que NÃO é projeto grava igual", livre.status, 200);
+    if (livre.json && livre.json.id) atas.push(livre.json.id);
+    lista = (await pedir("/restrito/api/atas")).json || [];
+    ok("…e volta escrito como foi digitado",
+      (lista.find((x) => x.id === livre.json.id) || {}).titulo, `${MARCA} — Assembleia geral extraordinária`);
+
     /* ====================================================================
        2. a data: obrigatória e real
        ==================================================================== */
@@ -324,6 +335,14 @@ function pedir(caminho, metodo = "GET", corpo = null) {
     verdade("o menu leva ao painel", /nav==="atas"/.test(html));
     verdade("a paginação da lista sabe repintar", /chave === "ata"/.test(html));
     verdade("a secretaria enxerga a área", /"frequencia","atas"/.test(html));
+    /* O TÍTULO ACEITA AS DUAS COISAS: a lista dos projetos e a digitação. Se
+       algum dia isto virar um `select`, nem toda reunião caberá no campo —
+       assembleia e reunião de diretoria não são de projeto nenhum. */
+    verdade("o título é campo de digitar, com lista de sugestões",
+      /<input type="text" id="ata-titulo" list="ata-titulos"/.test(html) && /<datalist id="ata-titulos">/.test(html));
+    verdade("…e o formulário de nova ata também", /<input type="text" id="na-titulo" list="na-titulos"/.test(html));
+    verdade("a lista de sugestões vem dos projetos cadastrados",
+      /function ataTituloOpcoes\(\)\{[\s\S]{0,400}CACHE\.projetos/.test(html));
     /* A coluna de assinatura sai VAZIA: é o que cada presente assina no papel.
        Uma célula preenchida aqui transformaria a folha em outra coisa. */
     verdade("a impressão tem a coluna Assinatura", /Assinatura<\/th>/.test(html));

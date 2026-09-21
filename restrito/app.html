@@ -982,11 +982,25 @@
 
       <div id="ata-editor" hidden>
       <div class="card">
-        <!-- O título é o PROJETO, escolhido na mesma lista que a frequência usa:
-             a ata impressa vai para a prestação de contas, e duas grafias do
-             mesmo projeto viram duas coisas diferentes lá. -->
+        <!-- ================================================================
+             O TÍTULO: ESCOLHER **OU** ESCREVER
+
+             Aqui a ata se separa da folha de frequência de propósito. Lá o
+             título é só a lista de projetos (decisão da 1.34.0: aula é sempre
+             de um projeto, e duas grafias do mesmo nome viram duas coisas na
+             prestação de contas). Reunião NÃO é sempre de projeto — assembleia
+             de associados e reunião de diretoria não são de nenhum —, então o
+             campo aceita as duas coisas: a lista sugere os projetos
+             cadastrados, e quem precisa digita o que a reunião foi.
+
+             É um `input` com `list=`, e não um select com opção "outro": o
+             desvio para digitar custaria um clique a mais toda vez, e o
+             campo ficaria com dois estados para a equipe entender.
+             ================================================================= -->
         <label class="freq-titulo-campo">Título da ata
-          <select id="ata-titulo" onchange="trocarAta()"></select>
+          <input type="text" id="ata-titulo" list="ata-titulos" maxlength="200" autocomplete="off"
+                 placeholder="Escolha um projeto ou escreva o assunto da reunião" oninput="trocarAta()">
+          <datalist id="ata-titulos"></datalist>
         </label>
         <div class="freq-controles">
           <div><label>Data</label><input type="date" id="ata-data" onchange="trocarAta()"></div>
@@ -3872,6 +3886,32 @@ function imprimirFrequencia(folha){
    (combobox de busca, paginação, menu da linha, impressão timbrada, e o
    seletor de projetos `freqTituloOpcoes`) já é compartilhado de verdade.
    ========================================================================== */
+/* ==========================================================================
+   O TÍTULO DA ATA — lista E digitação
+
+   A folha de frequência aceita SÓ os projetos cadastrados (1.34.0): aula é
+   sempre de um projeto, e duas grafias do mesmo nome viram duas coisas na
+   prestação de contas. A ata é diferente, e por um motivo de negócio: nem
+   toda reunião é de projeto. Assembleia de associados, reunião de diretoria e
+   conselho não são de nenhum — e um select fechado obrigaria a equipe a
+   escolher o projeto errado só para conseguir salvar.
+
+   Daí o `input` + `datalist`: a lista sugere (e é o caminho de quem quer o
+   nome exato do projeto), a digitação resolve o resto. O servidor apara em
+   200 caracteres, porque é o que vai para o cabeçalho impresso.
+   ========================================================================== */
+function ataTituloOpcoes(){
+  const titulos = (CACHE.projetos||[]).map((p)=>String(p.title||"").trim()).filter(Boolean);
+  /* Ordem alfabética: a lista é para achar, não para lembrar em que ordem foi
+     cadastrado. */
+  titulos.sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  return titulos.map((t)=>`<option value="${escA(t)}">`).join("");
+}
+/* Um lugar só enche a lista — ela depende do CACHE, que chega depois da tela. */
+function montarTitulosAta(){
+  const dl=$("#ata-titulos"); if(dl) dl.innerHTML = ataTituloOpcoes();
+}
+
 const ATA_TITULO_PADRAO = "Ata de reunião";
 /* O título de UMA ata: o dela, ou o padrão quando ela não tem — num lugar só,
    porque a mesma pergunta aparece na lista, no editor e na impressão. */
@@ -3953,7 +3993,9 @@ function modalNovaAta(){
     <h2>Nova ata</h2>
     <div class="modal-corpo">
       <label class="freq-titulo-campo">Título da ata
-        <select id="na-titulo">${freqTituloOpcoes("")}</select>
+        <input type="text" id="na-titulo" list="na-titulos" maxlength="200" autocomplete="off"
+               placeholder="Escolha um projeto ou escreva o assunto da reunião">
+        <datalist id="na-titulos">${ataTituloOpcoes()}</datalist>
       </label>
       <div class="formgrid">
         <div><label>Data</label><input type="date" id="na-data" value="${hojeISO}"></div>
@@ -3965,8 +4007,9 @@ function modalNovaAta(){
               .sort().map((l)=>`<option value="${escA(l)}">`).join("")
           }</datalist></div>
       </div>
-      <p class="ajuda" style="margin:.6rem 0 0">O título é o <b>projeto</b>, escolhido na lista de
-        <b>Cadastros › Projetos</b> — é ele que sai no cabeçalho da ata impressa, e dá para trocar depois.
+      <p class="ajuda" style="margin:.6rem 0 0">O título sai no <b>cabeçalho da ata impressa</b> e dá para
+        trocar depois. Escolha um <b>projeto</b> na lista (vêm de <b>Cadastros › Projetos</b>) ou
+        <b>escreva</b> o assunto — assembleia e reunião de diretoria não são de projeto nenhum.
         Depois de criar, você acrescenta os presentes (do cadastro ou como convidados).
         Nada é gravado até clicar em <b>Salvar</b>.</p>
     </div>
@@ -3982,10 +4025,11 @@ function criarAtaDoForm(){
   const titulo=($("#na-titulo").value||"").trim(), local=($("#na-local").value||"").trim();
   if(!data) return toast("Escolha a data da reunião.", true);
   fecharModal();
-  /* As opções do título ANTES do valor: `select.value` só pega se a <option>
-     existir — senão o select cai no primeiro item, em silêncio (a mesma
-     armadilha da folha de frequência). */
-  $("#ata-titulo").innerHTML = freqTituloOpcoes(titulo);
+  /* A lista de sugestões antes de escrever o valor. Aqui o valor NÃO depende
+     dela: o campo é de digitar, e um título que não é projeto nenhum
+     ("Assembleia de associados") entra inteiro — era isso que o `select`
+     impedia, caindo no primeiro item em silêncio. A lista é só atalho. */
+  montarTitulosAta();
   $("#ata-titulo").value = titulo;
   $("#ata-data").value = data; $("#ata-hora").value = hora; $("#ata-local").value = local;
   ATA = { id:0, titulo, data, hora, local, participantes:[] };
@@ -4202,7 +4246,7 @@ function pintarListaAtas(){
 function duplicarAta(id){
   const a=ATA_LISTA.find((x)=>x.id===id); if(!a) return;
   if(ATA_SUJO && ataTemConteudo() && !confirm("Há alterações não salvas na ata aberta. Trocar mesmo assim?")) return;
-  $("#ata-titulo").innerHTML=freqTituloOpcoes(a.titulo||"");
+  montarTitulosAta();
   $("#ata-titulo").value=a.titulo||"";
   $("#ata-data").value=a.data||""; $("#ata-hora").value=a.hora||""; $("#ata-local").value=a.local||"";
   ATA={ id:0, titulo:a.titulo||"", data:a.data||"", hora:a.hora||"", local:a.local||"",
@@ -4217,7 +4261,7 @@ function duplicarAta(id){
 function abrirAtaSalva(id){
   const a=ATA_LISTA.find((x)=>x.id===id); if(!a) return;
   if(ATA_SUJO && ataTemConteudo() && !confirm("Há alterações não salvas na ata aberta. Trocar mesmo assim?")) return;
-  $("#ata-titulo").innerHTML=freqTituloOpcoes(a.titulo||"");
+  montarTitulosAta();
   $("#ata-titulo").value=a.titulo||"";
   $("#ata-data").value=a.data||""; $("#ata-hora").value=a.hora||""; $("#ata-local").value=a.local||"";
   ATA={ id:a.id, titulo:a.titulo||"", data:a.data||"", hora:a.hora||"", local:a.local||"",

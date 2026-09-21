@@ -209,7 +209,10 @@ Frequência, Atas, Prontuário, Benefícios, Eventos, Documentos e
 Relatórios**. Frequência e Atas são as duas folhas que o sistema monta para
 serem assinadas **no papel**: a frequência é de um mês, com uma coluna por
 aula; a ata é de uma reunião, com dia, hora, lugar e uma coluna de assinatura
-por presente (e aceita convidado que não está em cadastro nenhum). Os formulários
+por presente (e aceita convidado que não está em cadastro nenhum). O título
+da folha de frequência vem dos projetos; o da ata é livre — a lista dos
+projetos aparece como sugestão, porque assembleia e reunião de diretoria não
+são de projeto nenhum. Os formulários
 têm máscara e validação de CPF (com dígito verificador), telefone, e-mail,
 NIS e Cartão SUS; a agenda e o prontuário referenciam paciente/profissional
 por seleção. Relatórios trazem indicadores, gráficos e exportação CSV.

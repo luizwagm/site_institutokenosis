@@ -15,6 +15,16 @@
 -- — dado com dois significados é dado que ninguém consegue consultar depois.
 --
 -- ---------------------------------------------------------------------------
+-- O TÍTULO É TEXTO, NÃO CHAVE (1.35.1)
+--
+-- Nasceu preso à lista de projetos, como na frequência. Durou uma versão: aula
+-- é sempre de um projeto, mas REUNIÃO não — assembleia de associados, diretoria
+-- e conselho fiscal não pertencem a projeto nenhum. Guardar aqui um id de
+-- projeto obrigaria a inventar um projeto falso para cada uma dessas.
+-- Por isso a coluna é TEXT e não referencia `projetos`: a tela oferece os
+-- projetos cadastrados como sugestão, e quem precisa escreve o assunto.
+--
+-- ---------------------------------------------------------------------------
 -- QUEM ESTÁ NA LISTA
 --
 -- `participantes` é JSON, como na frequência, e aceita DUAS formas:
@@ -35,7 +45,7 @@
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS atas (
   id            SERIAL PRIMARY KEY,
-  titulo        TEXT NOT NULL DEFAULT '',    -- o projeto (vem de Cadastros › Projetos)
+  titulo        TEXT NOT NULL DEFAULT '',    -- assunto livre; os projetos entram como sugestão
   data          TEXT NOT NULL DEFAULT '',    -- AAAA-MM-DD, o dia da reunião
   hora          TEXT NOT NULL DEFAULT '',    -- HH:MM (opcional)
   local         TEXT NOT NULL DEFAULT '',    -- onde foi
