@@ -799,6 +799,7 @@ async function loadAll() {
   renderServicosReadonly(); renderProjetosReadonly(); renderTable("documentos");
   renderTable("team"); renderTable("posts"); renderTable("feed"); renderTable("portfolio");
   renderGaleria();
+  darCapaAosVideos();   // (2.14.0) não espera: roda por trás, um vídeo de cada vez
 }
 
 /* ------------------------------ Galeria -------------------------------- */
@@ -1072,10 +1073,10 @@ function renderTable(t) {
             <input data-t="${t}" data-id="${r.id}" data-f="${f}" value="${escA(r[f])}" style="flex:1">
             <button class="btn btn-ghost btn-sm" onclick="pickImg(this)">Enviar foto</button>
             ${comVideo ? `<button class="btn btn-ghost btn-sm" onclick="pickVideo(this)">Enviar vídeo</button>` : ""}
-            ${ehVideo(r[f]) ? `<span class="thumb thumb--video" title="Matéria em vídeo">▶</span>`
+            ${ehVideo(r[f]) ? `<img class="thumb" src="${escA(capaDe(r[f]))}" alt="" title="Capa tirada do vídeo" onerror="this.nextElementSibling.style.display='';this.remove()"><span class="thumb thumb--video" title="Matéria em vídeo — ainda sem capa" style="display:none">▶</span>`
               : r[f] ? `<img class="thumb" src="${escA(r[f])}" alt="">` : ""}
           </div>
-          ${comVideo ? `<p class="hint">Foto <b>ou</b> vídeo (MP4/WEBM). Com vídeo, a lista mostra uma capa dizendo que é vídeo, e o vídeo toca dentro da matéria.</p>` : ""}`;
+          ${comVideo ? `<p class="hint">Foto <b>ou</b> vídeo (MP4/WEBM). Com vídeo, a capa é uma <b>foto tirada do próprio vídeo</b>, com o selo ▶ vídeo, e o vídeo toca dentro da matéria.</p>` : ""}`;
         }
         if (kind === "home") return `<label>${lab}</label>
           <select data-t="${t}" data-id="${r.id}" data-f="${f}">
@@ -1288,6 +1289,107 @@ const ehVideo = (u) => /\.(mp4|webm|ogv)(\?|#|$)/i.test(String(u || ""));
    codificado no cabeçalho `X-Nome-Arquivo`, porque nome de arquivo tem acento
    e espaço, que não cabem num cabeçalho HTTP cru.
    ========================================================================== */
+/* ------------------------------------------------ capa do vídeo (2.14.0)
+   A foto de capa de cada vídeo é tirada AQUI, no navegador: o servidor não tem
+   ffmpeg. O vídeo é aberto pelo endereço do próprio site (/assets/video/…) — o
+   que mantém o <canvas> "limpo" para exportar a imagem e respeita a CSP do
+   painel, que não aceita blob: nem data: para mídia.
+
+   QUAL QUADRO: nem o primeiro (quase sempre preto, ou no meio de um fade), nem
+   um qualquer. Tenta em 10% do vídeo (entre 1 s e 5 s), depois em 25%, 50% e
+   75%, e fica com o PRIMEIRO que não for escuro; se todos forem, fica com o
+   mais claro deles — nunca com "o último que deu".
+
+   ⚠ VÍDEO SEM DURAÇÃO. Arquivo gravado por MediaRecorder (e alguns mal
+   finalizados) não traz a duração no cabeçalho: o navegador diz Infinity. A
+   primeira versão supunha 1 s nesse caso, e todas as tentativas caíam dentro
+   do começo preto — o ensaio saiu com a capa PRETA. Agora, sem duração, ele
+   pula para o "infinito" primeiro: isso obriga o navegador a achar o fim do
+   arquivo, e aí a duração passa a existir.
+   escuro demais, tenta em 30% e em 50%. */
+const capaDe = (video) => String(video || "").replace(/\.(mp4|webm|ogv)$/i, ".jpg");
+function capturarQuadro(url) {
+  return new Promise((ok, falha) => {
+    const v = document.createElement("video");
+    v.muted = true; v.playsInline = true; v.preload = "auto";
+    let posicoes = [], melhor = null, medindo = false;
+    const solta = () => { v.removeAttribute("src"); v.load(); };   // vídeo é pesado
+    const desiste = setTimeout(() => { solta(); falha(new Error("o vídeo demorou demais para abrir")); }, 30000);
+    const termina = (dataUrl) => { clearTimeout(desiste); solta(); ok(dataUrl); };
+    const planeja = (d) => {
+      const fim = Math.max(0, d - 0.1);
+      posicoes = [Math.min(Math.max(1, d * 0.1), 5), d * 0.25, d * 0.5, d * 0.75].map((t) => Math.min(t, fim));
+      v.currentTime = posicoes.shift();
+    };
+    v.onerror = () => { clearTimeout(desiste); falha(new Error("o navegador não conseguiu abrir este vídeo")); };
+    v.onloadedmetadata = () => {
+      if (isFinite(v.duration) && v.duration > 0) return planeja(v.duration);
+      medindo = true; v.currentTime = 1e9;
+    };
+    v.onseeked = () => {
+      if (medindo) {
+        medindo = false;
+        return planeja(isFinite(v.duration) && v.duration > 0 ? v.duration : 5);
+      }
+      const w = v.videoWidth, h = v.videoHeight;
+      if (!w || !h) { clearTimeout(desiste); return falha(new Error("o vídeo não tem imagem")); }
+      const k = Math.min(1, 1280 / Math.max(w, h));
+      const c = document.createElement("canvas");
+      c.width = Math.round(w * k); c.height = Math.round(h * k);
+      const ctx = c.getContext("2d");
+      ctx.drawImage(v, 0, 0, c.width, c.height);
+      /* Luminosidade média por amostragem (1 pixel a cada 97): o bastante para
+         saber se o quadro é uma tela preta, sem percorrer a imagem inteira. */
+      const px = ctx.getImageData(0, 0, c.width, c.height).data;
+      let soma = 0, n = 0;
+      for (let p = 0; p < px.length; p += 4 * 97) { soma += px[p] * 0.299 + px[p + 1] * 0.587 + px[p + 2] * 0.114; n++; }
+      const luz = n ? soma / n : 0;
+      if (!melhor || luz > melhor.luz) melhor = { luz, url: c.toDataURL("image/jpeg", 0.85) };
+      if (luz >= 18 || !posicoes.length) return termina(melhor.url);
+      v.currentTime = posicoes.shift();
+    };
+    v.src = url;
+  });
+}
+async function gerarCapa(video) {
+  const dataUrl = await capturarQuadro(video);
+  return api("/api/capa-video", "POST", { video, dataUrl });
+}
+
+/* Os vídeos que já estavam no ar antes da 2.14.0 não têm capa. Ao abrir o
+   painel, ele pergunta ao servidor quais faltam e tira a foto de cada um,
+   um de cada vez — sem ninguém precisar reenviar vídeo nenhum.
+
+   Vídeo que o navegador não consegue abrir (um .mov em HEVC, por exemplo)
+   fica anotado nesta sessão, para o aviso não voltar a cada tela aberta. Ele
+   continua com a capa padrão, como sempre esteve. */
+let CAPAS_EM_CURSO = false;
+const FALHAS_CAPA = "capa-video-falhou";
+const lerFalhas = () => { try { return JSON.parse(sessionStorage.getItem(FALHAS_CAPA) || "[]"); } catch { return []; } };
+const anotarFalha = (v) => { try { sessionStorage.setItem(FALHAS_CAPA, JSON.stringify([...lerFalhas(), v])); } catch {} };
+async function darCapaAosVideos() {
+  if (CAPAS_EM_CURSO) return;
+  CAPAS_EM_CURSO = true;
+  try {
+    const { videos } = await api("/api/videos-sem-capa");
+    const falhas = lerFalhas();
+    const pendentes = (videos || []).filter((v) => !falhas.includes(v.video));
+    if (!pendentes.length) return;
+    toast(`Criando a capa de ${pendentes.length} vídeo(s) a partir do próprio vídeo…`);
+    let feitas = 0; const erros = [];
+    for (const v of pendentes) {
+      try { await gerarCapa(v.video); feitas++; }
+      catch { erros.push(v.titulo || v.video); anotarFalha(v.video); }
+    }
+    if (feitas) {
+      renderTable("feed"); renderTable("posts");
+      toast(`${feitas} vídeo(s) ganharam capa. Clique em Publicar para ela aparecer no site.`);
+    }
+    if (erros.length) toast(`Não consegui abrir: ${erros.join(", ")}. Fica(m) com a capa padrão.`, true);
+  } catch { /* sem rede ou sem sessão: tenta de novo na próxima abertura */ }
+  finally { CAPAS_EM_CURSO = false; }
+}
+
 function pickVideo(btn) {
   const target = btn.parentElement.querySelector("input[data-f]");
   const fi = document.createElement("input");
@@ -1309,7 +1411,17 @@ function pickVideo(btn) {
       let r = {}; try { r = JSON.parse(xhr.responseText); } catch {}
       if (xhr.status === 200 && r.path) {
         target.value = r.path;
-        toast("Vídeo enviado! Salve o item.");
+        toast("Vídeo enviado! Tirando a foto de capa…");
+        /* A miniatura ao lado do campo passa a ser a capa. O ?t= fura o
+           cache: o mesmo endereço pode ter tido outra capa antes. */
+        gerarCapa(r.path).then((c) => {
+          const mini = btn.parentElement.querySelector(".thumb");
+          const img = document.createElement("img");
+          img.className = "thumb"; img.alt = ""; img.title = "Capa tirada do vídeo";
+          img.src = c.capa + "?t=" + Date.now();
+          if (mini) mini.replaceWith(img); else btn.parentElement.appendChild(img);
+          toast("Vídeo enviado, com capa tirada do próprio vídeo. Salve o item.");
+        }).catch((e) => toast(`Vídeo enviado. A capa não saiu (${e.message}) — ele fica com a capa padrão. Salve o item.`, true));
       } else toast(r.error || "Não consegui enviar o vídeo.", true);
     };
     xhr.onerror = () => { btn.disabled = false; btn.textContent = rotulo; toast("Falha de rede ao enviar o vídeo.", true); };

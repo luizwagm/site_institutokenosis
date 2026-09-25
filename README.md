@@ -18,6 +18,13 @@ sempre HTML pronto, com o SEO já embutido — não há renderização por requi
 - As demais páginas saem dos moldes em `src/*.html`, com `{{PLACEHOLDER}}`.
 - A declaração `CAMPOS`, no `server.js`, é o que monta a interface do painel.
   Campo novo = uma linha ali; o painel se ajusta sozinho.
+- **Vídeo no Feed e na Memória (2.14.0):** a capa de cada vídeo é uma foto
+  tirada dele, pelo **navegador do painel** (o servidor não tem ffmpeg), e
+  mora ao lado do arquivo: `assets/video/abc.mp4` → `abc.jpg`. Sem a foto,
+  vale a capa genérica. Ao abrir o painel, os vídeos que ainda não têm capa
+  ganham uma sozinhos — depois é só **Publicar**.
+- **Os arquivos saem em fluxo e por faixa** (`Range` → `206`). Sem isso, o
+  vídeo não deixa avançar, o iPhone não toca e a capa sai preta.
 
 Para republicar sem abrir o painel (útil em script):
 
@@ -268,6 +275,7 @@ Cada uma sobe uma cópia do site numa porta própria e derruba no fim.
 | `node testar-frequencia.js` | o título e o local da folha de frequência, e o 503 (nunca 500) enquanto a gestão está subindo |
 | `node testar-ata.js` | a ata de reunião: data que existe no calendário, tetos no POST **e** no PUT, e a lista de presentes (id do cadastro × convidado) reconstruída no servidor |
 | `node testar-impressos.js` | o cabeçalho das listas impressas se repete em **toda** folha — com Chrome instalado, ela imprime 220 linhas de mentira e conta em quantas páginas o cabeçalho aparece |
+| `node testar-capa-video.js` | a capa de cada vídeo do Feed e da Memória é uma foto dele: entrega do vídeo **por faixa** (`206` — sem isso não se avança o vídeo, o iPhone não toca e a capa sai preta), a capa só ao lado de vídeo existente e só JPEG, e — com Chrome — o caminho inteiro com um vídeo que começa preto |
 
 > `testar-frequencia.js` e `testar-ata.js` falam com o **PostgreSQL de verdade** —
 > não existe banco descartável para ele. Ela só cria registros próprios,

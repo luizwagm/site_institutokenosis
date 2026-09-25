@@ -747,6 +747,11 @@ body.tem-cookie-barra .zap-flutua { bottom: calc(var(--cookie-barra-h, 0px) + 1.
    marcação nova em cada cartão.
    ========================================================================== */
 .materia__foto--video { position: relative; }
+/* (2.14.0) A capa agora é um quadro do próprio vídeo — e vídeo de celular é
+   EM PÉ. O cartão recorta para 16:9 (ou 500px de altura no Feed); cortando
+   pelo centro, o rosto de quem fala fica pela metade. Um pouco acima do meio
+   é onde ele costuma estar. */
+.materia__foto--video img { object-position: center 30%; }
 .materia__foto--video::after {
   content: "▶ vídeo";
   position: absolute; left: .8rem; bottom: .8rem;

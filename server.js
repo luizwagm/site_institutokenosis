@@ -94,7 +94,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "2.13.2";
+const APP_VERSION = "2.14.0";
 
 /* ==========================================================================
    CONSULTA DE CEP
@@ -166,6 +166,25 @@ const VIDEO_DIR = path.join(ROOT, "assets", "video");
 const VIDEO_MAX = Number(process.env.VIDEO_MAX_MB || 120) * 1024 * 1024;
 const CAPA_VIDEO = "/assets/img/capa-video.svg";
 const ehVideo = (u) => /\.(mp4|webm|ogv)(\?|#|$)/i.test(String(u || ""));
+
+/* A CAPA DE CADA VÍDEO (2.14.0) — uma foto tirada do próprio vídeo, e não mais
+   a mesma capa genérica para todos. Na lista do Feed e da Memória, dez vídeos
+   eram dez cartões iguais: ninguém sabia qual era qual sem abrir.
+
+   Quem tira a foto é o NAVEGADOR do painel (um <video> e um <canvas>): o
+   servidor não tem ffmpeg, e instalar um binário de 70 MB para isso seria
+   trazer para produção um programa inteiro por causa de uma imagem.
+
+   A capa mora AO LADO do vídeo, com o mesmo nome: abc.mp4 → abc.jpg. Assim
+   ela não precisa de coluna no banco, acompanha o arquivo e, se o vídeo for
+   trocado, o nome novo simplesmente ainda não tem capa — e ganha uma. Sem a
+   foto, vale a capa genérica de antes: nada quebra no meio do caminho. */
+function capaDoVideo(url) {
+  const m = /^\/assets\/video\/([A-Za-z0-9._-]+)\.(mp4|webm|ogv)$/i.exec(String(url || ""));
+  if (!m) return null;
+  const jpg = m[1] + ".jpg";
+  return fs.existsSync(path.join(VIDEO_DIR, jpg)) ? "/assets/video/" + jpg : null;
+}
 fs.mkdirSync(path.join(ROOT, "data"), { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 fs.mkdirSync(VIDEO_DIR, { recursive: true });
@@ -997,8 +1016,10 @@ function soTexto(valor) {
    ========================================================================== */
 function medirImagem(url) {
   const m = /^\/assets\/img\/uploads\/([A-Za-z0-9._-]+)$/.exec(String(url || ""));
-  if (!m) return null;
-  const arq = path.join(UPLOAD_DIR, m[1]);
+  /* (2.14.0) a capa do vídeo, que mora na pasta dos vídeos */
+  const mv = /^\/assets\/video\/([A-Za-z0-9._-]+\.jpg)$/.exec(String(url || ""));
+  if (!m && !mv) return null;
+  const arq = m ? path.join(UPLOAD_DIR, m[1]) : path.join(VIDEO_DIR, mv[1]);
   let b;
   try { b = fs.readFileSync(arq); } catch { return null; }
 
@@ -1225,7 +1246,7 @@ async function publish() {
      descarta o terceiro. Agora as duas áreas têm o seu, e sem padrão nenhum
      ninguém volta a chamar esta função direto de um `map` sem perceber. */
   const cartaoMateria = (p, i, area) => `<article class="materia materia--${area}" data-revela${i % 3 ? ` data-revela-atraso="${i % 3}"` : ""}>
-            ${p.image ? `<a class="materia__foto${ehVideo(p.image) ? " materia__foto--video" : ""}" href="/${area}/${esc(p.slug)}/" tabindex="-1" aria-hidden="true"><img src="${esc(ehVideo(p.image) ? CAPA_VIDEO : p.image)}" alt="${esc(p.title)}" loading="lazy" decoding="async"${ehVideo(p.image) ? ' width="900" height="560"' : (medidasDoImg(p.image) || ' width="900" height="560"')}></a>` : ""}
+            ${p.image ? `<a class="materia__foto${ehVideo(p.image) ? " materia__foto--video" : ""}" href="/${area}/${esc(p.slug)}/" tabindex="-1" aria-hidden="true"><img src="${esc(ehVideo(p.image) ? (capaDoVideo(p.image) || CAPA_VIDEO) : p.image)}" alt="${esc(p.title)}" loading="lazy" decoding="async"${ehVideo(p.image) ? (medidasDoImg(capaDoVideo(p.image)) || ' width="900" height="560"') : (medidasDoImg(p.image) || ' width="900" height="560"')}></a>` : ""}
             <div class="materia__corpo">
               <time class="materia__data" datetime="${esc(p.date)}">${dataBR(p.date)}</time>
               <h3 class="materia__titulo"><a href="/${area}/${esc(p.slug)}/">${esc(p.title)}</a></h3>
@@ -1487,10 +1508,10 @@ async function publish() {
          inteiro de quem só queria ler o texto. */
       FIGURA: !p.image ? ""
         : ehVideo(p.image)
-        ? `<figure class="materia-capa materia-capa--video" data-revela><video src="${esc(p.image)}" controls preload="metadata" playsinline poster="${esc(CAPA_VIDEO)}"></video></figure>`
+        ? `<figure class="materia-capa materia-capa--video" data-revela><video src="${esc(p.image)}" controls preload="metadata" playsinline poster="${esc(capaDoVideo(p.image) || CAPA_VIDEO)}"></video></figure>`
         : `<figure class="materia-capa" data-revela><img src="${esc(p.image)}" alt="${esc(p.title)}" fetchpriority="high" decoding="async"${medidasDoImg(p.image)}></figure>`,
       JSONLD: jsonldTag({ "@context": "https://schema.org", "@type": "Article",
-        headline: p.title, description: p.excerpt, image: ehVideo(p.image) ? SITE + CAPA_VIDEO : p.image, datePublished: p.date, inLanguage: "pt-BR",
+        headline: p.title, description: p.excerpt, image: ehVideo(p.image) ? SITE + (capaDoVideo(p.image) || CAPA_VIDEO) : p.image, datePublished: p.date, inLanguage: "pt-BR",
         author: { "@id": `${SITE}/#org` }, publisher: { "@id": `${SITE}/#org` },
         mainEntityOfPage: `${SITE}/memoria/${p.slug}/` }),
     }));
@@ -1519,10 +1540,10 @@ async function publish() {
          inteiro de quem só queria ler o texto. */
       FIGURA: !p.image ? ""
         : ehVideo(p.image)
-        ? `<figure class="materia-capa materia-capa--video" data-revela><video src="${esc(p.image)}" controls preload="metadata" playsinline poster="${esc(CAPA_VIDEO)}"></video></figure>`
+        ? `<figure class="materia-capa materia-capa--video" data-revela><video src="${esc(p.image)}" controls preload="metadata" playsinline poster="${esc(capaDoVideo(p.image) || CAPA_VIDEO)}"></video></figure>`
         : `<figure class="materia-capa" data-revela><img src="${esc(p.image)}" alt="${esc(p.title)}" fetchpriority="high" decoding="async"${medidasDoImg(p.image)}></figure>`,
       JSONLD: jsonldTag({ "@context": "https://schema.org", "@type": "Article",
-        headline: p.title, description: p.excerpt, image: ehVideo(p.image) ? SITE + CAPA_VIDEO : p.image, datePublished: p.date, inLanguage: "pt-BR",
+        headline: p.title, description: p.excerpt, image: ehVideo(p.image) ? SITE + (capaDoVideo(p.image) || CAPA_VIDEO) : p.image, datePublished: p.date, inLanguage: "pt-BR",
         author: { "@id": `${SITE}/#org` }, publisher: { "@id": `${SITE}/#org` },
         mainEntityOfPage: `${SITE}/feed/${p.slug}/` }),
     }));
@@ -2324,6 +2345,48 @@ Consulte <code>journalctl -u kenosis -n 40</code>.</small></p></div>`);
         return json(res, 200, { ok: true, path: `/assets/video/${arquivo}`, bytes: kb * 1024 });
       }
 
+      /* ------------------------------------------ capa do vídeo (2.14.0)
+         O painel tira a foto do vídeo no navegador e manda para cá. O NOME
+         do arquivo não vem do navegador: ele sai do vídeo, que tem de existir
+         na pasta dos vídeos — assim ninguém escreve fora dela nem grava a
+         capa de um vídeo que não é daqui. E o conteúdo é conferido pelos
+         BYTES: um JPEG começa com FF D8 FF, diga o navegador o que disser. */
+      if (p === "/api/capa-video" && req.method === "POST") {
+        const { video, dataUrl } = await readBody(req);
+        const mv = /^\/assets\/video\/([A-Za-z0-9._-]+)\.(mp4|webm|ogv)$/i.exec(String(video || ""));
+        if (!mv || !fs.existsSync(path.join(VIDEO_DIR, mv[1] + "." + mv[2])))
+          return json(res, 400, { error: "Vídeo não encontrado." });
+        const md = /^data:image\/jpeg;base64,([A-Za-z0-9+\/=]+)$/.exec(String(dataUrl || ""));
+        if (!md) return json(res, 400, { error: "A capa precisa ser uma imagem JPEG." });
+        const bytes = Buffer.from(md[1], "base64");
+        if (bytes.length > 3 * 1024 * 1024) return json(res, 413, { error: "Capa grande demais (máx. 3 MB)." });
+        if (!(bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff))
+          return json(res, 400, { error: "O arquivo não é um JPEG." });
+        /* Grava num temporário e RENOMEIA: quem abrir a página no meio da
+           gravação vê a capa antiga ou a nova, nunca meia imagem. */
+        const destino = path.join(VIDEO_DIR, mv[1] + ".jpg");
+        const temp = destino + ".tmp-" + process.pid;
+        fs.writeFileSync(temp, bytes);
+        fs.renameSync(temp, destino);
+        return json(res, 200, { ok: true, capa: "/assets/video/" + mv[1] + ".jpg" });
+      }
+
+      /* Os vídeos das matérias que ainda não têm capa. É o que o painel usa
+         para dar capa aos vídeos que já estavam no ar antes desta versão —
+         e a quem subir um vídeo por outro caminho. */
+      if (p === "/api/videos-sem-capa" && req.method === "GET") {
+        const faltam = [];
+        for (const tabela of ["feed", "posts"]) {
+          for (const r of db.prepare(`SELECT id, title, image FROM ${tabela} WHERE image<>''`).all()) {
+            if (ehVideo(r.image) && /^\/assets\/video\/[A-Za-z0-9._-]+$/.test(r.image)
+                && fs.existsSync(path.join(VIDEO_DIR, path.basename(r.image))) && !capaDoVideo(r.image))
+              faltam.push({ tabela, id: r.id, titulo: r.title, video: r.image });
+          }
+        }
+        res.setHeader("Cache-Control", "no-store");
+        return json(res, 200, { videos: faltam });
+      }
+
       if (p === "/api/upload" && req.method === "POST") {
         const { name, dataUrl } = await readBody(req);
         // SVG fica DE FORA de propósito: pode conter <script> e, servido como
@@ -2376,8 +2439,52 @@ Consulte <code>journalctl -u kenosis -n 40</code>.</small></p></div>`);
     // é isso que faz 1 visita valer 1, e não 15 por causa dos assets da página.
     if (path.extname(file) === ".html") trackVisit(req, p);
 
-    res.writeHead(200, { "Content-Type": MIME[path.extname(file)] || "application/octet-stream" });
-    res.end(fs.readFileSync(file));
+    /* ENTREGA EM FLUXO, E POR FAIXA (2.14.0).
+
+       Até aqui era readFileSync + res.end: o arquivo INTEIRO na memória a cada
+       pedido, e o cabeçalho Range ignorado. Para vídeo isso quebrava três
+       coisas ao mesmo tempo, todas medidas em produção (Range pedido, 200
+       devolvido, sem Content-Range):
+
+       · o vídeo da matéria não deixava AVANÇAR — sem resposta por faixa, o
+         navegador marca a mídia como não-pulável e a barra volta para o 0;
+       · no iPhone ele provavelmente nem TOCAVA — o Safari pede bytes=0-1
+         antes de tudo e recusa vídeo de quem responde 200 com o arquivo
+         inteiro;
+       · e a capa tirada do vídeo saía PRETA: toda busca caía no segundo 0.
+
+       Sem contar a memória: um vídeo de 120 MB com dez pessoas assistindo
+       eram 1,2 GB carregados de uma vez. Agora o arquivo sai em fluxo, do
+       disco para a rede, com Content-Length; e "bytes=ini-fim" recebe 206
+       com o pedaço pedido. Pedido de várias faixas numa vez (raro) recebe o
+       arquivo inteiro com 200, o que a norma permite. */
+    const tipo = MIME[path.extname(file)] || "application/octet-stream";
+    const tam = fs.statSync(file).size;
+    const faixa = /^bytes=([0-9]*)-([0-9]*)$/.exec(String(req.headers.range || ""));
+    const envia = (ini, fim) => {
+      const fluxo = fs.createReadStream(file, { start: ini, end: fim });
+      /* erro no meio do caminho (arquivo trocado durante a entrega): fecha
+         a resposta em vez de deixar a conexão pendurada */
+      fluxo.on("error", () => { if (!res.headersSent) res.writeHead(500); res.end(); });
+      fluxo.pipe(res);
+    };
+    if (faixa && (faixa[1] !== "" || faixa[2] !== "")) {
+      let ini, fim;
+      if (faixa[1] === "") { ini = Math.max(0, tam - Number(faixa[2])); fim = tam - 1; }   // "bytes=-500": os últimos 500
+      else { ini = Number(faixa[1]); fim = faixa[2] === "" ? tam - 1 : Math.min(Number(faixa[2]), tam - 1); }
+      if (!(ini <= fim) || ini >= tam) {
+        res.writeHead(416, { "Content-Range": `bytes */${tam}`, "Accept-Ranges": "bytes" });
+        return res.end();
+      }
+      res.writeHead(206, { "Content-Type": tipo, "Content-Length": fim - ini + 1,
+        "Content-Range": `bytes ${ini}-${fim}/${tam}`, "Accept-Ranges": "bytes" });
+      if (req.method === "HEAD") return res.end();
+      return envia(ini, fim);
+    }
+    res.writeHead(200, { "Content-Type": tipo, "Content-Length": tam, "Accept-Ranges": "bytes" });
+    if (req.method === "HEAD") return res.end();
+    if (tam === 0) return res.end();
+    envia(0, tam - 1);
   } catch (e) {
     // detalhe do erro vai só para o log do servidor: mensagem de exceção
     // costuma revelar caminho de arquivo e estrutura interna
