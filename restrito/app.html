@@ -4434,6 +4434,33 @@ function timbreHTML(titulo, corpo, op){
       espremia as vizinhas e a mesma relação saía com colunas diferentes a
       cada emissão. Com fixed, vale a largura declarada no cabeçalho (em %,
       para servir igual em retrato e paisagem); o conteúdo quebra dentro dela. */
+   /* O CABEÇALHO SE REPETE EM TODA FOLHA (1.36.0).
+
+      "display:table-header-group" é o padrão de um <thead>, mas está escrito
+      aqui de propósito: é a única linha que segura a repetição, e qualquer
+      "display" diferente herdado de outra regra a desliga SEM AVISO — a lista
+      continua saindo, só que da segunda folha em diante sem dizer o que é
+      cada coluna.
+
+      Provado em folha de verdade (Chrome headless, 220 linhas em 7 páginas):
+      com <thead>, o cabeçalho sai nas 7; com a mesma linha solta no corpo da
+      tabela, sai só na 1ª. Vale também para tabela ANINHADA na célula da
+      tabela do timbre, que é como todo impresso daqui é montado.
+
+      "tr{page-break-inside:avoid}" é o par disso: uma linha partida ao meio
+      pela dobra da folha fica com metade do nome numa página e metade na
+      outra. */
+   thead{display:table-header-group}
+   tfoot{display:table-footer-group}
+   /* A tabela do TIMBRE fica de fora desta regra: a linha dela guarda o
+      documento inteiro, e pedir para não quebrar um corpo de sete páginas é
+      pedir o impossível — o navegador reage empurrando conteúdo para a folha
+      seguinte e abrindo buracos. Vale para as tabelas de DENTRO. */
+   table:not(.pag) > tbody > tr,table:not(.pag) > thead > tr{page-break-inside:avoid}
+   /* O cabeçalho repetido precisa PARECER cabeçalho em toda folha: sozinho no
+      alto da página 4, sem o título por perto, uma linha igual às outras
+      passa por dado. */
+   table.m thead th{background:#f4f7fb;border-bottom:1.5px solid #cfd8e8;color:#253282;font-weight:700}
    table.m{table-layout:fixed}
    table.m th{width:auto;white-space:normal;overflow-wrap:break-word}
    table.m td,table.m th{font-size:.78rem;padding:.3rem .45rem}
@@ -4572,9 +4599,9 @@ function imprimirRelPacientes(){
       <div class="kpi"><b>${ativos}</b><span>Ativos</span></div>
       <div class="kpi"><b>${d.length-ativos}</b><span>Inativos</span></div>
     </div>
-    <table class="m"><tr><th style="width:21%">Usuário</th><th style="width:23%">Endereço completo</th><th style="width:10%">Telefone</th>
+    <table class="m"><thead><tr><th style="width:21%">Usuário</th><th style="width:23%">Endereço completo</th><th style="width:10%">Telefone</th>
       <th style="width:12%">Projeto</th><th style="width:14%">Serviços</th>
-      <th style="width:13%">Profissional</th><th style="width:7%">Situação</th></tr>`+
+      <th style="width:13%">Profissional</th><th style="width:7%">Situação</th></tr></thead><tbody>`+
     d.map((x)=>`<tr>
       <td>${escA(x.nome)}</td>
       <td>${escA(enderecoCompleto(x)||"—")}</td>
@@ -4582,7 +4609,7 @@ function imprimirRelPacientes(){
       <td>${escA(x.projeto_nome||"—")}</td>
       <td>${x.servicos.length?x.servicos.map(escA).join("<br>"):"—"}</td>
       <td>${x.profissionais.length?x.profissionais.map(escA).join("<br>"):"—"}</td>
-      <td>${relpacAtivo(x)?"Ativo":"Inativo"}</td></tr>`).join("")+`</table>`;
+      <td>${relpacAtivo(x)?"Ativo":"Inativo"}</td></tr>`).join("")+`</tbody></table>`;
   abrirImpressao(rot, corpo, { subtitulo:`${d.length} usuário(s) · emitida em ${new Date().toLocaleDateString("pt-BR")}`, paisagem:true });
 }
 
@@ -4778,7 +4805,14 @@ function imprimirAgenda(){
      na chamada, como nas outras impressões. */
   let corpo=`<style>
      .ag-sub{color:#5a6172;font-size:.82rem;margin:-.4rem 0 1rem}
-     .ag-dia{margin:1.1rem 0 .3rem;color:#253282;font-weight:700;font-size:.9rem;border-bottom:1px solid #e7ecf4;padding-bottom:.25rem;text-transform:capitalize}
+     /* O dia mora num <thead> para o navegador repeti-lo quando os
+        atendimentos de um mesmo dia não cabem numa folha só. Sem isso, a
+        segunda página trazia horário e nome sem dizer de que dia eram — e
+        quem confere a agenda no papel trabalha POR DIA. */
+     .ag-tab{width:100%;border-collapse:collapse;margin:1.1rem 0 0}
+     .ag-tab thead{display:table-header-group}
+     .ag-tab tbody tr,.ag-tab thead tr{page-break-inside:avoid}
+     .ag-dia{margin:0 0 .3rem;color:#253282;font-weight:700;font-size:.9rem;border-bottom:1px solid #e7ecf4;padding-bottom:.25rem;text-transform:capitalize;text-align:left}
      .ag-l{display:flex;gap:.7rem;align-items:baseline;padding:.34rem .55rem;border-bottom:1px solid #f1f4f9;page-break-inside:avoid}
      .ag-h{flex:0 0 92px;font-weight:700;color:#253282;font-variant-numeric:tabular-nums;font-size:.82rem}
      .ag-d{flex:1;font-size:.82rem;color:#232733;line-height:1.5}
@@ -4788,8 +4822,10 @@ function imprimirAgenda(){
   for(const dia of datas){
     const [a,mth,d]=dia.split("-").map(Number);
     const dow=DIAS_SEMANA[new Date(a,mth-1,d).getDay()];
-    corpo+=`<div class="ag-dia">${dow}, ${d} de ${MESES_PT[mth-1]} de ${a}</div>`;
-    corpo+=dados.filter((x)=>x.data===dia).map(linha).join("");
+    corpo+=`<table class="ag-tab"><thead><tr><th class="ag-dia">${dow}, ${d} de ${MESES_PT[mth-1]} de ${a}</th></tr></thead>`
+      + `<tbody><tr><td style="padding:0">`
+      + dados.filter((x)=>x.data===dia).map(linha).join("")
+      + `</td></tr></tbody></table>`;
   }
   corpo+=`<p class="ag-tot">Total de registros: ${dados.length}</p>`;
   abrirImpressao("Agenda de serviços", corpo, { paisagem:true, subtitulo: periodo + (filtro ? filtro.replace(/^ · /, " · ") : "") });

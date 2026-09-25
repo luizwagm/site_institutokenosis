@@ -24,7 +24,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.35.1";
+const SISTEMA_VERSION = "1.35.2";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -198,6 +198,13 @@ function proteger(tabela, obj) {
    que as entregou.
    ========================================================================== */
 const HISTORICO_VERSOES = [
+  { versao: "1.35.2", data: "2026-09-24", titulo: "O cabeçalho sai em todas as folhas", mudancas: [
+    "Nas listas impressas, o cabeçalho das colunas passou a se repetir no alto de CADA página",
+    "Antes ele saía só na primeira: da segunda em diante a relação era uma grade sem dizer o que era cada coluna",
+    "Na agenda impressa, o DIA se repete quando os atendimentos de um dia não cabem numa folha só",
+    "O cabeçalho repetido tem fundo próprio, para não ser confundido com mais uma linha de dados",
+    "Uma linha deixou de poder ser partida ao meio pela dobra da folha",
+  ] },
   { versao: "1.35.1", data: "2026-09-20", titulo: "O título da ata aceita qualquer assunto", mudancas: [
     "O título da ata deixou de ser só a lista de projetos: agora dá para ESCREVER",
     "A lista dos projetos cadastrados continua ali, como sugestão, para quem quer o nome exato",

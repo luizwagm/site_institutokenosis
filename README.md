@@ -267,6 +267,7 @@ Cada uma sobe uma cópia do site numa porta própria e derruba no fim.
 | `node testar-limitador.js` | a trava de tentativas de senha |
 | `node testar-frequencia.js` | o título e o local da folha de frequência, e o 503 (nunca 500) enquanto a gestão está subindo |
 | `node testar-ata.js` | a ata de reunião: data que existe no calendário, tetos no POST **e** no PUT, e a lista de presentes (id do cadastro × convidado) reconstruída no servidor |
+| `node testar-impressos.js` | o cabeçalho das listas impressas se repete em **toda** folha — com Chrome instalado, ela imprime 220 linhas de mentira e conta em quantas páginas o cabeçalho aparece |
 
 > `testar-frequencia.js` e `testar-ata.js` falam com o **PostgreSQL de verdade** —
 > não existe banco descartável para ele. Ela só cria registros próprios,
