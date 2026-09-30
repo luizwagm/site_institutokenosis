@@ -652,6 +652,75 @@
     }
     @media print{aside,.appbar,.topbar .btn,.navbtn,.nav-veu,.nav-abrir{display:none}.app{grid-template-columns:1fr}}
 
+    /* FREQUÊNCIA — a data marcada (1.37.0). A bolinha embaixo do dia é o
+       marca-texto daquela coluna; as observações moram no fim da tabela. */
+    .freq-cor{display:block;width:1.05rem;height:1.05rem;margin:.25rem auto 0;padding:0;border-radius:50%;
+      border:1.5px solid #9aa6bd;background:#fff;cursor:pointer}
+    .freq-cor.tem{border-color:#232733}
+    .freq-cor:disabled{opacity:.35;cursor:not-allowed}
+    .freq-cor:focus-visible{outline:2px solid var(--celeste);outline-offset:2px}
+    .freq-obs-tit td{background:#f4f7fb;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--dim)}
+    .freq-obs-linha td{cursor:pointer;text-align:left}
+    .freq-obs-linha:hover td{background:#f2f7fd}
+    .freq-pastilha{display:inline-block;width:.95rem;height:.95rem;border-radius:3px;border:1px solid #6b7280;
+      vertical-align:-.14rem;margin-right:.45rem;background:#fff}
+    .freq-paleta{display:flex;gap:.5rem;flex-wrap:wrap;margin:.2rem 0 .8rem}
+    .freq-paleta button{width:2.4rem;height:2.4rem;padding:0;border-radius:9px;border:2px solid #cfd8e8;cursor:pointer;
+      font-size:.62rem;font-weight:600;color:var(--muted);background:#fff}
+    .freq-paleta button.on{border-color:#232733;box-shadow:0 0 0 2px #fff inset}
+    .freq-paleta button:focus-visible{outline:2px solid var(--celeste);outline-offset:2px}
+    .freq-marca-obs{width:100%;min-height:5.5rem;font:inherit;padding:.5rem .6rem;border:1.5px solid #cfd8e8;border-radius:8px;resize:vertical}
+
+    /* Colunas da frequência e da ata. Eram `style=` na própria célula, e
+       estilo inline vence qualquer folha — o computador não conseguia soltar
+       a largura mínima. Como classe, o celular continua com elas. */
+    .col-nome{min-width:220px}
+    .col-assinatura{min-width:240px}
+    /* CPF, data, número: um dado que não se parte ao meio. "123.456.789-" numa
+       linha e "00" na outra é ilegível. */
+    .c-inteiro{white-space:nowrap}
+
+    /* ==================================================================
+       COMPUTADOR: A TABELA CABE NO CARTÃO (29/09/2026)
+       Pedido do Instituto: a tabela "ajustada perfeitamente às colunas",
+       sem barra horizontal, em toda tabela vista em computador.
+
+       "Computador" aqui é quem tem MOUSE (hover + ponteiro fino), não quem
+       tem tela larga. Notebook com zoom de 125–150% no Windows fica abaixo
+       dos 860px e herdava a regra do CELULAR — `min-width:max-content`, que
+       FORÇA a rolagem lateral mesmo quando a tabela caberia. No celular a
+       rolagem continua: ali espremer coluna deixa a tabela ilegível.
+
+       O resto é o `ajustarTabelas()`, em três degraus, só na tabela que
+       ainda não coube: (1) largura natural — o texto quebra entre palavras;
+       (2) `.tab-aperta` — a palavra comprida demais (e-mail, link, código)
+       quebra no meio, e só ela; (3) `.tab-compacta` — menos respiro e letra
+       menor. Este bloco é o ÚLTIMO do <style> de propósito: regra de
+       @media no meio do arquivo perde por ordem, sem aviso.
+       ================================================================== */
+    @media (hover:hover) and (pointer:fine){
+      table{min-width:0 !important;width:100%;max-width:100%}
+      .col-nome{min-width:0}
+      .col-assinatura{min-width:0;width:30%}
+      #au-tabela .au-resumo{min-width:0}
+      /* `!important` porque é a saída de emergência: a regra da auditoria
+         (`#au-tabela .au-resumo`, por id) vencia por especificidade e a
+         palavra de 200 letras continuava empurrando a tabela. */
+      td.quebra-tudo{overflow-wrap:anywhere !important}
+      .tab-compacta th,.tab-compacta td{padding:.4rem .35rem;font-size:.82rem}
+      .tab-compacta th{letter-spacing:0}
+      .tab-compacta .freq-dia{padding-left:.15rem;padding-right:.15rem}
+      .tab-compacta .freq-dia input{width:1.9rem;padding:.2rem 0}
+      .tab-compacta .btn-sm{padding:.3rem .5rem}
+      /* O quarto degrau existe por causa da FREQUÊNCIA (dez colunas de dia)
+         numa janela logo acima de 860px, com a lateral aberta: sobram uns
+         550px. Dois algarismos cabem em 1.6rem. */
+      .tab-minima th,.tab-minima td{padding:.3rem .2rem;font-size:.76rem}
+      .tab-minima th{font-size:.64rem}
+      .tab-minima .freq-dia{padding-left:.1rem;padding-right:.1rem}
+      .tab-minima .freq-dia input{width:1.6rem;font-size:.76rem}
+    }
+
   </style>
 </head>
 <body>
@@ -908,10 +977,15 @@
               <input type="hidden" id="freq-add" onchange="addNaFolha(this.value)">
               <div class="cbx-list" id="freq-add-list" hidden></div>
             </div></div>
+          <!-- A DATA MARCADA: feriado, data programada. Abre o mesmo modal da
+               bolinha de cor de cada coluna, só que perguntando o dia. -->
+          <div><button type="button" class="btn btn-ghost btn-sm" onclick="modalMarcaFreq('')">＋ Observação de data</button></div>
         </div>
         <p class="ajuda" style="margin:.7rem 0 0">Digite os <b>dias do mês</b> das aulas nos cabeçalhos das colunas
           (deixe em branco as que não usar). As células ficam vazias de propósito — são as assinaturas, no papel.
-          Escolher um usuário no seletor acrescenta a linha na hora; a lista sai em ordem alfabética, numerada.</p>
+          Escolher um usuário no seletor acrescenta a linha na hora; a lista sai em ordem alfabética, numerada.<br>
+          A <b>bolinha</b> embaixo de cada dia pinta a coluna inteira (feriado, data programada) e guarda uma
+          <b>observação</b> daquela data — ela aparece no fim da tabela, também na impressão.</p>
       </div>
       <!-- barra de seleção: o Remover só existe com alguém marcado -->
       <div class="freq-selbar" id="freq-selbar"></div>
@@ -2086,6 +2160,62 @@ async function iniciarApp(me){
    (transição de `transform`), e um elemento escondido não anima. Assim o
    mesmo HTML serve aos dois tamanhos, sem duplicar menu.
    ========================================================================== */
+/* ==========================================================================
+   A TABELA CABE NO CARTÃO — no computador (29/09/2026)
+   O CSS faz o grosso (ver o bloco "COMPUTADOR" no fim do <style>). Aqui fica
+   o que CSS não sabe fazer: medir. Cada tabela visível que ainda passa da
+   largura do cartão sobe um degrau de cada vez, e para no primeiro que
+   resolve — a tabela que já cabe fica intocada.
+
+     1. natural .......... nada muda
+     2. .tab-aperta ...... SÓ a célula com palavra comprida demais (e-mail,
+                           link, código colado) passa a quebrar no meio.
+                           Aplicar isso à tabela inteira partiria as DATAS
+                           ("29/09/20" + "26"): o algoritmo de tabela encolhe
+                           toda coluna que PODE encolher.
+     3. .tab-compacta .... menos respiro e letra menor
+     4. .tab-minima ...... o limite legível (a frequência, com dez colunas de
+                           dia, numa janela estreita com a lateral aberta)
+
+   Mede de novo quando a tela muda (lista repintada, painel aberto, janela
+   redimensionada) — logo depois da mudança, ANTES de o navegador desenhar,
+   então tirar e repor as classes não pisca. E não por requestAnimationFrame:
+   com a aba em segundo plano ele não roda, e a tabela ficava sem ajuste até
+   alguém mexer na janela. No celular não faz nada: lá a tabela rola de lado,
+   de propósito.
+   ========================================================================== */
+const TELA_PC = window.matchMedia("(hover:hover) and (pointer:fine)");
+const PALAVRA_LONGA = /\S{26,}/;
+function tabelaCabe(t){
+  const caixa = t.parentElement;
+  return !caixa || caixa.scrollWidth <= caixa.clientWidth + 1;
+}
+function ajustarTabelas(){
+  const tabelas = [...document.querySelectorAll("table")];
+  for(const t of tabelas){
+    t.classList.remove("tab-aperta", "tab-compacta", "tab-minima");
+    t.querySelectorAll("td.quebra-tudo").forEach((c)=>c.classList.remove("quebra-tudo"));
+  }
+  if(!TELA_PC.matches) return;
+  for(const t of tabelas){
+    if(!t.offsetParent || tabelaCabe(t)) continue;      // escondida mede zero; a que cabe fica como está
+    t.classList.add("tab-aperta");
+    t.querySelectorAll("td").forEach((c)=>{ if(PALAVRA_LONGA.test(c.textContent)) c.classList.add("quebra-tudo"); });
+    if(tabelaCabe(t)) continue;
+    t.classList.add("tab-compacta");
+    if(tabelaCabe(t)) continue;
+    t.classList.add("tab-minima");
+  }
+}
+/* As próprias trocas de classe feitas acima (na tabela e nas células) não
+   podem religar a medição — seria um laço. */
+new MutationObserver((muts)=>{
+  if(muts.every((m)=>m.type === "attributes" && /^(TABLE|TD)$/.test(m.target.tagName))) return;
+  ajustarTabelas();
+}).observe(document.body, { childList:true, subtree:true, attributes:true, attributeFilter:["class"] });
+window.addEventListener("resize", ajustarTabelas);
+TELA_PC.addEventListener?.("change", ajustarTabelas);
+
 function navEstreito(){ return window.matchMedia("(max-width:860px)").matches; }
 function abrirNav(){
   document.body.classList.add("nav-aberta");
@@ -3413,7 +3543,43 @@ function freqTituloOpcoes(atual){
 /* As turmas são de hora em hora, das 07h às 20h — 13 opções fixas. */
 const FREQ_TURMAS = Array.from({length:13},(_,i)=>`${String(7+i).padStart(2,"0")}h às ${String(8+i).padStart(2,"0")}h`);
 const FREQ_COLS = 10;      // duas aulas por semana: 8 a 10 dias conforme o mês
-let FREQ = null;           // a folha aberta {id, turma, mes, titulo, local, datas[], participantes[]}
+let FREQ = null;           // a folha aberta {id, turma, mes, titulo, local, datas[], participantes[], marcas[]}
+
+/* ==========================================================================
+   A DATA MARCADA — feriado, data programada (1.37.0)
+
+   É o marca-texto da folha de papel: a coluna do dia pintada de ponta a
+   ponta e, no fim da tabela, o que aquele dia tem de diferente.
+
+   A PALETA É FECHADA E FLUORESCENTE, de propósito. Seis tons de marca-texto
+   distinguem-se entre si à primeira vista e deixam o algarismo do dia (em
+   tinta escura) legível em cima deles; um seletor livre de cor permitiria o
+   azul-marinho que esconde o número, e duas tonalidades de verde que ninguém
+   diferencia no papel. O servidor só aceita estes seis NOMES.
+
+   A COR NUNCA É A ÚNICA INFORMAÇÃO: a observação diz "Dia 07 — …" por
+   extenso. Numa impressora preto-e-branco os seis tons viram cinzas
+   parecidos, e a folha continua dizendo qual data é qual.
+
+   A marca é DO DIA, não da posição da coluna (ver migration 013).
+   ========================================================================== */
+const FREQ_PALETA = [
+  ["amarelo", "Amarelo", "#F7FF3C"], ["verde", "Verde", "#6CFF4A"], ["ciano", "Ciano", "#3DF2FF"],
+  ["rosa", "Rosa", "#FF7AD9"], ["laranja", "Laranja", "#FFA63D"], ["lilas", "Lilás", "#CF8BFF"],
+];
+const FREQ_OBS_MAX = 300;
+const freqTinta = (cor)=>(FREQ_PALETA.find((p)=>p[0]===cor)||[,, ""])[2];
+const freqDia2 = (d)=>{ const v=String(d||"").replace(/[^0-9]/g,""); return v && +v>=1 && +v<=31 ? String(+v).padStart(2,"0") : ""; };
+/* As marcas como vieram do banco, já descartando o que não é marca. */
+const freqMarcasDe = (v)=>freqArr(v)
+  .filter((m)=>m && typeof m==="object" && freqDia2(m.dia))
+  .map((m)=>({ dia:freqDia2(m.dia), cor:freqTinta(m.cor)?m.cor:"", obs:String(m.obs||"").trim() }))
+  .filter((m)=>m.cor || m.obs);
+const freqMarca = (dia, marcas)=>((marcas||(FREQ&&FREQ.marcas)||[]).find((m)=>m.dia===dia))||null;
+/* Só as marcas de dias que AINDA estão na folha, em ordem de dia: é o que se
+   grava e o que se imprime. Marca de um dia apagado da folha não vai junto. */
+const freqMarcasValidas = (marcas, dias)=>(marcas||[])
+  .filter((m)=>dias.includes(m.dia)).sort((a,b)=>a.dia.localeCompare(b.dia));
 let FREQ_LISTA = [];       // as folhas salvas (para carregar ao trocar os selects)
 let FREQ_SUJO = false;     // alteração ainda não salva
 
@@ -3514,7 +3680,7 @@ function criarFolhaDoForm(){
      primeiro item da lista, em silêncio. */
   $("#freq-titulo").innerHTML=freqTituloOpcoes(titulo);
   $("#freq-titulo").value=titulo; $("#freq-local").value=local;
-  FREQ={ id:0, turma, mes, titulo, local, datas:[], participantes:[] };
+  FREQ={ id:0, turma, mes, titulo, local, datas:[], participantes:[], marcas:[] };
   FREQ_SUJO=false; FREQ_SEL.clear();
   $("#freq-status").textContent="";
   pintarModoFolha(); pintarFrequencia(); pintarListaFolhas();
@@ -3562,26 +3728,131 @@ function pintarFrequencia(){
     .map((p)=>p.id);
   const dias=[];
   for(let i=0;i<FREQ_COLS;i++)
-    dias.push(`<th class="freq-dia"><input maxlength="2" inputmode="numeric" value="${escA(FREQ.datas[i]||"")}" placeholder="—" onchange="mudarDataFreq(${i},this)"></th>`);
-  $("#freq-thead").innerHTML = `<tr><th style="text-align:left;min-width:220px">Nome</th><th>CPF</th><th>Nº</th>${dias.join("")}<th style="width:2.4rem"></th></tr>`;
+    dias.push(`<th class="freq-dia" data-c="${i}"><input maxlength="2" inputmode="numeric" value="${escA(FREQ.datas[i]||"")}" placeholder="—" onchange="mudarDataFreq(${i},this)">`
+      + `<button type="button" class="freq-cor" data-c="${i}" onclick="modalMarcaFreq(freqDia2(FREQ.datas[${i}]))"></button></th>`);
+  $("#freq-thead").innerHTML = `<tr><th class="col-nome" style="text-align:left">Nome</th><th>CPF</th><th>Nº</th>${dias.join("")}<th style="width:2.4rem"></th></tr>`;
 
   /* A seleção sobrevive à repintura (acrescentar alguém não desmarca os já
      marcados), mas nunca guarda quem saiu da folha. */
   FREQ_SEL = new Set([...FREQ_SEL].filter((id)=>FREQ.participantes.some((x)=>String(x)===String(id))));
   const linhas = FREQ.participantes.map(freqPessoa);
   $("#freq-tbody").innerHTML = linhas.length
-    ? linhas.map((p,i)=>`<tr><td>${escA(p.nome)}</td><td>${escA(p.cpf||"—")}</td><td class="freq-num">${String(i+1).padStart(2,"0")}</td>${'<td class="freq-cel"></td>'.repeat(FREQ_COLS)}<td style="text-align:center"><input type="checkbox" class="freq-sel"${FREQ_SEL.has(String(p.id))?" checked":""} onchange="freqMarcar('${p.id}',this.checked)" title="Selecionar para remover"></td></tr>`).join("")
+    ? linhas.map((p,i)=>`<tr><td>${escA(p.nome)}</td><td class="c-inteiro">${escA(p.cpf||"—")}</td><td class="freq-num">${String(i+1).padStart(2,"0")}</td>${Array.from({length:FREQ_COLS},(_,c)=>`<td class="freq-cel" data-c="${c}"></td>`).join("")}<td style="text-align:center"><input type="checkbox" class="freq-sel"${FREQ_SEL.has(String(p.id))?" checked":""} onchange="freqMarcar('${p.id}',this.checked)" title="Selecionar para remover"></td></tr>`).join("")
     : `<tr><td class="vazio" colspan="${FREQ_COLS+4}">Nenhum usuário na folha — escolha em "Adicionar usuário".</td></tr>`;
   pintarSelecaoFreq();
+  pintarMarcasFreq();
 
   // o seletor agora é o combobox genérico (cbx) — lê o CACHE sozinho e já
   // filtra inativos; quem já está na folha é barrado no addNaFolha
 }
 
+/* Pinta as colunas marcadas e escreve as observações no fim da tabela — SEM
+   refazer o cabeçalho. Refazê-lo a cada dia digitado trocaria os campos por
+   outros novos e o Tab cairia no vazio: quem digita os dez dias em sequência
+   perderia o foco dez vezes. */
+function pintarMarcasFreq(){
+  if(!FREQ) return;
+  for(let c=0;c<FREQ_COLS;c++){
+    const dia=freqDia2(FREQ.datas[c]);
+    const m=dia ? freqMarca(dia) : null;
+    const tinta=m ? freqTinta(m.cor) : "";
+    document.querySelectorAll(`#freq-thead [data-c="${c}"], #freq-tbody [data-c="${c}"]`).forEach((el)=>{
+      if(el.classList.contains("freq-cor")){
+        el.disabled=!dia;
+        el.style.background=tinta||"#fff";
+        el.classList.toggle("tem", !!m);
+        const rot = !dia ? "Digite o dia para poder marcar esta data"
+          : m ? `Dia ${dia}: ${m.obs||"data marcada"} — clique para alterar`
+              : `Marcar o dia ${dia} (cor e observação)`;
+        el.title=rot; el.setAttribute("aria-label", rot);
+      } else el.style.background=tinta;
+    });
+  }
+  const tb=$("#freq-tbody");
+  tb.querySelectorAll(".freq-obs-tit,.freq-obs-linha").forEach((tr)=>tr.remove());
+  const comObs=freqMarcasValidas(FREQ.marcas, freqDatas()).filter((m)=>m.obs);
+  if(!comObs.length) return;
+  tb.insertAdjacentHTML("beforeend",
+    `<tr class="freq-obs-tit"><td colspan="${FREQ_COLS+4}">Observações</td></tr>`+
+    comObs.map((m)=>`<tr class="freq-obs-linha" onclick="modalMarcaFreq('${m.dia}')" title="Clique para alterar">
+      <td colspan="${FREQ_COLS+4}"><span class="freq-pastilha" style="background:${freqTinta(m.cor)||"#fff"}"></span><b>Dia ${m.dia}</b> — ${escA(m.obs)}</td></tr>`).join(""));
+}
+
 function mudarDataFreq(i, campo){
   const v=String(campo.value).replace(/\D/g,"").slice(0,2);
   campo.value = (v && +v>=1 && +v<=31) ? v : "";
+  /* Corrigir o dia de uma coluna marcada LEVA a marca junto: quem troca 07
+     por 08 está consertando a data do feriado, não criando outro dia. Só não
+     leva se o dia novo já tiver a sua, ou se o antigo continuar noutra coluna. */
+  const antes=freqDia2(FREQ.datas[i]), depois=freqDia2(campo.value);
   FREQ.datas[i]=campo.value; FREQ_SUJO=true;
+  const m=antes ? freqMarca(antes) : null;
+  if(m && depois && depois!==antes && !freqMarca(depois) && !FREQ.datas.some((d)=>freqDia2(d)===antes)) m.dia=depois;
+  pintarMarcasFreq();
+}
+
+/* --------------------------------------------------------------------------
+   O MODAL DA DATA MARCADA — um só, com duas portas: a bolinha de cada coluna
+   (já sabe o dia) e o botão "＋ Observação de data" (pergunta o dia).
+   -------------------------------------------------------------------------- */
+let MARCA_COR = "";
+function modalMarcaFreq(dia){
+  if(!FREQ) return;
+  const dias=freqDatas();
+  if(!dias.length) return toast("Digite primeiro os dias das aulas no cabeçalho das colunas.", true);
+  const escolhido = dias.includes(dia) ? dia : dias[0];
+  const host=$("#modal-host")||(()=>{const d=document.createElement("div");d.id="modal-host";document.body.appendChild(d);return d;})();
+  host.innerHTML=`<div class="modal-bg"><div class="modal" style="--modal-larg:520px">
+    <h2>Observação de data</h2>
+    <div class="modal-corpo">
+      <label>Dia</label>
+      <select id="mf-dia" onchange="carregarMarcaFreq()">${dias.map((d)=>`<option value="${d}"${d===escolhido?" selected":""}>Dia ${d}${freqMarca(d)?" — já marcado":""}</option>`).join("")}</select>
+      <label style="margin-top:.8rem">Cor da coluna</label>
+      <div class="freq-paleta" id="mf-paleta" role="radiogroup" aria-label="Cor da coluna"></div>
+      <label>Observação <span class="ajuda" style="margin:0;font-weight:400">(feriado, data programada…)</span></label>
+      <textarea id="mf-obs" class="freq-marca-obs" maxlength="${FREQ_OBS_MAX}" placeholder="Ex.: Feriado — não houve aula"></textarea>
+      <p class="ajuda" style="margin:.5rem 0 0">A cor pinta a <b>coluna inteira</b> desse dia. A observação sai no
+        <b>fim da tabela</b>, na tela e na impressão. Vale depois de <b>Salvar</b> a folha.</p>
+    </div>
+    <div class="acoes">
+      <button class="btn btn-ghost" id="mf-remover" onclick="removerMarcaFreq()" hidden>Remover marcação</button>
+      <button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-navy" onclick="salvarMarcaFreq()">Salvar observação</button>
+    </div>
+  </div></div>`;
+  carregarMarcaFreq();
+  $("#mf-obs").focus();
+}
+/* Trocar o dia no modal traz o que aquele dia já tem — senão a marca de um dia
+   seria gravada por cima da de outro. */
+function carregarMarcaFreq(){
+  const m=freqMarca($("#mf-dia").value);
+  MARCA_COR = m ? m.cor : "amarelo";      // dia novo já vem com o marca-texto clássico
+  $("#mf-obs").value = m ? m.obs : "";
+  $("#mf-remover").hidden = !m;
+  pintarPaletaFreq();
+}
+function pintarPaletaFreq(){
+  $("#mf-paleta").innerHTML =
+    `<button type="button" role="radio" aria-checked="${!MARCA_COR}" class="${MARCA_COR?"":"on"}" title="Sem cor" onclick="escolherCorFreq('')">sem</button>`+
+    FREQ_PALETA.map(([nome,rot,tinta])=>`<button type="button" role="radio" aria-checked="${MARCA_COR===nome}" class="${MARCA_COR===nome?"on":""}"
+      style="background:${tinta}" title="${rot}" aria-label="${rot}" onclick="escolherCorFreq('${nome}')"></button>`).join("");
+}
+function escolherCorFreq(nome){ MARCA_COR=nome; pintarPaletaFreq(); }
+function salvarMarcaFreq(){
+  const dia=$("#mf-dia").value;
+  const obs=String($("#mf-obs").value||"").replace(/\s+/g," ").trim().slice(0,FREQ_OBS_MAX);
+  if(!MARCA_COR && !obs) return toast("Escolha uma cor ou escreva a observação.", true);
+  FREQ.marcas=(FREQ.marcas||[]).filter((m)=>m.dia!==dia);
+  FREQ.marcas.push({ dia, cor:MARCA_COR, obs });
+  FREQ_SUJO=true;
+  fecharModal(); pintarMarcasFreq();
+}
+function removerMarcaFreq(){
+  const dia=$("#mf-dia").value;
+  FREQ.marcas=(FREQ.marcas||[]).filter((m)=>m.dia!==dia);
+  FREQ_SUJO=true;
+  fecharModal(); pintarMarcasFreq();
 }
 function addNaFolha(id){
   if(!id) return;
@@ -3631,7 +3902,8 @@ async function salvarFrequencia(){
   const btn=$("#freq-salvar");
   const corpo={ turma:FREQ.turma, mes:FREQ.mes,
     titulo:FREQ.titulo||"", local:FREQ.local||"",
-    datas:JSON.stringify(freqDatas()), participantes:JSON.stringify(FREQ.participantes) };
+    datas:JSON.stringify(freqDatas()), participantes:JSON.stringify(FREQ.participantes),
+    marcas:JSON.stringify(freqMarcasValidas(FREQ.marcas, freqDatas())) };
   btn.disabled=true;
   try{
     if(FREQ.id) await api("frequencias/"+FREQ.id,"PUT",corpo);
@@ -3781,12 +4053,15 @@ function duplicarFolha(id){
   $("#freq-turma").value=f.turma; $("#freq-mes").value=f.mes;
   $("#freq-titulo").innerHTML=freqTituloOpcoes(f.titulo||"");
   $("#freq-titulo").value=f.titulo||""; $("#freq-local").value=f.local||"";
+  /* As MARCAS não vêm na cópia: a cópia é para outro mês, e o feriado do dia
+     07 de setembro pintaria — calado — o dia 07 de outubro. */
   FREQ={ id:0, turma:f.turma, mes:f.mes, titulo:f.titulo||"", local:f.local||"",
-         datas:freqArr(f.datas), participantes:freqArr(f.participantes) };
+         datas:freqArr(f.datas), participantes:freqArr(f.participantes), marcas:[] };
   FREQ_SEL.clear();
   FREQ_SUJO=true;
   pintarModoFolha();      // é uma folha nova com conteúdo — sair sem salvar perde
-  $("#freq-status").textContent=`Cópia da folha de ${freqMesLabel(f.mes)} (${f.turma}) — escolha o mês, ajuste os dias e clique em Salvar para registrar a nova.`;
+  $("#freq-status").textContent=`Cópia da folha de ${freqMesLabel(f.mes)} (${f.turma}) — escolha o mês, ajuste os dias e clique em Salvar para registrar a nova.`
+    + (freqMarcasDe(f.marcas).length ? " As cores e observações de data não foram copiadas: são daquele mês." : "");
   pintarFrequencia();
   pintarListaFolhas();
   $("#pane-freq").scrollIntoView({ block:"start" });
@@ -3801,7 +4076,7 @@ function abrirFolhaSalva(id){
   $("#freq-titulo").innerHTML=freqTituloOpcoes(f.titulo||"");
   $("#freq-titulo").value=f.titulo||""; $("#freq-local").value=f.local||"";
   FREQ={ id:f.id, turma:f.turma, mes:f.mes, titulo:f.titulo||"", local:f.local||"",
-         datas:freqArr(f.datas), participantes:freqArr(f.participantes) };
+         datas:freqArr(f.datas), participantes:freqArr(f.participantes), marcas:freqMarcasDe(f.marcas) };
   FREQ_SEL.clear();
   FREQ_SUJO=false; $("#freq-status").textContent="";
   pintarModoFolha();
@@ -3818,7 +4093,19 @@ function imprimirFolha(id){
   const f=FREQ_LISTA.find((x)=>x.id===id);
   if(!f) return;
   imprimirFrequencia({ turma:f.turma, mes:f.mes, local:f.local, titulo:f.titulo,
-                       datas:freqArr(f.datas), participantes:freqArr(f.participantes) });
+                       datas:freqArr(f.datas), participantes:freqArr(f.participantes), marcas:freqMarcasDe(f.marcas) });
+}
+/* As observações fecham a TABELA — últimas linhas do corpo, e não um rodapé:
+   `<tfoot>` se repetiria em toda folha, e a observação é dita uma vez, depois
+   do último nome. A pastilha repete a cor da coluna; o dia vai por extenso
+   (07/09) para a folha se explicar sozinha, até em preto-e-branco. */
+function observacoesImpressas(marcas, nCols, mes){
+  const comObs=(marcas||[]).filter((m)=>m.obs);
+  if(!comObs.length) return "";
+  const mm=String(mes||"").slice(5,7);
+  const cel='border:1px solid #6b7280;padding:.22rem .45rem;line-height:1.3;white-space:normal;text-align:left';
+  return `<tr><td colspan="${nCols}" style="${cel};font-weight:700;color:#232733;background:#f4f7fb;-webkit-print-color-adjust:exact;print-color-adjust:exact">Observações</td></tr>`+
+    comObs.map((m)=>`<tr><td colspan="${nCols}" style="${cel}"><span style="display:inline-block;width:.8rem;height:.8rem;border:1px solid #6b7280;vertical-align:-.1rem;margin-right:.4rem;background:${freqTinta(m.cor)||"#fff"};-webkit-print-color-adjust:exact;print-color-adjust:exact"></span><b>Dia ${m.dia}${mm?"/"+mm:""}</b> — ${escA(m.obs)}</td></tr>`).join("");
 }
 function imprimirFrequencia(folha){
   const dias=normalizarDias(folha.datas);
@@ -3834,7 +4121,13 @@ function imprimirFrequencia(folha){
   const diaW=4.5, cpfW=12, numW=4;
   const nomeW=(100 - cpfW - numW - diaW*dias.length).toFixed(1);
   const negrito=bordas+';font-weight:700;color:#232733';
-  const cab=`<tr><th style="${negrito};text-align:left;width:${nomeW}%">Nome</th><th style="${negrito};width:${cpfW}%">CPF</th><th style="${negrito};width:${numW}%">Nº</th>${dias.map((d)=>`<th style="${negrito};width:${diaW}%">${d}</th>`).join("")}</tr>`;
+  /* A DATA MARCADA no papel: a coluna sai pintada de cima a baixo. O navegador
+     NÃO imprime fundo por padrão ("gráficos de plano de fundo" desligado) — o
+     print-color-adjust na própria célula é o que obriga a tinta a sair. */
+  const marcas=freqMarcasValidas(folha.marcas, dias);
+  const fundo=(d)=>{ const m=freqMarca(d, marcas), t=m?freqTinta(m.cor):"";
+    return t ? `;background:${t};-webkit-print-color-adjust:exact;print-color-adjust:exact` : ""; };
+  const cab=`<tr><th style="${negrito};text-align:left;width:${nomeW}%">Nome</th><th style="${negrito};width:${cpfW}%">CPF</th><th style="${negrito};width:${numW}%">Nº</th>${dias.map((d)=>`<th style="${negrito};width:${diaW}%${fundo(d)}">${d}</th>`).join("")}</tr>`;
   /* TÍTULO E PERÍODO EM TODA PÁGINA: os dois vão DENTRO do <thead>, como
      linhas de colspan — é o <thead> que o navegador repete no alto de cada
      folha impressa, então cada página nasce com título, turma, mês e as
@@ -3856,7 +4149,8 @@ function imprimirFrequencia(folha){
      por folha em paisagem SEM mexer no tamanho da fonte — o aperto é todo de
      padding e line-height (~19px por linha). */
   const celula='border:1px solid #6b7280;padding:.05rem .45rem;line-height:1.15';
-  const corpo=linhas.map((p,i)=>`<tr><td style="${celula};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escA(p.nome)}</td><td style="${celula};white-space:nowrap">${escA(p.cpf||"")}</td><td style="${celula};text-align:center">${String(i+1).padStart(2,"0")}</td>${`<td style="${celula};height:1rem"></td>`.repeat(dias.length)}</tr>`).join("");
+  const corpo=linhas.map((p,i)=>`<tr><td style="${celula};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escA(p.nome)}</td><td style="${celula};white-space:nowrap">${escA(p.cpf||"")}</td><td style="${celula};text-align:center">${String(i+1).padStart(2,"0")}</td>${dias.map((d)=>`<td style="${celula};height:1rem${fundo(d)}"></td>`).join("")}</tr>`).join("")
+    + observacoesImpressas(marcas, nCols, folha.mes);
   /* O cabeçalho vai em <thead> DE VERDADE: é o que o navegador repete no
      alto de cada página impressa — da segunda em diante a tabela continua
      dizendo quais são as datas, sem ninguém voltar à primeira folha. */
@@ -4052,8 +4346,8 @@ function trocarAta(){
 function pintarAta(){
   const linhas = ataOrdenar(ataPessoas());
   $("#ata-thead").innerHTML =
-    `<tr><th style="text-align:left;min-width:220px">Nome</th><th>CPF</th><th>Nº</th>`+
-    `<th style="min-width:240px">Assinatura</th><th style="width:2.4rem"></th></tr>`;
+    `<tr><th class="col-nome" style="text-align:left">Nome</th><th>CPF</th><th>Nº</th>`+
+    `<th class="col-assinatura">Assinatura</th><th style="width:2.4rem"></th></tr>`;
   /* A seleção sobrevive à repintura (acrescentar alguém não desmarca os já
      marcados) e nunca guarda quem saiu da ata. */
   const chaves = new Set(linhas.map((p)=>p.chave));
@@ -4061,7 +4355,7 @@ function pintarAta(){
   $("#ata-tbody").innerHTML = linhas.length
     ? linhas.map((p,i)=>`<tr>
         <td>${escA(p.nome)}${p.convidado?' <span class="tag tag-Inativo" style="font-size:.66rem">convidado</span>':""}</td>
-        <td>${escA(p.cpf||"—")}</td>
+        <td class="c-inteiro">${escA(p.cpf||"—")}</td>
         <td class="freq-num">${String(i+1).padStart(2,"0")}</td>
         <td class="freq-cel"></td>
         <td style="text-align:center"><input type="checkbox" class="freq-sel"${ATA_SEL.has(p.chave)?" checked":""}

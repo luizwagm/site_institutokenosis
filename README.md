@@ -272,9 +272,10 @@ Cada uma sobe uma cópia do site numa porta própria e derruba no fim.
 | `node testar-cabecalhos.js` | os cabeçalhos que o navegador obedece — inclusive a `Permissions-Policy` aberta no `/restrito`, sem a qual a câmera da reunião é recusada em silêncio |
 | `node testar-texto.js` | o texto do painel chega à tela sem tag e sem `&nbsp;` |
 | `node testar-limitador.js` | a trava de tentativas de senha |
-| `node testar-frequencia.js` | o título e o local da folha de frequência, e o 503 (nunca 500) enquanto a gestão está subindo |
+| `node testar-frequencia.js` | o título e o local da folha de frequência, o 503 (nunca 500) enquanto a gestão está subindo, e a **data marcada** (cor da paleta + observação: o servidor limpa dia, cor e tamanho; a observação sai escapada e colorida no papel) |
 | `node testar-ata.js` | a ata de reunião: data que existe no calendário, tetos no POST **e** no PUT, e a lista de presentes (id do cadastro × convidado) reconstruída no servidor |
 | `node testar-impressos.js` | o cabeçalho das listas impressas se repete em **toda** folha — com Chrome instalado, ela imprime 220 linhas de mentira e conta em quantas páginas o cabeçalho aparece |
+| `node testar-tabelas.js` | no **computador** nenhuma tabela passa da largura do cartão (sem barra lateral) — o Chrome abre a ata, a frequência, a auditoria e uma lista com o CSS e o ajuste tirados do `app.html`, em cartões de 1015, 711 e 550px, e mede; confere também que CPF e data não se partem |
 | `node testar-capa-video.js` | a capa de cada vídeo do Feed e da Memória é uma foto dele: entrega do vídeo **por faixa** (`206` — sem isso não se avança o vídeo, o iPhone não toca e a capa sai preta), a capa só ao lado de vídeo existente e só JPEG, e — com Chrome — o caminho inteiro com um vídeo que começa preto |
 
 > `testar-frequencia.js` e `testar-ata.js` falam com o **PostgreSQL de verdade** —

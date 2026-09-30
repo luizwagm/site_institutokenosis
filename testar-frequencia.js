@@ -362,6 +362,126 @@ function pedir(caminho, metodo = "GET", corpo = null) {
       verdade("e o nome continua legível", aspas.includes("&quot;Vida&quot;"));
     }
 
+    /* ====================================================================
+       9. A DATA MARCADA (1.37.0) — cor na coluna e observação no fim
+
+       Feriado, data programada: a coluna do dia pintada e, embaixo da
+       tabela, o que aquele dia tem de diferente. O servidor é quem garante
+       o que é gravado — a tela qualquer um contorna.
+       ==================================================================== */
+    console.log("\n  9. a data marcada: cor e observação");
+    {
+      const cols9 = (await Q.all(
+        `SELECT column_name FROM information_schema.columns
+           WHERE table_schema='public' AND table_name='frequencias'`)).map((c) => c.column_name);
+      verdade("a coluna `marcas` existe", cols9.includes("marcas"));
+
+      const base9 = { turma: "09h às 10h", mes: "2099-09", titulo: `${MARCA} — Marcas`, local: "ZZ QA",
+                      datas: "[\"02\",\"07\",\"09\"]", participantes: "[]" };
+      const marcasDe = async (id) => {
+        const l = (await pedir("/restrito/api/frequencias")).json || [];
+        const f = l.find((x) => x.id === id);
+        try { return JSON.parse(f.marcas); } catch { return null; }
+      };
+
+      const c = await pedir("/restrito/api/frequencias", "POST", Object.assign({}, base9, {
+        marcas: JSON.stringify([{ dia: "07", cor: "amarelo", obs: "Feriado — Independência" }]) }));
+      ok("a folha com data marcada grava", c.status, 200);
+      const idM = c.json && c.json.id;
+      if (idM) folhas.push(idM);
+      ok("a marca voltou inteira: dia, cor e observação", await marcasDe(idM),
+        [{ dia: "07", cor: "amarelo", obs: "Feriado — Independência" }]);
+
+      /* Folha sem marca nenhuma — como TODAS as que já existiam — continua
+         valendo: a coluna nasce com a lista vazia. */
+      const semMarca = await pedir("/restrito/api/frequencias", "POST", base9);
+      if (semMarca.json && semMarca.json.id) folhas.push(semMarca.json.id);
+      ok("folha sem marca nenhuma grava", semMarca.status, 200);
+      ok("…e volta com a lista vazia", await marcasDe(semMarca.json.id), []);
+
+      /* O que a tela não deixaria passar, mandado direto à rota. */
+      await pedir(`/restrito/api/frequencias/${idM}`, "PUT", { marcas: JSON.stringify([
+        { dia: "9", cor: "verde", obs: "  data   programada  " },          // dia sem zero, espaços sobrando
+        { dia: "07", cor: "#ff0000", obs: "cor inventada" },                // cor fora da paleta
+        { dia: "40", cor: "rosa", obs: "dia que não existe" },              // dia impossível
+        { dia: "02", cor: "", obs: "" },                                    // marca vazia
+        { dia: "02", cor: "javascript:alert(1)", obs: "" },                 // vazia de novo, com lixo
+        "texto solto", null, [1, 2],                                        // o que nem objeto é
+      ]) });
+      ok("o servidor limpa: dia normalizado, cor desconhecida vira sem cor, o resto some", await marcasDe(idM), [
+        { dia: "07", cor: "", obs: "cor inventada" },
+        { dia: "09", cor: "verde", obs: "data programada" },
+      ]);
+
+      /* Um dia, uma marca: mandar duas para o mesmo dia não cria duas linhas
+         de observação na folha — vale a última. */
+      await pedir(`/restrito/api/frequencias/${idM}`, "PUT", { marcas: JSON.stringify([
+        { dia: "07", cor: "rosa", obs: "primeira" }, { dia: "07", cor: "ciano", obs: "segunda" }]) });
+      ok("duas marcas no mesmo dia: fica a última", await marcasDe(idM),
+        [{ dia: "07", cor: "ciano", obs: "segunda" }]);
+
+      /* A observação vai para o papel, embaixo da tabela: tem teto, e ele
+         vale também na EDIÇÃO — limite só na criação se contorna editando. */
+      await pedir(`/restrito/api/frequencias/${idM}`, "PUT", { marcas: JSON.stringify([
+        { dia: "07", cor: "laranja", obs: "x".repeat(900) }]) });
+      ok("a observação é aparada em 300 caracteres", ((await marcasDe(idM))[0] || {}).obs.length, 300);
+
+      /* JSON quebrado não derruba a rota nem apaga a folha. */
+      const torto = await pedir(`/restrito/api/frequencias/${idM}`, "PUT", { marcas: "{isto não é json" });
+      ok("JSON torto não dá erro", torto.status, 200);
+      ok("…e vira lista vazia", await marcasDe(idM), []);
+
+      /* Editar outra coisa NÃO apaga as marcas: o PUT parcial só mexe no que veio. */
+      await pedir(`/restrito/api/frequencias/${idM}`, "PUT", { marcas: JSON.stringify([
+        { dia: "02", cor: "lilas", obs: "Aula de reposição" }]) });
+      await pedir(`/restrito/api/frequencias/${idM}`, "PUT", { local: "ZZ QA Outro" });
+      ok("mudar só o local preserva as marcas", await marcasDe(idM),
+        [{ dia: "02", cor: "lilas", obs: "Aula de reposição" }]);
+
+      /* ---------------- a tela: a paleta é a do servidor, e o papel diz o dia */
+      const fs = require("node:fs");
+      const html = fs.readFileSync(path.join(__dirname, "restrito", "app.html"), "utf8");
+      const servidor = fs.readFileSync(path.join(__dirname, "restrito.js"), "utf8");
+      const nomesTela = (/const FREQ_PALETA = \[([\s\S]*?)\];/.exec(html) || [, ""])[1]
+        .match(/\["([a-z]+)"/g).map((x) => x.slice(2, -1));
+      const nomesServidor = JSON.parse((/const FREQ_CORES = (\[[^\]]*\]);/.exec(servidor) || [, "[]"])[1]);
+      ok("as cores da tela são exatamente as que o servidor aceita", nomesTela, nomesServidor);
+      ok("são seis", nomesTela.length, 6);
+
+      /* `observacoesImpressas` é função pura: extraída do app.html e exercitada
+         aqui, como o `freqTituloOpcoes` acima. */
+      const fonte = /function observacoesImpressas\(marcas, nCols, mes\)\{([\s\S]*?)\n\}/.exec(html);
+      verdade("a montagem das observações impressas existe", !!fonte);
+      const paleta = /const FREQ_PALETA = \[[\s\S]*?\];/.exec(html)[0];
+      const tinta = /const freqTinta = [^\n]*/.exec(html)[0];
+      const escA = (x) => String(x ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+      const imprimir = new Function("escA", "marcas", "nCols", "mes",
+        paleta + "\n" + tinta + "\nfunction observacoesImpressas(marcas, nCols, mes){" + fonte[1] + "\n}\nreturn observacoesImpressas(marcas, nCols, mes);");
+      const papel = imprimir(escA, [
+        { dia: "07", cor: "amarelo", obs: "Feriado <b>nacional</b>" },
+        { dia: "09", cor: "verde", obs: "" },                       // só cor: não tem o que dizer embaixo
+      ], 6, "2099-09");
+      verdade("a observação sai no papel com o dia por extenso", /Dia 07\/09<\/b> — Feriado/.test(papel));
+      verdade("ocupa a largura toda da tabela", papel.includes('colspan="6"'));
+      verdade("a pastilha repete a cor da coluna", papel.includes("#F7FF3C"));
+      /* Na PASTILHA, e não em qualquer lugar da folha: a faixa "Observações"
+         também traz a regra, e uma prova frouxa passaria só por causa dela.
+         Sem isto o navegador imprime a pastilha em branco ("gráficos de
+         plano de fundo" vem desligado). */
+      verdade("e é obrigada a sair colorida na impressora",
+        /<span[^>]*background:#F7FF3C[^>]*print-color-adjust:exact/.test(papel));
+      /* A COLUNA pintada no papel é montada dentro de `imprimirFrequencia`,
+         que abre janela — confere-se o código: fundo + a regra, juntos. */
+      verdade("a coluna do dia marcado também é obrigada a sair colorida",
+        html.includes("`;background:${t};-webkit-print-color-adjust:exact;print-color-adjust:exact`"));
+      verdade("…no cabeçalho e em cada linha da coluna",
+        html.includes('width:${diaW}%${fundo(d)}"') && html.includes('height:1rem${fundo(d)}"'));
+      verdade("o texto digitado não vira HTML no papel", papel.includes("&lt;b>nacional&lt;/b>") && !papel.includes("<b>nacional"));
+      ok("marca só de cor não gera linha de observação", (papel.match(/<tr>/g) || []).length, 2);
+      ok("sem observação nenhuma, a tabela termina no último nome",
+        imprimir(escA, [{ dia: "09", cor: "verde", obs: "" }], 6, "2099-09"), "");
+    }
+
   } catch (e) {
     falhou++;
     console.log(`\n    ✖ a suíte parou: ${e.message}`);

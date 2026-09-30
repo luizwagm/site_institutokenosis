@@ -24,7 +24,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.35.2";
+const SISTEMA_VERSION = "1.37.0";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -198,6 +198,21 @@ function proteger(tabela, obj) {
    que as entregou.
    ========================================================================== */
 const HISTORICO_VERSOES = [
+  { versao: "1.37.0", data: "2026-09-30", titulo: "Frequência: data marcada com cor e observação", mudancas: [
+    "Cada coluna de data da frequência pode ganhar uma cor de marca-texto — a coluna inteira fica pintada",
+    "Novo botão Observação de data: escolhe o dia, a cor e escreve o que houve (feriado, data programada)",
+    "As observações aparecem no fim da tabela, na tela e na folha impressa, com o dia por extenso",
+    "Seis cores fluorescentes para escolher; a coluna sai colorida também no papel",
+    "Corrigir o dia de uma coluna marcada leva a cor e a observação junto",
+    "Duplicar uma folha não copia as marcações: o feriado de um mês não é o do outro",
+  ] },
+  { versao: "1.36.0", data: "2026-09-29", titulo: "Tabelas sem barra lateral no computador", mudancas: [
+    "No computador, toda tabela cabe na largura da tela — sem barra de rolagem para o lado",
+    "A lista de presença da ata e a folha de frequência se ajustam às colunas, inclusive em notebook com zoom",
+    "CPF, data e número nunca se partem ao meio; nomes compridos quebram entre as palavras",
+    "Quando o espaço aperta, a tabela fica mais compacta em vez de escapar do cartão",
+    "No celular nada muda: a tabela continua rolando de lado, que é o que a mantém legível",
+  ] },
   { versao: "1.35.2", data: "2026-09-24", titulo: "O cabeçalho sai em todas as folhas", mudancas: [
     "Nas listas impressas, o cabeçalho das colunas passou a se repetir no alto de CADA página",
     "Antes ele saía só na primeira: da segunda em diante a relação era uma grade sem dizer o que era cada coluna",
@@ -518,6 +533,41 @@ const slugify = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").
 
    Devolve a mensagem de erro, ou null quando está tudo certo.
    ========================================================================== */
+/* ==========================================================================
+   FREQUÊNCIA — as DATAS MARCADAS (feriado, data programada) — 1.37.0
+
+   Uma marca por dia: cor de marca-texto na coluna e, se houver, a observação
+   que sai no rodapé da tabela impressa. Vem da tela como JSON, e é conferida
+   AQUI porque a tela qualquer um contorna:
+
+     · o dia tem de ser um dia (01–31), e vale um por dia — o último ganha;
+     · a cor é um NOME da paleta; nome desconhecido vira "sem cor", em vez de
+       recusar a folha inteira por um enfeite;
+     · a observação tem teto (vai para o papel, abaixo da tabela);
+     · marca sem cor E sem observação não é marca — some.
+
+   Devolve o JSON limpo, em ordem de dia.
+   ========================================================================== */
+const FREQ_CORES = ["amarelo", "verde", "ciano", "rosa", "laranja", "lilas"];
+const FREQ_OBS_MAX = 300;
+function normalizarMarcasFreq(valor) {
+  let lista = valor;
+  if (typeof lista === "string") { try { lista = JSON.parse(lista || "[]"); } catch { lista = []; } }
+  if (!Array.isArray(lista)) lista = [];
+  const porDia = new Map();
+  for (const m of lista) {
+    if (!m || typeof m !== "object" || Array.isArray(m)) continue;
+    const d = String(m.dia == null ? "" : m.dia).replace(/[^0-9]/g, "");
+    if (!d || +d < 1 || +d > 31) continue;
+    const cor = FREQ_CORES.includes(m.cor) ? m.cor : "";
+    const obs = String(m.obs == null ? "" : m.obs).replace(/\s+/g, " ").trim().slice(0, FREQ_OBS_MAX);
+    const dia = String(+d).padStart(2, "0");
+    if (!cor && !obs) { porDia.delete(dia); continue; }
+    porDia.set(dia, { dia, cor, obs });
+  }
+  return JSON.stringify([...porDia.values()].sort((a, b) => a.dia.localeCompare(b.dia)));
+}
+
 const ATA_MAX_PRESENTES = 300;   // uma folha de reunião; acima disso é engano ou abuso
 function normalizarAta(b, { exigirData } = {}) {
   if (b.titulo !== undefined) b.titulo = String(b.titulo || "").trim().slice(0, 200);
@@ -641,7 +691,7 @@ const TAB = {
      dado da folha; o local é o que distingue duas folhas da mesma turma no
      mesmo mês — sem ele, a lista mostra duas linhas idênticas e escolher qual
      abrir vira adivinhação. */
-  frequencias: ["turma", "mes", "local", "titulo", "datas", "participantes"],
+  frequencias: ["turma", "mes", "local", "titulo", "datas", "participantes", "marcas"],
   /* ATA — irmã da frequência (migration 012), e pela mesma razão de ser: o
      sistema monta a folha, o papel recebe as assinaturas. A diferença está na
      identidade: a frequência é de um MÊS com uma coluna por aula; a ata é de
@@ -1914,6 +1964,7 @@ async function rotaApi(req, res, p) {
            qualquer um contorna. */
         b.titulo = String(b.titulo || "").trim().slice(0, 200);
         b.local = String(b.local || "").trim().slice(0, 120);
+        b.marcas = normalizarMarcasFreq(b.marcas);
         if (!b.turma) return json(res, 400, { error: "Escolha a turma." });
         if (!/^\d{4}-\d{2}$/.test(b.mes)) return json(res, 400, { error: "Escolha o mês." });
       }
@@ -2039,6 +2090,7 @@ async function rotaApi(req, res, p) {
       if (tabela === "frequencias") {
         if (b.titulo !== undefined) b.titulo = String(b.titulo || "").trim().slice(0, 200);
         if (b.local !== undefined) b.local = String(b.local || "").trim().slice(0, 120);
+        if (b.marcas !== undefined) b.marcas = normalizarMarcasFreq(b.marcas);
       }
       /* A ata edita como cria. `exigirData` fica de fora porque o PUT pode
          trazer só um campo — mas a data que VIER é conferida do mesmo jeito:

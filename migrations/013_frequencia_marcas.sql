@@ -1,0 +1,23 @@
+-- ============================================================================
+-- FREQUÊNCIA — a DATA MARCADA (feriado, data programada)
+--
+-- A folha de papel sempre teve isso, à caneta: o dia em que não houve aula
+-- riscado de marca-texto, e embaixo da tabela "07 — feriado". Esta coluna é
+-- esse marca-texto.
+--
+-- `marcas` é uma lista JSON, como `datas` e `participantes`:
+--     [{"dia":"07","cor":"amarelo","obs":"Feriado — Independência"}, …]
+--
+-- A CHAVE É O DIA, e não a posição da coluna: os dias são reordenados ao
+-- gravar (crescente, sem repetido), então "a terceira coluna" de hoje pode ser
+-- a quarta amanhã — e a cor do feriado iria parar na aula do dia seguinte. O
+-- dia não muda de lugar.
+--
+-- A COR É UM NOME da paleta (amarelo, verde, ciano, rosa, laranja, lilas), não
+-- um código: o servidor aceita só os seis, e a tinta de cada um mora na tela —
+-- trocar um tom não exige mexer no que já foi gravado.
+--
+-- Cor e observação são independentes: dá para só pintar a coluna, ou só
+-- escrever a observação. Marca sem as duas não existe — é apagada.
+-- ============================================================================
+ALTER TABLE frequencias ADD COLUMN IF NOT EXISTS marcas TEXT NOT NULL DEFAULT '[]';
