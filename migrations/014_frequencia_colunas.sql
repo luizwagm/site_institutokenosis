@@ -1,0 +1,16 @@
+-- ============================================================================
+-- FREQUÊNCIA — quantas colunas de data a folha tem (1.38.0)
+--
+-- Eram DEZ, fixas no código (FREQ_COLS): "duas aulas por semana, 8 a 10 dias
+-- conforme o mês". Bastou um mês com ações a mais para não caber — e a equipe
+-- precisa tanto ACRESCENTAR colunas quanto TIRAR as que sobram.
+--
+-- O número mora na FOLHA, e não é deduzido dos dias digitados: uma folha
+-- montada no começo do mês com doze colunas e só três datas preenchidas tem de
+-- reabrir com doze, e não com três.
+--
+-- 10 por padrão: é o que toda folha já existente tinha na tela, então nenhuma
+-- muda de cara com esta migração. O teto (31, os dias do mês) e o piso (1)
+-- são conferidos no servidor, que é quem recebe da tela.
+-- ============================================================================
+ALTER TABLE frequencias ADD COLUMN IF NOT EXISTS colunas INTEGER NOT NULL DEFAULT 10;

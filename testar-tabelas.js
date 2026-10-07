@@ -110,13 +110,16 @@ function tabelaAta() {
       + `<td style="text-align:center"><input type="checkbox" class="freq-sel"></td></tr>`).join("")
     + `</tbody></table>`;
 }
-function tabelaFreq() {
-  const dias = ["01", "03", "08", "10", "15", "17", "22", "24", "29", "30"]
-    .map((d) => `<th class="freq-dia"><input maxlength="2" value="${d}"></th>`).join("");
+/* A folha de frequência como pintarFrequencia() a monta desde a 1.38.0: o ×
+   de tirar em cada coluna, a bolinha da cor e o "+" no fim. `n` colunas: a
+   folha agora pode ter de 1 a 31 — e a de 31 é a que mais aperta. */
+function tabelaFreq(n = 10) {
+  const dias = Array.from({ length: n }, (_, i) => String(i + 1).padStart(2, "0"))
+    .map((d) => `<th class="freq-dia"><button type="button" class="freq-tirar">×</button><input maxlength="2" value="${d}"><button type="button" class="freq-cor"></button></th>`).join("");
   return `<table class="freq-tab"><thead><tr><th class="col-nome" style="text-align:left">Nome</th><th>CPF</th><th>Nº</th>`
-    + `${dias}<th style="width:2.4rem"></th></tr></thead><tbody>`
-    + NOMES.map((n, i) => `<tr><td>${n}</td><td class="c-inteiro">123.456.789-00</td><td class="freq-num">0${i + 1}</td>`
-      + `<td class="freq-cel"></td>`.repeat(10) + `<td><input type="checkbox" class="freq-sel"></td></tr>`).join("")
+    + `${dias}<th class="freq-mais"><button type="button">+</button></th><th style="width:2.4rem"></th></tr></thead><tbody>`
+    + NOMES.map((nome, i) => `<tr><td>${nome}</td><td class="c-inteiro">123.456.789-00</td><td class="freq-num">0${i + 1}</td>`
+      + `<td class="freq-cel"></td>`.repeat(n) + `<td class="freq-mais"></td><td><input type="checkbox" class="freq-sel"></td></tr>`).join("")
     + `</tbody></table>`;
 }
 function tabelaAuditoria() {
@@ -145,7 +148,7 @@ if (!chrome) {
   try {
     const blocos = [];
     for (const w of LARGURAS) {
-      for (const [nome, tab] of [["ata", tabelaAta()], ["frequência", tabelaFreq()], ["auditoria", tabelaAuditoria()], ["lista", tabelaLista()]]) {
+      for (const [nome, tab] of [["ata", tabelaAta()], ["frequência", tabelaFreq()], ["frequência de 20 colunas", tabelaFreq(20)], ["frequência de 31 colunas", tabelaFreq(31)], ["auditoria", tabelaAuditoria()], ["lista", tabelaLista()]]) {
         blocos.push(`<div class="card" data-caso="${nome} em ${w}px" style="width:${w}px;padding:0;overflow:auto">${tab}</div>`);
       }
     }
@@ -169,7 +172,7 @@ if (!chrome) {
             cpf: Math.max(0, ...[...c.querySelectorAll("td.c-inteiro")].map(linhas)),
             data: Math.max(0, ...[...c.querySelectorAll("td.c-data")].map(linhas)),
             diaCortado: [...c.querySelectorAll(".freq-dia input")].some((i) => i.scrollWidth > i.clientWidth + 1),
-            degrau: t.classList.contains("tab-minima") ? 4 : t.classList.contains("tab-compacta") ? 3
+            degrau: t.classList.contains("tab-micro") ? 5 : t.classList.contains("tab-minima") ? 4 : t.classList.contains("tab-compacta") ? 3
               : t.classList.contains("tab-aperta") ? 2 : 1,
           };
         }),
@@ -186,7 +189,15 @@ if (!chrome) {
     if (res) {
       verdade("o navegador conta como COMPUTADOR (mouse)", res.pc);
       for (const c of res.casos) {
-        verdade(`${c.caso}: cabe no cartão, sem barra lateral`, c.sobra <= 1, `passa ${c.sobra}px (degrau ${c.degrau})`);
+        /* (1.38.0) Folha de frequência com MUITAS colunas num cartão estreito:
+           31 dias em 711px deixam ~14px por dia, e não existe campo legível
+           desse tamanho. Ali o combinado é outro — o último degrau (micro), e a
+           rolagem lateral só DENTRO do cartão, nunca na página. A conta de onde
+           cabe: 31 colunas a partir de 1015px, 20 a partir de 711px. */
+        const larg = Number((/em ([0-9]+)px/.exec(c.caso) || [])[1]);
+        const impossivel = (/de 31 colunas/.test(c.caso) && larg < 1015) || (/de 20 colunas/.test(c.caso) && larg < 711);
+        if (impossivel) verdade(`${c.caso}: não cabe — vai ao último degrau e rola DENTRO do cartão`, c.degrau === 5, `degrau ${c.degrau}`);
+        else verdade(`${c.caso}: cabe no cartão, sem barra lateral`, c.sobra <= 1, `passa ${c.sobra}px (degrau ${c.degrau})`);
         if (c.cpf) verdade(`${c.caso}: o CPF numa linha só`, c.cpf === 1, `${c.cpf} linhas`);
         if (c.data) verdade(`${c.caso}: a data numa linha só`, c.data === 1, `${c.data} linhas`);
         if (/frequência/.test(c.caso)) verdade(`${c.caso}: o dia ainda cabe no campo`, !c.diaCortado);

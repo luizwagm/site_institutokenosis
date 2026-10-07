@@ -77,7 +77,8 @@ verdade("a agenda põe o dia num <thead> para repetir",
 /* Frequência e ata já nasceram certas (1.33 e 1.35). A prova existe para que
    continuem assim: as duas são folhas assinadas fora do sistema. */
 verdade("a folha de frequência mantém o cabeçalho em <thead>",
-  /table-layout:fixed;font-size:\.82rem">\$\{colgroup\}<thead>/.test(html));
+  /* (1.38.0) a letra da folha agora varia com o número de colunas: \${fonte} */
+  /table-layout:fixed;font-size:(\.82rem|\$\{fonte\})">\$\{colgroup\}<thead>/.test(html));
 verdade("a ata mantém o cabeçalho em <thead>",
   /table-layout:fixed;font-size:\.86rem">\$\{colgroup\}<thead>/.test(html));
 

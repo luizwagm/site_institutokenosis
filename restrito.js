@@ -24,7 +24,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.37.0";
+const SISTEMA_VERSION = "1.38.0";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -198,6 +198,13 @@ function proteger(tabela, obj) {
    que as entregou.
    ========================================================================== */
 const HISTORICO_VERSOES = [
+  { versao: "1.38.0", data: "2026-10-07", titulo: "Frequência: pôr e tirar colunas de data", mudancas: [
+    "A folha de frequência deixou de ter dez colunas fixas: o botão + no fim dos dias acrescenta uma coluna",
+    "O × no alto de cada coluna de data a retira; com dia ou cor digitados, pergunta antes",
+    "De 1 a 31 colunas por folha — os dias do mês — e a quantidade fica salva com a folha",
+    "Na tela, até 31 colunas cabem sem barra lateral num computador comum; a letra diminui um pouco nas folhas cheias",
+    "Na impressão, as colunas de data dividem o espaço da folha, e o Nome continua legível",
+  ] },
   { versao: "1.37.0", data: "2026-09-30", titulo: "Frequência: data marcada com cor e observação", mudancas: [
     "Cada coluna de data da frequência pode ganhar uma cor de marca-texto — a coluna inteira fica pintada",
     "Novo botão Observação de data: escolhe o dia, a cor e escreve o que houve (feriado, data programada)",
@@ -548,6 +555,23 @@ const slugify = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").
 
    Devolve o JSON limpo, em ordem de dia.
    ========================================================================== */
+/* QUANTAS COLUNAS DE DATA a folha tem (1.38.0, migration 014): de 1 a 31 —
+   os dias de um mês. Nunca menos que as datas que vieram junto: uma folha com
+   doze dias preenchidos e "10 colunas" esconderia duas aulas na tela. Vazio ou
+   lixo vira 10, o número de sempre. */
+function normalizarColunasFreq(valor, datas) {
+  let n = Math.trunc(Number(valor));
+  if (!Number.isFinite(n) || valor === null || valor === "") n = 10;
+  else if (n < 1) n = 1;
+  let preenchidas = 0;
+  if (datas !== undefined) {
+    let l = datas;
+    if (typeof l === "string") { try { l = JSON.parse(l || "[]"); } catch { l = []; } }
+    if (Array.isArray(l)) preenchidas = l.filter((d) => String(d == null ? "" : d).trim()).length;
+  }
+  return Math.min(31, Math.max(n, preenchidas, 1));
+}
+
 const FREQ_CORES = ["amarelo", "verde", "ciano", "rosa", "laranja", "lilas"];
 const FREQ_OBS_MAX = 300;
 function normalizarMarcasFreq(valor) {
@@ -691,7 +715,7 @@ const TAB = {
      dado da folha; o local é o que distingue duas folhas da mesma turma no
      mesmo mês — sem ele, a lista mostra duas linhas idênticas e escolher qual
      abrir vira adivinhação. */
-  frequencias: ["turma", "mes", "local", "titulo", "datas", "participantes", "marcas"],
+  frequencias: ["turma", "mes", "local", "titulo", "datas", "participantes", "marcas", "colunas"],
   /* ATA — irmã da frequência (migration 012), e pela mesma razão de ser: o
      sistema monta a folha, o papel recebe as assinaturas. A diferença está na
      identidade: a frequência é de um MÊS com uma coluna por aula; a ata é de
@@ -1965,6 +1989,7 @@ async function rotaApi(req, res, p) {
         b.titulo = String(b.titulo || "").trim().slice(0, 200);
         b.local = String(b.local || "").trim().slice(0, 120);
         b.marcas = normalizarMarcasFreq(b.marcas);
+        b.colunas = normalizarColunasFreq(b.colunas, b.datas);
         if (!b.turma) return json(res, 400, { error: "Escolha a turma." });
         if (!/^\d{4}-\d{2}$/.test(b.mes)) return json(res, 400, { error: "Escolha o mês." });
       }
@@ -2091,6 +2116,7 @@ async function rotaApi(req, res, p) {
         if (b.titulo !== undefined) b.titulo = String(b.titulo || "").trim().slice(0, 200);
         if (b.local !== undefined) b.local = String(b.local || "").trim().slice(0, 120);
         if (b.marcas !== undefined) b.marcas = normalizarMarcasFreq(b.marcas);
+        if (b.colunas !== undefined) b.colunas = normalizarColunasFreq(b.colunas, b.datas);
       }
       /* A ata edita como cria. `exigirData` fica de fora porque o PUT pode
          trazer só um campo — mas a data que VIER é conferida do mesmo jeito:

@@ -654,6 +654,18 @@
 
     /* FREQUÊNCIA — a data marcada (1.37.0). A bolinha embaixo do dia é o
        marca-texto daquela coluna; as observações moram no fim da tabela. */
+    /* (1.38.0) Tirar e pôr coluna de data. O × fica no canto de cima da
+       coluna, num respiro próprio (padding-top), para não montar em cima do
+       campo do dia. */
+    th.freq-dia{position:relative;padding-top:1.05rem}
+    .freq-tirar{position:absolute;top:2px;right:2px;width:1rem;height:1rem;padding:0;border:0;border-radius:50%;
+      background:none;color:#9aa6bd;font-size:.95rem;line-height:1;cursor:pointer}
+    .freq-tirar:hover,.freq-tirar:focus-visible{color:#b3261e;background:#fdecee}
+    th.freq-mais,td.freq-mais{width:2.3rem;text-align:center;padding-left:.15rem;padding-right:.15rem}
+    .freq-mais button{width:1.8rem;height:1.8rem;padding:0;border:1.5px dashed #9aa6bd;border-radius:7px;
+      background:#fff;color:var(--celeste);font-size:1.15rem;font-weight:700;line-height:1;cursor:pointer}
+    .freq-mais button:hover:not(:disabled){border-style:solid;border-color:var(--celeste)}
+    .freq-mais button:disabled{opacity:.35;cursor:not-allowed}
     .freq-cor{display:block;width:1.05rem;height:1.05rem;margin:.25rem auto 0;padding:0;border-radius:50%;
       border:1.5px solid #9aa6bd;background:#fff;cursor:pointer}
     .freq-cor.tem{border-color:#232733}
@@ -719,6 +731,18 @@
       .tab-minima th{font-size:.64rem}
       .tab-minima .freq-dia{padding-left:.1rem;padding-right:.1rem}
       .tab-minima .freq-dia input{width:1.6rem;font-size:.76rem}
+      /* (1.38.0) O QUINTO DEGRAU existe por causa da folha de frequência com
+         colunas livres: 31 colunas numa tela de 1366 deixam ~24px por dia.
+         Dois algarismos cabem em 1.2rem com a letra a .68rem. Abaixo disso não
+         há campo legível — a folha rola de lado DENTRO do cartão, último recurso. */
+      .tab-micro th,.tab-micro td{padding:.25rem .12rem;font-size:.7rem}
+      .tab-micro th{font-size:.6rem;letter-spacing:0}
+      .tab-micro th.freq-dia{padding:.85rem .05rem .2rem}
+      .tab-micro .freq-dia input{width:1.2rem;font-size:.68rem;padding:.15rem 0;border-width:1px}
+      .tab-micro .freq-cor{width:.8rem;height:.8rem}
+      .tab-micro .freq-tirar{width:.8rem;height:.8rem;font-size:.75rem;top:1px;right:0}
+      .tab-micro th.freq-mais,.tab-micro td.freq-mais{width:1.6rem}
+      .tab-micro .freq-mais button{width:1.3rem;height:1.3rem;font-size:.9rem}
     }
 
   </style>
@@ -984,6 +1008,7 @@
         <p class="ajuda" style="margin:.7rem 0 0">Digite os <b>dias do mês</b> das aulas nos cabeçalhos das colunas
           (deixe em branco as que não usar). As células ficam vazias de propósito — são as assinaturas, no papel.
           Escolher um usuário no seletor acrescenta a linha na hora; a lista sai em ordem alfabética, numerada.<br>
+          O <b>+</b> no fim dos dias acrescenta uma coluna (até 31); o <b>×</b> no alto de cada uma a retira.<br>
           A <b>bolinha</b> embaixo de cada dia pinta a coluna inteira (feriado, data programada) e guarda uma
           <b>observação</b> daquela data — ela aparece no fim da tabela, também na impressão.</p>
       </div>
@@ -2176,6 +2201,9 @@ async function iniciarApp(me){
      3. .tab-compacta .... menos respiro e letra menor
      4. .tab-minima ...... o limite legível (a frequência, com dez colunas de
                            dia, numa janela estreita com a lateral aberta)
+     5. .tab-micro ....... (1.38.0) a folha de frequência com muitas colunas
+                           (até 31). Se nem assim couber, ela rola de lado
+                           DENTRO do cartão — dia ilegível seria pior.
 
    Mede de novo quando a tela muda (lista repintada, painel aberto, janela
    redimensionada) — logo depois da mudança, ANTES de o navegador desenhar,
@@ -2193,7 +2221,7 @@ function tabelaCabe(t){
 function ajustarTabelas(){
   const tabelas = [...document.querySelectorAll("table")];
   for(const t of tabelas){
-    t.classList.remove("tab-aperta", "tab-compacta", "tab-minima");
+    t.classList.remove("tab-aperta", "tab-compacta", "tab-minima", "tab-micro");
     t.querySelectorAll("td.quebra-tudo").forEach((c)=>c.classList.remove("quebra-tudo"));
   }
   if(!TELA_PC.matches) return;
@@ -2205,6 +2233,8 @@ function ajustarTabelas(){
     t.classList.add("tab-compacta");
     if(tabelaCabe(t)) continue;
     t.classList.add("tab-minima");
+    if(tabelaCabe(t)) continue;
+    t.classList.add("tab-micro");
   }
 }
 /* As próprias trocas de classe feitas acima (na tabela e nas células) não
@@ -3542,7 +3572,13 @@ function freqTituloOpcoes(atual){
 }
 /* As turmas são de hora em hora, das 07h às 20h — 13 opções fixas. */
 const FREQ_TURMAS = Array.from({length:13},(_,i)=>`${String(7+i).padStart(2,"0")}h às ${String(8+i).padStart(2,"0")}h`);
-const FREQ_COLS = 10;      // duas aulas por semana: 8 a 10 dias conforme o mês
+const FREQ_COLS = 10;      // colunas de uma folha NOVA: duas aulas por semana, 8 a 10 dias
+/* (1.38.0) O número de colunas é DA FOLHA (migration 014): um mês com ações a
+   mais ganha colunas, e as que sobram saem. De 1 a 31 — os dias do mês. */
+const FREQ_MAX_COLS = 31;
+const freqCols = ()=> (FREQ && FREQ.colunas) || FREQ_COLS;
+/* Folha salva: o número dela, mas nunca menos que as datas que ela tem. */
+const freqColunasDe = (f)=> Math.min(FREQ_MAX_COLS, Math.max(Number(f.colunas) || FREQ_COLS, freqArr(f.datas).length, 1));
 let FREQ = null;           // a folha aberta {id, turma, mes, titulo, local, datas[], participantes[], marcas[]}
 
 /* ==========================================================================
@@ -3680,7 +3716,7 @@ function criarFolhaDoForm(){
      primeiro item da lista, em silêncio. */
   $("#freq-titulo").innerHTML=freqTituloOpcoes(titulo);
   $("#freq-titulo").value=titulo; $("#freq-local").value=local;
-  FREQ={ id:0, turma, mes, titulo, local, datas:[], participantes:[], marcas:[] };
+  FREQ={ id:0, turma, mes, titulo, local, datas:[], participantes:[], marcas:[], colunas:FREQ_COLS };
   FREQ_SUJO=false; FREQ_SEL.clear();
   $("#freq-status").textContent="";
   pintarModoFolha(); pintarFrequencia(); pintarListaFolhas();
@@ -3727,18 +3763,24 @@ function pintarFrequencia(){
     .sort((a,b)=>String(a.nome).localeCompare(String(b.nome),"pt-BR"))
     .map((p)=>p.id);
   const dias=[];
-  for(let i=0;i<FREQ_COLS;i++)
-    dias.push(`<th class="freq-dia" data-c="${i}"><input maxlength="2" inputmode="numeric" value="${escA(FREQ.datas[i]||"")}" placeholder="—" onchange="mudarDataFreq(${i},this)">`
+  const nCols=freqCols();
+  for(let i=0;i<nCols;i++)
+    dias.push(`<th class="freq-dia" data-c="${i}">`
+      + (nCols>1 ? `<button type="button" class="freq-tirar" onclick="tirarColunaFreq(${i})" title="Tirar esta coluna" aria-label="Tirar a coluna ${i+1}">×</button>` : "")
+      + `<input maxlength="2" inputmode="numeric" value="${escA(FREQ.datas[i]||"")}" placeholder="—" onchange="mudarDataFreq(${i},this)">`
       + `<button type="button" class="freq-cor" data-c="${i}" onclick="modalMarcaFreq(freqDia2(FREQ.datas[${i}]))"></button></th>`);
-  $("#freq-thead").innerHTML = `<tr><th class="col-nome" style="text-align:left">Nome</th><th>CPF</th><th>Nº</th>${dias.join("")}<th style="width:2.4rem"></th></tr>`;
+  /* O "+" mora no FIM dos dias: é ali que o olho procura a próxima coluna. */
+  const mais = `<th class="freq-mais"><button type="button" onclick="porColunaFreq()"${nCols>=FREQ_MAX_COLS?" disabled":""}
+    title="${nCols>=FREQ_MAX_COLS?"A folha já tem 31 colunas — os dias do mês":"Acrescentar uma coluna de data"}" aria-label="Acrescentar uma coluna de data">+</button></th>`;
+  $("#freq-thead").innerHTML = `<tr><th class="col-nome" style="text-align:left">Nome</th><th>CPF</th><th>Nº</th>${dias.join("")}${mais}<th style="width:2.4rem"></th></tr>`;
 
   /* A seleção sobrevive à repintura (acrescentar alguém não desmarca os já
      marcados), mas nunca guarda quem saiu da folha. */
   FREQ_SEL = new Set([...FREQ_SEL].filter((id)=>FREQ.participantes.some((x)=>String(x)===String(id))));
   const linhas = FREQ.participantes.map(freqPessoa);
   $("#freq-tbody").innerHTML = linhas.length
-    ? linhas.map((p,i)=>`<tr><td>${escA(p.nome)}</td><td class="c-inteiro">${escA(p.cpf||"—")}</td><td class="freq-num">${String(i+1).padStart(2,"0")}</td>${Array.from({length:FREQ_COLS},(_,c)=>`<td class="freq-cel" data-c="${c}"></td>`).join("")}<td style="text-align:center"><input type="checkbox" class="freq-sel"${FREQ_SEL.has(String(p.id))?" checked":""} onchange="freqMarcar('${p.id}',this.checked)" title="Selecionar para remover"></td></tr>`).join("")
-    : `<tr><td class="vazio" colspan="${FREQ_COLS+4}">Nenhum usuário na folha — escolha em "Adicionar usuário".</td></tr>`;
+    ? linhas.map((p,i)=>`<tr><td>${escA(p.nome)}</td><td class="c-inteiro">${escA(p.cpf||"—")}</td><td class="freq-num">${String(i+1).padStart(2,"0")}</td>${Array.from({length:nCols},(_,c)=>`<td class="freq-cel" data-c="${c}"></td>`).join("")}<td class="freq-mais"></td><td style="text-align:center"><input type="checkbox" class="freq-sel"${FREQ_SEL.has(String(p.id))?" checked":""} onchange="freqMarcar('${p.id}',this.checked)" title="Selecionar para remover"></td></tr>`).join("")
+    : `<tr><td class="vazio" colspan="${nCols+5}">Nenhum usuário na folha — escolha em "Adicionar usuário".</td></tr>`;
   pintarSelecaoFreq();
   pintarMarcasFreq();
 
@@ -3752,7 +3794,7 @@ function pintarFrequencia(){
    perderia o foco dez vezes. */
 function pintarMarcasFreq(){
   if(!FREQ) return;
-  for(let c=0;c<FREQ_COLS;c++){
+  for(let c=0;c<freqCols();c++){
     const dia=freqDia2(FREQ.datas[c]);
     const m=dia ? freqMarca(dia) : null;
     const tinta=m ? freqTinta(m.cor) : "";
@@ -3773,9 +3815,37 @@ function pintarMarcasFreq(){
   const comObs=freqMarcasValidas(FREQ.marcas, freqDatas()).filter((m)=>m.obs);
   if(!comObs.length) return;
   tb.insertAdjacentHTML("beforeend",
-    `<tr class="freq-obs-tit"><td colspan="${FREQ_COLS+4}">Observações</td></tr>`+
+    `<tr class="freq-obs-tit"><td colspan="${freqCols()+5}">Observações</td></tr>`+
     comObs.map((m)=>`<tr class="freq-obs-linha" onclick="modalMarcaFreq('${m.dia}')" title="Clique para alterar">
-      <td colspan="${FREQ_COLS+4}"><span class="freq-pastilha" style="background:${freqTinta(m.cor)||"#fff"}"></span><b>Dia ${m.dia}</b> — ${escA(m.obs)}</td></tr>`).join(""));
+      <td colspan="${freqCols()+5}"><span class="freq-pastilha" style="background:${freqTinta(m.cor)||"#fff"}"></span><b>Dia ${m.dia}</b> — ${escA(m.obs)}</td></tr>`).join(""));
+}
+
+/* Pôr coluna: no fim, já com o cursor no dia novo — quem acrescenta coluna
+   vai digitar a data em seguida. */
+function porColunaFreq(){
+  if(!FREQ) return;
+  if(freqCols()>=FREQ_MAX_COLS) return toast("A folha já tem 31 colunas — os dias do mês.", true);
+  FREQ.colunas=freqCols()+1; FREQ_SUJO=true;
+  pintarFrequencia();
+  const ins=document.querySelectorAll("#freq-thead .freq-dia input");
+  if(ins.length) ins[ins.length-1].focus();
+}
+/* Tirar coluna: a coluna SAI (as da direita andam uma casa), e com ela a data.
+   A cor e a observação daquele dia saem junto, a menos que o mesmo dia ainda
+   esteja noutra coluna. Coluna com dia ou marca pergunta antes — coluna vazia
+   sai direto, que é o caso de quem só está enxugando a folha. */
+function tirarColunaFreq(i){
+  if(!FREQ) return;
+  if(freqCols()<=1) return toast("A folha precisa de pelo menos uma coluna de data.", true);
+  const dia=freqDia2(FREQ.datas[i]);
+  const ficaNoutra=dia && FREQ.datas.some((d,j)=>j!==i && freqDia2(d)===dia);
+  const m=dia && !ficaNoutra ? freqMarca(dia) : null;
+  if(dia && !confirm(`Tirar a coluna do dia ${dia}?` + (m ? "\n\nA cor e a observação desse dia saem junto." : "")
+      + "\n\nA folha só muda de verdade depois do Salvar.")) return;
+  FREQ.datas.splice(i,1);
+  if(m) FREQ.marcas=(FREQ.marcas||[]).filter((x)=>x.dia!==dia);
+  FREQ.colunas=freqCols()-1; FREQ_SUJO=true;
+  pintarFrequencia();
 }
 
 function mudarDataFreq(i, campo){
@@ -3903,7 +3973,7 @@ async function salvarFrequencia(){
   const corpo={ turma:FREQ.turma, mes:FREQ.mes,
     titulo:FREQ.titulo||"", local:FREQ.local||"",
     datas:JSON.stringify(freqDatas()), participantes:JSON.stringify(FREQ.participantes),
-    marcas:JSON.stringify(freqMarcasValidas(FREQ.marcas, freqDatas())) };
+    marcas:JSON.stringify(freqMarcasValidas(FREQ.marcas, freqDatas())), colunas:freqCols() };
   btn.disabled=true;
   try{
     if(FREQ.id) await api("frequencias/"+FREQ.id,"PUT",corpo);
@@ -4056,7 +4126,7 @@ function duplicarFolha(id){
   /* As MARCAS não vêm na cópia: a cópia é para outro mês, e o feriado do dia
      07 de setembro pintaria — calado — o dia 07 de outubro. */
   FREQ={ id:0, turma:f.turma, mes:f.mes, titulo:f.titulo||"", local:f.local||"",
-         datas:freqArr(f.datas), participantes:freqArr(f.participantes), marcas:[] };
+         datas:freqArr(f.datas), participantes:freqArr(f.participantes), marcas:[], colunas:freqColunasDe(f) };
   FREQ_SEL.clear();
   FREQ_SUJO=true;
   pintarModoFolha();      // é uma folha nova com conteúdo — sair sem salvar perde
@@ -4076,7 +4146,7 @@ function abrirFolhaSalva(id){
   $("#freq-titulo").innerHTML=freqTituloOpcoes(f.titulo||"");
   $("#freq-titulo").value=f.titulo||""; $("#freq-local").value=f.local||"";
   FREQ={ id:f.id, turma:f.turma, mes:f.mes, titulo:f.titulo||"", local:f.local||"",
-         datas:freqArr(f.datas), participantes:freqArr(f.participantes), marcas:freqMarcasDe(f.marcas) };
+         datas:freqArr(f.datas), participantes:freqArr(f.participantes), marcas:freqMarcasDe(f.marcas), colunas:freqColunasDe(f) };
   FREQ_SEL.clear();
   FREQ_SUJO=false; $("#freq-status").textContent="";
   pintarModoFolha();
@@ -4107,6 +4177,17 @@ function observacoesImpressas(marcas, nCols, mes){
   return `<tr><td colspan="${nCols}" style="${cel};font-weight:700;color:#232733;background:#f4f7fb;-webkit-print-color-adjust:exact;print-color-adjust:exact">Observações</td></tr>`+
     comObs.map((m)=>`<tr><td colspan="${nCols}" style="${cel}"><span style="display:inline-block;width:.8rem;height:.8rem;border:1px solid #6b7280;vertical-align:-.1rem;margin-right:.4rem;background:${freqTinta(m.cor)||"#fff"};-webkit-print-color-adjust:exact;print-color-adjust:exact"></span><b>Dia ${m.dia}${mm?"/"+mm:""}</b> — ${escA(m.obs)}</td></tr>`).join("");
 }
+/* AS LARGURAS DA FOLHA IMPRESSA (1.38.0). Com dez dias fixos bastava 4,5% por
+   dia. Com colunas livres, a mesma conta dava ao Nome largura NEGATIVA a partir
+   de dezoito dias — a tabela desmontava no papel. Agora os dias dividem o que
+   sobra depois de garantir ao Nome um quarto da folha, e a letra diminui um
+   pouco nas folhas muito cheias. Soma sempre 100. */
+function larguraColunasFreq(n){
+  const cpfW=12, numW=4, nomeMin=25;
+  const diaW = n<=10 ? 4.5 : Math.max(1.6, Math.min(4.5, (100 - cpfW - numW - nomeMin) / n));
+  const nomeW = +(100 - cpfW - numW - diaW*n).toFixed(1);
+  return { diaW:+diaW.toFixed(2), cpfW, numW, nomeW, fonte: n>20 ? ".72rem" : n>14 ? ".78rem" : ".82rem" };
+}
 function imprimirFrequencia(folha){
   const dias=normalizarDias(folha.datas);
   const linhas=folha.participantes.map(freqPessoa)
@@ -4118,8 +4199,7 @@ function imprimirFrequencia(folha){
      com percentual é que são infladas para fechar a tabela, e o Nome ficou
      com 15px (uma letra por linha). Dia e Nº são estreitos (dois dígitos),
      CPF cabe justo (000.000.000-00) e o Nome leva todo o resto. */
-  const diaW=4.5, cpfW=12, numW=4;
-  const nomeW=(100 - cpfW - numW - diaW*dias.length).toFixed(1);
+  const { diaW, cpfW, numW, nomeW, fonte } = larguraColunasFreq(dias.length);
   const negrito=bordas+';font-weight:700;color:#232733';
   /* A DATA MARCADA no papel: a coluna sai pintada de cima a baixo. O navegador
      NÃO imprime fundo por padrão ("gráficos de plano de fundo" desligado) — o
@@ -4156,7 +4236,7 @@ function imprimirFrequencia(folha){
      dizendo quais são as datas, sem ninguém voltar à primeira folha. */
   /* Sem título no corpo (ele já mora no thead); o da janela continua. */
   abrirImpressao("",
-    `<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:.82rem">${colgroup}<thead>${cabecalhoFolha}${cab}</thead><tbody>${corpo}</tbody></table>`,
+    `<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:${fonte}">${colgroup}<thead>${cabecalhoFolha}${cab}</thead><tbody>${corpo}</tbody></table>`,
     { paisagem:true, tituloJanela:freqTitulo(folha)+" — "+ondeQuando });
 }
 

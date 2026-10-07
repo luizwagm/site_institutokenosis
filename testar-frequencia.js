@@ -482,6 +482,66 @@ function pedir(caminho, metodo = "GET", corpo = null) {
         imprimir(escA, [{ dia: "09", cor: "verde", obs: "" }], 6, "2099-09"), "");
     }
 
+    /* ====================================================================
+       10. PÔR E TIRAR COLUNAS DE DATA (1.38.0)
+
+       Eram dez colunas fixas no código. Agora o número é DA FOLHA: um mês com
+       ações a mais ganha colunas, e as que sobram saem. 1 a 31.
+       ==================================================================== */
+    console.log("\n  10. a folha com o número de colunas dela");
+    {
+      const cols10 = (await Q.all(
+        `SELECT column_name FROM information_schema.columns
+           WHERE table_schema='public' AND table_name='frequencias'`)).map((c) => c.column_name);
+      verdade("a coluna `colunas` existe", cols10.includes("colunas"));
+
+      const base10 = { turma: "10h às 11h", mes: "2099-10", titulo: `${MARCA} — Colunas`, local: "ZZ QA",
+                       datas: "[\"02\",\"07\"]", participantes: "[]" };
+      const colunasDe = async (id) => {
+        const l = (await pedir("/restrito/api/frequencias")).json || [];
+        return Number((l.find((x) => x.id === id) || {}).colunas);
+      };
+      const nova = await pedir("/restrito/api/frequencias", "POST", base10);
+      if (nova.json && nova.json.id) folhas.push(nova.json.id);
+      ok("folha sem o número de colunas nasce com 10 (o de sempre)", await colunasDe(nova.json.id), 10);
+
+      const doze = await pedir("/restrito/api/frequencias", "POST", Object.assign({}, base10, { colunas: 14 }));
+      if (doze.json && doze.json.id) folhas.push(doze.json.id);
+      ok("folha com 14 colunas guarda as 14", await colunasDe(doze.json.id), 14);
+
+      await pedir(`/restrito/api/frequencias/${doze.json.id}`, "PUT", { colunas: 6 });
+      ok("tirar colunas depois de salva: 6", await colunasDe(doze.json.id), 6);
+      await pedir(`/restrito/api/frequencias/${doze.json.id}`, "PUT", { local: "ZZ QA Outro" });
+      ok("mudar outra coisa não mexe no número de colunas", await colunasDe(doze.json.id), 6);
+
+      /* O que a tela não mandaria, mandado direto à rota. */
+      await pedir(`/restrito/api/frequencias/${doze.json.id}`, "PUT", { colunas: 99 });
+      ok("mais que 31 (os dias do mês) é cortado em 31", await colunasDe(doze.json.id), 31);
+      await pedir(`/restrito/api/frequencias/${doze.json.id}`, "PUT", { colunas: 0 });
+      ok("zero vira 1 — a folha precisa de uma coluna de data", await colunasDe(doze.json.id), 1);
+      await pedir(`/restrito/api/frequencias/${doze.json.id}`, "PUT", { colunas: "abc" });
+      ok("lixo vira 10", await colunasDe(doze.json.id), 10);
+      await pedir(`/restrito/api/frequencias/${doze.json.id}`, "PUT",
+        { colunas: 3, datas: JSON.stringify(["01", "02", "03", "04", "05"]) });
+      ok("nunca menos colunas que as datas que vieram junto (5 datas, \"3 colunas\" → 5)", await colunasDe(doze.json.id), 5);
+
+      /* --------------- a folha impressa: as larguras com 10, 20 e 31 dias */
+      const fs = require("node:fs");
+      const html = fs.readFileSync(path.join(__dirname, "restrito", "app.html"), "utf8");
+      const fonte = /function larguraColunasFreq\(n\)\{([\s\S]*?)\n\}/.exec(html);
+      verdade("a conta das larguras da folha impressa existe", !!fonte);
+      const larguras = new Function("n", fonte[1]);
+      for (const n of [1, 10, 14, 20, 31]) {
+        const w = larguras(n);
+        const soma = w.nomeW + w.cpfW + w.numW + w.diaW * n;
+        verdade(`${n} dia(s): as colunas somam 100% da folha`, Math.abs(soma - 100) < 0.2, String(soma));
+        verdade(`${n} dia(s): o Nome fica com pelo menos um quarto da folha`, w.nomeW >= 24.9, String(w.nomeW));
+      }
+      ok("com dez dias, a folha sai igual a antes (4,5% por dia, letra .82rem)",
+        [larguras(10).diaW, larguras(10).fonte], [4.5, ".82rem"]);
+      verdade("com 31 dias, a letra diminui", larguras(31).fonte === ".72rem");
+    }
+
   } catch (e) {
     falhou++;
     console.log(`\n    ✖ a suíte parou: ${e.message}`);
