@@ -287,10 +287,100 @@ function iniConsentimento() {
   else if (escolha === "aceito") carregarMedicao();
 }
 
+/* ------------------------ Transparência por ano (2.15.0) -----------------
+   Sem script, todos os anos ficam à vista, um embaixo do outro — a página
+   continua inteira e legível. Com ele, aparece só o ano escolhido. O ano vai
+   no endereço (#ano-2026), então o link copiado abre no ano certo; e um link
+   para uma publicação (#doc-12) abre o ano dela, já com ela aberta. */
+function iniTransparencia() {
+  const abas = $$(".transp-anos__ano");
+  if (!abas.length) return;
+  const mostrar = (id, rolar) => {
+    const alvo = abas.find((a) => a.getAttribute("aria-controls") === id) || abas[0];
+    abas.forEach((a) => {
+      const sim = a === alvo;
+      a.setAttribute("aria-selected", String(sim));
+      a.tabIndex = sim ? 0 : -1;
+      const painel = document.getElementById(a.getAttribute("aria-controls"));
+      if (painel) painel.hidden = !sim;
+    });
+    if (rolar) alvo.scrollIntoView({ block: "nearest", inline: "nearest" });
+  };
+  const peloEndereco = () => {
+    const h = decodeURIComponent(location.hash.slice(1));
+    if (/^ano-/.test(h)) return mostrar(h, false);
+    const pub = h && document.getElementById(h);
+    if (pub && pub.matches(".transp-pub")) {
+      mostrar(pub.closest(".transp-ano").id, false);
+      pub.open = true;
+      pub.scrollIntoView({ block: "start" });
+      return;
+    }
+    mostrar(abas[0].getAttribute("aria-controls"), false);
+  };
+  abas.forEach((a, i) => {
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      const id = a.getAttribute("aria-controls");
+      mostrar(id, false);
+      history.replaceState(null, "", "#" + id);
+    });
+    // setas trocam de ano, como em qualquer grupo de abas
+    a.addEventListener("keydown", (e) => {
+      const passo = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+      if (!passo) return;
+      e.preventDefault();
+      const prox = abas[(i + passo + abas.length) % abas.length];
+      prox.click(); prox.focus();
+    });
+  });
+  window.addEventListener("hashchange", peloEndereco);
+  peloEndereco();
+
+  /* Foto ampliada, com anterior/próxima dentro da MESMA publicação. Sem
+     script, a foto abre sozinha numa aba nova — o link é de verdade. */
+  const fotos = $$("[data-amplia]");
+  if (!fotos.length || typeof HTMLDialogElement === "undefined") return;
+  const lupa = document.createElement("dialog");
+  lupa.className = "transp-lupa";
+  lupa.setAttribute("aria-label", "Foto ampliada");
+  lupa.innerHTML = '<img alt=""><p class="transp-lupa__legenda"></p>'
+    + '<button type="button" class="transp-lupa__ant" aria-label="Foto anterior">‹</button>'
+    + '<button type="button" class="transp-lupa__prox" aria-label="Próxima foto">›</button>'
+    + '<button type="button" class="transp-lupa__fechar" aria-label="Fechar">×</button>';
+  document.body.appendChild(lupa);
+  const img = $("img", lupa), legenda = $(".transp-lupa__legenda", lupa);
+  let grupo = [], pos = 0;
+  const pinta = () => {
+    const a = grupo[pos], mini = $("img", a);
+    img.src = a.getAttribute("href"); img.alt = mini ? mini.alt : "";
+    legenda.textContent = (mini ? mini.alt : "") + (grupo.length > 1 ? `  (${pos + 1}/${grupo.length})` : "");
+    $(".transp-lupa__ant", lupa).hidden = $(".transp-lupa__prox", lupa).hidden = grupo.length < 2;
+  };
+  const anda = (n) => { pos = (pos + n + grupo.length) % grupo.length; pinta(); };
+  fotos.forEach((a) => a.addEventListener("click", (e) => {
+    e.preventDefault();
+    grupo = fotos.filter((f) => f.dataset.amplia === a.dataset.amplia);
+    pos = grupo.indexOf(a);
+    pinta();
+    lupa.showModal();
+  }));
+  $(".transp-lupa__ant", lupa).addEventListener("click", () => anda(-1));
+  $(".transp-lupa__prox", lupa).addEventListener("click", () => anda(1));
+  $(".transp-lupa__fechar", lupa).addEventListener("click", () => lupa.close());
+  lupa.addEventListener("click", (e) => { if (e.target === lupa) lupa.close(); });   // clique fora da foto
+  lupa.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") anda(1);
+    else if (e.key === "ArrowLeft") anda(-1);
+  });
+  lupa.addEventListener("close", () => { img.removeAttribute("src"); });
+}
+
 /* -------------------------------- Boot ----------------------------------- */
 function iniciar() {
   iniCabecalho(); iniMenu(); iniLupa(); iniRevelacao();
   iniFormulario(); iniBotaoZap(); iniServicos(); iniAno(); iniResultados(); iniConsentimento();
+  iniTransparencia();
 }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar);
 else iniciar();

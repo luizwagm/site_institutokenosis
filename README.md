@@ -25,6 +25,13 @@ sempre HTML pronto, com o SEO já embutido — não há renderização por requi
   ganham uma sozinhos — depois é só **Publicar**.
 - **Os arquivos saem em fluxo e por faixa** (`Range` → `206`). Sem isso, o
   vídeo não deixa avançar, o iPhone não toca e a capa sai preta.
+- **Transparência por ano (2.15.0):** cada linha de `documentos` é uma
+  PUBLICAÇÃO de um ano (e, se quiser, de um mês), com vários anexos na coluna
+  JSON `anexos` — PDF enviado (`assets/docs/`, conferido pelos bytes `%PDF-`),
+  link (só http/https), fotos (reduzidas a 1920 px no painel) e vídeos (com a
+  capa tirada do vídeo). No site, uma aba por ano e as publicações do mês mais
+  recente ao mais antigo, recolhíveis. Documento antigo, só com `url`, vira
+  uma publicação com um link — sem migração. Prova: `node testar-transparencia.js`.
 
 Para republicar sem abrir o painel (útil em script):
 

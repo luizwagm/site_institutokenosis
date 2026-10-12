@@ -357,6 +357,103 @@ h1, h2, h3, h4 {
 .doc__nome { font-weight: 700; font-size: .95rem; }
 .doc__meta { font-size: .8rem; color: rgba(255, 255, 255, .65); }
 
+/* ----------------------- Transparência por ano (2.15.0) -----------------------
+   Uma aba por ano e, dentro dela, publicações que abrem e fecham. O ano ativo
+   é a peça BRANCA da faixa: no fundo marinho, é o único ponto de contraste
+   máximo, e o olho vai para ele antes de ler qualquer coisa. O mês fica em
+   Fraunces celeste, na coluna da esquerda: é por ele que se procura, então
+   ele é lido primeiro e alinhado como um índice. */
+.transp-anos {
+  display: flex; flex-wrap: wrap; gap: .55rem; margin-bottom: 2rem;
+}
+.transp-anos__ano {
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .55rem 1.15rem; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .28); color: #fff; text-decoration: none;
+  font-family: var(--fonte-titulo); font-weight: 600; font-size: 1.05rem;
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
+.transp-anos__ano small {
+  font-family: var(--fonte-corpo); font-size: .72rem; font-weight: 700;
+  min-width: 1.5rem; padding: .1rem .4rem; border-radius: 999px; text-align: center;
+  background: rgba(255, 255, 255, .14);
+}
+.transp-anos__ano:hover { border-color: #fff; background: rgba(255, 255, 255, .08); }
+.transp-anos__ano[aria-selected="true"] { background: #fff; color: var(--marinho); border-color: #fff; }
+.transp-anos__ano[aria-selected="true"] small { background: var(--celeste-luz); color: var(--marinho); }
+.transp-anos__ano:focus-visible, .transp-pub__cabeca:focus-visible { outline: 3px solid var(--celeste-claro); outline-offset: 3px; }
+/* `hidden` é posto pelo script na aba que não está à vista; sem esta regra, um
+   display vindo de outro seletor o anularia em silêncio. */
+.transp-ano[hidden] { display: none; }
+.transparencia .transp-ano__titulo {   /* vence o ".transparencia h3" branco */
+  font-family: var(--fonte-corpo); font-size: .78rem; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--celeste-claro);
+  margin-bottom: 1rem;
+}
+.transp-pub {
+  background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: var(--raio-p); margin-bottom: .75rem;
+  transition: background .2s ease;
+}
+.transp-pub[open] { background: rgba(255, 255, 255, .09); }
+.transp-pub__cabeca {
+  display: grid; grid-template-columns: 8.5rem 1fr auto; align-items: center; gap: 1rem;
+  padding: 1.05rem 1.3rem; cursor: pointer; list-style: none; border-radius: var(--raio-p);
+}
+.transp-pub__cabeca::-webkit-details-marker { display: none; }
+.transp-pub__quando { font-family: var(--fonte-titulo); font-weight: 600; font-size: 1.1rem; color: var(--celeste-claro); }
+.transp-pub__nome { font-weight: 700; font-size: .98rem; line-height: 1.35; }
+.transp-pub__conta { display: block; margin-top: .2rem; font-weight: 400; font-size: .8rem; color: rgba(255, 255, 255, .65); }
+.transp-pub__seta { color: rgba(255, 255, 255, .7); transition: transform .25s ease; }
+.transp-pub[open] .transp-pub__seta { transform: rotate(180deg); }
+.transp-pub__corpo { display: grid; gap: 1.1rem; padding: .2rem 1.3rem 1.4rem; }
+.transp-pub__texto { color: rgba(255, 255, 255, .82); font-size: .95rem; max-width: 70ch; }
+.transp-pub__docs { display: grid; grid-template-columns: repeat(2, 1fr); gap: .75rem; }
+.transp-pub__fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .6rem; }
+.transp-foto { display: block; border-radius: 10px; overflow: hidden; background: rgba(255, 255, 255, .08); }
+.transp-foto img {
+  display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover;
+  transition: transform .35s ease;
+}
+.transp-foto:hover img { transform: scale(1.04); }
+.transp-foto:focus-visible { outline: 3px solid var(--celeste-claro); outline-offset: 2px; }
+.transp-pub__videos { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: .9rem; }
+.transp-video video { display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 12px; background: #0b1440; }
+.transp-video figcaption { margin-top: .4rem; font-size: .82rem; color: rgba(255, 255, 255, .7); }
+
+/* A foto ampliada, com anterior/próxima da MESMA publicação. */
+.transp-lupa {
+  width: 100vw; height: 100vh; max-width: none; max-height: none; margin: 0; padding: 0;
+  border: 0; background: rgba(8, 12, 40, .95); color: #fff;
+}
+.transp-lupa::backdrop { background: rgba(8, 12, 40, .95); }
+.transp-lupa[open] { display: grid; grid-template-rows: 1fr auto; place-items: center; }
+.transp-lupa img { max-width: 92vw; max-height: 82vh; width: auto; height: auto; border-radius: 8px; }
+.transp-lupa__legenda { padding: .8rem 1rem 1.4rem; font-size: .9rem; color: rgba(255, 255, 255, .8); text-align: center; }
+.transp-lupa button {
+  position: fixed; width: 3rem; height: 3rem; border-radius: 50%; border: 0; cursor: pointer;
+  background: rgba(255, 255, 255, .14); color: #fff; font-size: 1.5rem; line-height: 1;
+}
+.transp-lupa button:hover, .transp-lupa button:focus-visible { background: rgba(255, 255, 255, .28); outline: none; }
+.transp-lupa__fechar { top: 1rem; right: 1rem; }
+.transp-lupa__ant { left: 1rem; top: 50%; transform: translateY(-50%); }
+.transp-lupa__prox { right: 1rem; top: 50%; transform: translateY(-50%); }
+
+@media (max-width: 640px) {
+  /* No celular, a faixa de anos rola para o lado em vez de quebrar em três
+     linhas — o conteúdo do ano tem de aparecer sem rolar a página antes. */
+  .transp-anos { flex-wrap: nowrap; overflow-x: auto; padding-bottom: .4rem; scrollbar-width: thin; }
+  .transp-anos__ano { flex: none; }
+  .transp-pub__cabeca { grid-template-columns: 1fr auto; gap: .35rem .8rem; padding: .95rem 1rem; }
+  .transp-pub__quando { font-size: .98rem; }
+  .transp-pub__nome { grid-column: 1; }
+  .transp-pub__seta { grid-column: 2; grid-row: 1 / span 2; }
+  .transp-pub__corpo { padding: .1rem 1rem 1.1rem; }
+  .transp-pub__docs { grid-template-columns: 1fr; }
+  .transp-pub__fotos { grid-template-columns: repeat(3, 1fr); gap: .4rem; }
+  .transp-lupa__ant, .transp-lupa__prox { top: auto; bottom: 1rem; transform: none; }
+}
+
 /* -------------------------------- Ajudar ---------------------------------- */
 .ajudar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
 .ajudar__cartao {

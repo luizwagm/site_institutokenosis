@@ -94,7 +94,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "2.14.0";
+const APP_VERSION = "2.15.0";
 
 /* ==========================================================================
    CONSULTA DE CEP
@@ -166,6 +166,80 @@ const VIDEO_DIR = path.join(ROOT, "assets", "video");
 const VIDEO_MAX = Number(process.env.VIDEO_MAX_MB || 120) * 1024 * 1024;
 const CAPA_VIDEO = "/assets/img/capa-video.svg";
 const ehVideo = (u) => /\.(mp4|webm|ogv)(\?|#|$)/i.test(String(u || ""));
+
+/* ==========================================================================
+   TRANSPARÊNCIA POR ANO, COM ANEXOS (2.15.0)
+
+   Antes, cada documento era UM card com UM link, e a página seguia a ordem
+   de cadastro: os relatórios de Agosto e Setembro de 2026 foram parar entre
+   2018 e 2020, e cada mês novo esticava a página.
+
+   Agora cada linha de `documentos` é uma PUBLICAÇÃO ("Mês de Agosto") de um
+   ANO, com quantos anexos precisar — PDF enviado, link do Drive, fotos e
+   vídeos. A página monta uma aba por ano (o ano aparece sozinho quando há
+   publicação nele) e, dentro dela, as publicações do mês mais recente para
+   o mais antigo. A ordem deixou de depender de quem cadastrou primeiro.
+
+   Os anexos vivem numa coluna JSON da própria publicação: salvar é uma ida
+   só ao servidor, e apagar a publicação não deixa anexo órfão no banco. Os
+   documentos antigos (um link na coluna `url`) continuam valendo sem
+   migração: viram uma publicação com um anexo de link.
+   ========================================================================== */
+const DOCS_DIR = path.join(ROOT, "assets", "docs");
+fs.mkdirSync(DOCS_DIR, { recursive: true });
+const DOC_MAX = Number(process.env.DOC_MAX_MB || 30) * 1024 * 1024;
+const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho",
+  "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+/* O que cada tipo de anexo pode apontar. Arquivo só vale se for NOSSO (a pasta
+   certa, nome sem barra); link só vale se for http(s) — `javascript:` num href
+   seria código rodando no site. */
+const ANEXO_URL = {
+  pdf: /^\/assets\/docs\/[A-Za-z0-9._-]+\.pdf$/i,
+  link: /^https?:\/\/[^\s"'<>]+$/i,
+  foto: /^\/assets\/img\/uploads\/[A-Za-z0-9._-]+\.(jpe?g|png|webp|gif)$/i,
+  video: /^\/assets\/video\/[A-Za-z0-9._-]+\.(mp4|webm|ogv)$/i,
+};
+const anexoValido = (a) => !!(a && typeof a === "object" && ANEXO_URL[a.tipo]
+  && typeof a.url === "string" && a.url.length <= 2000 && ANEXO_URL[a.tipo].test(a.url));
+/* Os anexos de uma publicação. Sem a coluna preenchida (documento de antes da
+   2.15.0), o link antigo vira o anexo único. */
+function anexosDe(d) {
+  if (d.anexos != null && d.anexos !== "") {
+    try {
+      const lista = JSON.parse(d.anexos);
+      return Array.isArray(lista) ? lista.filter(anexoValido).map((a) => ({ tipo: a.tipo, url: a.url, titulo: String(a.titulo || "") })) : [];
+    } catch { return []; }
+  }
+  const u = String(d.url || "").trim();
+  if (!u) return [];
+  return [{ tipo: ANEXO_URL.pdf.test(u) ? "pdf" : "link", url: u, titulo: "" }].filter(anexoValido);
+}
+const anoDoDoc = (d) => (/\d{4}/.exec(String(d.ano || "")) || [""])[0];
+/* Confere e arruma o que chega do painel numa publicação. Devolve a mensagem
+   de erro, ou null. Recusar com motivo é melhor que descartar calado: quem
+   colou um link torto precisa saber que ele não entrou. */
+function prepararDocumento(b) {
+  if ("ano" in b) {
+    b.ano = String(b.ano || "").trim();
+    if (!/^\d{4}$/.test(b.ano)) return "Informe o ano com 4 números (ex.: 2026).";
+  }
+  if ("mes" in b) {
+    const m = Number(b.mes);
+    b.mes = Number.isInteger(m) && m >= 1 && m <= 12 ? m : null;
+  }
+  if ("anexos" in b) {
+    let lista = b.anexos;
+    if (typeof lista === "string") { try { lista = lista.trim() ? JSON.parse(lista) : []; } catch { return "Anexos em formato inválido."; } }
+    if (!Array.isArray(lista)) return "Anexos em formato inválido.";
+    if (lista.length > 80) return "São no máximo 80 anexos por publicação.";
+    const ruim = lista.find((a) => !anexoValido(a));
+    if (ruim) return ruim && ruim.tipo === "link"
+      ? "Um dos links não é válido — ele precisa começar com https://"
+      : "Um dos anexos não é válido. Envie o arquivo de novo.";
+    b.anexos = JSON.stringify(lista.map((a) => ({ tipo: a.tipo, url: a.url, titulo: String(a.titulo || "").trim().slice(0, 160) })));
+  }
+  return null;
+}
 
 /* A CAPA DE CADA VÍDEO (2.14.0) — uma foto tirada do próprio vídeo, e não mais
    a mesma capa genérica para todos. Na lista do Feed e da Memória, dez vídeos
@@ -250,6 +324,10 @@ for (const col of ["slug TEXT DEFAULT ''", "content TEXT DEFAULT ''", "categoria
 // guia de profissionais: WhatsApp próprio, especialidades que atende e se sai na home
 for (const col of ["whatsapp TEXT DEFAULT ''", "especialidades TEXT DEFAULT ''", "na_home INTEGER DEFAULT 0"]) {
   try { db.exec(`ALTER TABLE team ADD COLUMN ${col}`); } catch {}
+}
+// (2.15.0) Transparência: o mês da publicação e os anexos dela (JSON)
+for (const col of ["mes INTEGER", "anexos TEXT"]) {
+  try { db.exec(`ALTER TABLE documentos ADD COLUMN ${col}`); } catch {}
 }
 
 const sha = (s) => crypto.createHash("sha256").update(String(s)).digest("hex");
@@ -1196,19 +1274,77 @@ async function publish() {
           </a>`;
   const projetosHome = projetos.slice(0, 3).map(cartaoProjeto).join("\n          ");
 
-  const ICONE_DOC = '<svg class="doc__icone" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>';
-  const cartaoDoc = (d, i) => `<a class="doc" href="${esc(d.url || "#")}"${d.url ? ' target="_blank" rel="noopener"' : ""} data-revela${i % 2 ? ' data-revela-atraso="1"' : ""}>
-            ${ICONE_DOC}
-            <span>
-              <span class="doc__nome">${esc(d.title)}</span><br>
-              <span class="doc__meta">${esc([soTexto(d.tipo), d.ano].filter(Boolean).join(" · "))}</span>
-            </span>
-          </a>`;
-  // Estado vazio: sem isto a seção fica com um buraco e parece quebrada.
-  // A OSC vai publicando os documentos aos poucos — o site precisa aguentar isso.
-  const SEM_DOC = '<p class="sub-secao">Os documentos estão em publicação. Precisa de algum agora? <a href="/#contato" style="color:var(--celeste-claro)">Fale conosco</a>.</p>';
-  const docsHome = documentos.slice(0, 4).map(cartaoDoc).join("\n          ") || SEM_DOC;
-  const docsTodos = documentos.map(cartaoDoc).join("\n          ");
+  /* ---------------------------------------------- Transparência (2.15.0)
+     Uma aba por ano; dentro dela, as publicações do mês mais recente para o
+     mais antigo. A publicação do "ano todo" (relatório anual, sem mês) vem
+     primeiro: é o resumo do ano. Cada publicação é um <details> — fechada,
+     ela ocupa uma linha, e é isso que impede a página de crescer sem fim. A
+     mais recente de cada ano já vem aberta. */
+  const ICONE_DOC = '<svg class="doc__icone" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>';
+  const ICONE_LINK = '<svg class="doc__icone" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>';
+  const SETA = '<svg class="transp-pub__seta" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+  const dominio = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
+  const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+  const docsPorAno = new Map();
+  for (const d of documentos) {
+    /* rascunho — "+ Nova publicação" clicado e nada preenchido — não vai ao ar */
+    if (!String(d.title || "").trim() && !anexosDe(d).length) continue;
+    const ano = anoDoDoc(d) || "Outros";
+    if (!docsPorAno.has(ano)) docsPorAno.set(ano, []);
+    docsPorAno.get(ano).push(d);
+  }
+  const anos = [...docsPorAno.keys()].sort((a, b) => (b === "Outros") - (a === "Outros") || b.localeCompare(a));
+  for (const ano of anos) docsPorAno.get(ano).sort((a, b) => ((b.mes || 13) - (a.mes || 13)) || (b.id - a.id));
+
+  const publicacaoTransp = (d, aberta) => {
+    const anexos = anexosDe(d);
+    const arquivos = anexos.filter((a) => a.tipo === "pdf" || a.tipo === "link");
+    const fotos = anexos.filter((a) => a.tipo === "foto");
+    const videos = anexos.filter((a) => a.tipo === "video");
+    const quando = d.mes ? MESES[d.mes - 1] : "Ano todo";
+    const conta = [arquivos.length && plural(arquivos.length, "documento", "documentos"),
+      fotos.length && plural(fotos.length, "foto", "fotos"), videos.length && plural(videos.length, "vídeo", "vídeos")]
+      .filter(Boolean).join(" · ");
+    const titulo = esc(d.title);
+    return `<details class="transp-pub" id="doc-${d.id}"${aberta ? " open" : ""}>
+            <summary class="transp-pub__cabeca">
+              <span class="transp-pub__quando">${esc(quando)}</span>
+              <span class="transp-pub__nome">${titulo}${conta ? `<small class="transp-pub__conta">${conta}</small>` : ""}</span>
+              ${SETA}
+            </summary>
+            <div class="transp-pub__corpo">
+              ${soTexto(d.tipo) ? `<p class="transp-pub__texto">${esc(soTexto(d.tipo))}</p>` : ""}
+              ${arquivos.length ? `<div class="transp-pub__docs">
+                ${arquivos.map((a) => `<a class="doc" href="${esc(a.url)}" target="_blank" rel="noopener">
+                  ${a.tipo === "pdf" ? ICONE_DOC : ICONE_LINK}
+                  <span>
+                    <span class="doc__nome">${esc(a.titulo || (a.tipo === "pdf" ? "Documento em PDF" : "Abrir documento"))}</span><br>
+                    <span class="doc__meta">${a.tipo === "pdf" ? "PDF · abre em nova aba" : esc("Link · " + (/drive\.google\.com|docs\.google\.com/.test(a.url) ? "Google Drive" : dominio(a.url)))}</span>
+                  </span>
+                </a>`).join("\n                ")}
+              </div>` : ""}
+              ${fotos.length ? `<div class="transp-pub__fotos">
+                ${fotos.map((a, i) => `<a class="transp-foto" href="${esc(a.url)}" target="_blank" rel="noopener" data-amplia="doc-${d.id}">
+                  <img src="${esc(a.url)}" alt="${esc(a.titulo || `Foto ${i + 1} de ${fotos.length} — ${d.title}`)}" loading="lazy"${medidasDoImg(a.url) || ' width="400" height="300"'}>
+                </a>`).join("\n                ")}
+              </div>` : ""}
+              ${videos.length ? `<div class="transp-pub__videos">
+                ${videos.map((a) => `<figure class="transp-video">
+                  <video controls preload="none" playsinline poster="${esc(capaDoVideo(a.url) || CAPA_VIDEO)}" src="${esc(a.url)}"${a.titulo ? ` title="${esc(a.titulo)}"` : ""}></video>
+                  ${a.titulo ? `<figcaption>${esc(a.titulo)}</figcaption>` : ""}
+                </figure>`).join("\n                ")}
+              </div>` : ""}
+              ${anexos.length ? "" : '<p class="transp-pub__texto">Os arquivos desta publicação estão sendo preparados.</p>'}
+            </div>
+          </details>`;
+  };
+  const transpAnos = anos.length ? `<div class="transp-anos" role="tablist" aria-label="Escolha o ano">
+          ${anos.map((ano, i) => `<a class="transp-anos__ano" id="aba-${esc(ano)}" href="#ano-${esc(ano)}" role="tab" aria-controls="ano-${esc(ano)}" aria-selected="${i === 0}">${esc(ano)}<small>${docsPorAno.get(ano).length}</small></a>`).join("\n          ")}
+        </div>
+        ${anos.map((ano) => `<section class="transp-ano" id="ano-${esc(ano)}" role="tabpanel" aria-labelledby="aba-${esc(ano)}">
+          <h3 class="transp-ano__titulo">${ano === "Outros" ? "Outros documentos" : `Publicações de ${esc(ano)}`}</h3>
+          ${docsPorAno.get(ano).map((d, i) => publicacaoTransp(d, i === 0)).join("\n          ")}
+        </section>`).join("\n        ")}` : "";
 
   const ajudarHtml = String(S.ajudar_cards || "").split("\n").map((l) => l.trim()).filter(Boolean)
     .map((l, i) => {
@@ -1462,7 +1598,7 @@ async function publish() {
 
   gravar("transparencia", base("transparencia.html", {
     TRANSP_INTRO: esc(S.pg_transp_intro || ""), TRANSP_OBSERVACAO: esc(S.pg_transp_observacao || ""),
-    DOCUMENTOS: "        " + (docsTodos || '<p class="sub-secao">Documentos em publicação.</p>'),
+    DOCUMENTOS: "        " + (transpAnos || '<p class="sub-secao">Documentos em publicação.</p>'),
     JSONLD: jsonldTag({ "@context": "https://schema.org", "@graph": [migalha("Transparência", "/transparencia/")] }),
   }));
 
@@ -1621,7 +1757,7 @@ async function publish() {
 const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".json": "application/json",
   ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
   ".webmanifest": "application/manifest+json", ".xml": "application/xml", ".txt": "text/plain",
-  ".mp4": "video/mp4", ".webm": "video/webm", ".ogv": "video/ogg" };
+  ".mp4": "video/mp4", ".webm": "video/webm", ".ogv": "video/ogg", ".pdf": "application/pdf" };
 const json = (res, code, obj) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" }); res.end(JSON.stringify(obj)); };
 const readBody = (req) => new Promise((ok, bad) => {
   let d = "", n = 0;
@@ -1632,7 +1768,7 @@ const TABLES = {
   feed:         ["title", "slug", "excerpt", "content", "image", "date", "sort"],
   services:     ["title", "slug", "text", "content", "sort"],
   projetos:     ["title", "slug", "sigla", "status", "resumo", "publico", "content", "sort"],
-  documentos:   ["title", "tipo", "ano", "url", "sort"],
+  documentos:   ["title", "tipo", "ano", "mes", "url", "anexos", "sort"],
   portfolio:    ["title", "subtitle", "image", "sort"],          // parceiros
   team:         ["name", "role", "bio", "photo", "whatsapp", "especialidades", "na_home", "sort"],
   posts:        ["title", "slug", "excerpt", "content", "image", "date", "sort"],
@@ -2267,6 +2403,7 @@ Consulte <code>journalctl -u kenosis -n 40</code>.</small></p></div>`);
             const clash = db.prepare(`SELECT id FROM ${table} WHERE slug=?`).get(b.slug);
             if (clash) b.slug = `${b.slug}-${Date.now().toString(36)}`;
           }
+          if (table === "documentos") { const erro = prepararDocumento(b); if (erro) return json(res, 400, { error: erro }); }
           limparRicos(table, b);
           const use = cols.filter((c) => c in b);
           const r = db.prepare(`INSERT INTO ${table}(${use.join(",")}) VALUES(${use.map(() => "?").join(",")})`).run(...use.map((c) => b[c]));
@@ -2283,6 +2420,7 @@ Consulte <code>journalctl -u kenosis -n 40</code>.</small></p></div>`);
             const clash = db.prepare(`SELECT id FROM ${table} WHERE slug=?`).get(b.slug);
             if (clash && String(clash.id) !== String(id)) b.slug = `${b.slug}-${Date.now().toString(36)}`;
           }
+          if (table === "documentos") { const erro = prepararDocumento(b); if (erro) return json(res, 400, { error: erro }); }
           limparRicos(table, b);
           const use = cols.filter((c) => c in b);
           if (use.length) db.prepare(`UPDATE ${table} SET ${use.map((c) => c + "=?").join(",")} WHERE id=?`).run(...use.map((c) => b[c]), id);
@@ -2293,6 +2431,53 @@ Consulte <code>journalctl -u kenosis -n 40</code>.</small></p></div>`);
           return json(res, 200, { ok: true });
         }
       }
+      /* --------------------------------------- PDF da Transparência (2.15.0)
+         Sobe em binário e em fluxo, como o vídeo. O conteúdo é conferido pelos
+         BYTES e não pelo nome: um PDF começa com "%PDF-". Sem isso, qualquer
+         arquivo renomeado para .pdf seria servido do nosso domínio. */
+      if (p === "/api/upload-pdf" && req.method === "POST") {
+        if (String(req.headers["content-type"] || "").split(";")[0].trim() !== "application/pdf")
+          return json(res, 400, { error: "Envie um arquivo PDF." });
+        const declarado = Number(req.headers["content-length"] || 0);
+        if (declarado > DOC_MAX)
+          return json(res, 413, { error: `O PDF tem ${Math.round(declarado / 1048576)} MB. O limite é ${Math.round(DOC_MAX / 1048576)} MB — para arquivos maiores, use o link do Google Drive.` });
+        const bruto = decodeURIComponent(String(req.headers["x-nome-arquivo"] || "documento"));
+        const base = slug(path.parse(bruto).name).slice(0, 50) || "documento";
+        const arquivo = `${Date.now().toString(36)}-${base}.pdf`;
+        const destino = path.join(DOCS_DIR, arquivo);
+        try {
+          await new Promise((pronto, falhou) => {
+            const saida = fs.createWriteStream(destino);
+            let bytes = 0, abortou = false;
+            req.on("data", (c) => {
+              bytes += c.length;
+              if (bytes > DOC_MAX && !abortou) {
+                abortou = true;
+                saida.destroy(); req.destroy();
+                try { fs.unlinkSync(destino); } catch {}
+                falhou(new Error("PDF acima do limite"));
+              }
+            });
+            req.on("error", falhou);
+            saida.on("error", falhou);
+            saida.on("finish", () => { if (!abortou) pronto(); });
+            req.pipe(saida);
+          });
+        } catch (e) {
+          if (!res.headersSent) return json(res, 413, { error: `PDF acima do limite de ${Math.round(DOC_MAX / 1048576)} MB.` });
+          return;
+        }
+        const fd = fs.openSync(destino, "r"); const cab = Buffer.alloc(5);
+        fs.readSync(fd, cab, 0, 5, 0); fs.closeSync(fd);
+        if (cab.toString("latin1") !== "%PDF-") {
+          fs.unlinkSync(destino);
+          return json(res, 400, { error: "Este arquivo não é um PDF de verdade." });
+        }
+        const kb = Math.round(fs.statSync(destino).size / 1024);
+        console.log(`  · PDF recebido: ${arquivo} (${kb} KB)`);
+        return json(res, 200, { ok: true, path: `/assets/docs/${arquivo}`, bytes: kb * 1024 });
+      }
+
       /* ====================================================================
          O VÍDEO SOBE EM BINÁRIO, não em base64 dentro de JSON.
 
@@ -2381,6 +2566,14 @@ Consulte <code>journalctl -u kenosis -n 40</code>.</small></p></div>`);
             if (ehVideo(r.image) && /^\/assets\/video\/[A-Za-z0-9._-]+$/.test(r.image)
                 && fs.existsSync(path.join(VIDEO_DIR, path.basename(r.image))) && !capaDoVideo(r.image))
               faltam.push({ tabela, id: r.id, titulo: r.title, video: r.image });
+          }
+        }
+        /* (2.15.0) e os vídeos anexados às publicações da Transparência */
+        for (const d of db.prepare("SELECT * FROM documentos").all()) {
+          for (const a of anexosDe(d)) {
+            if (a.tipo === "video" && fs.existsSync(path.join(VIDEO_DIR, path.basename(a.url))) && !capaDoVideo(a.url)
+                && !faltam.some((f) => f.video === a.url))
+              faltam.push({ tabela: "documentos", id: d.id, titulo: d.title, video: a.url });
           }
         }
         res.setHeader("Cache-Control", "no-store");

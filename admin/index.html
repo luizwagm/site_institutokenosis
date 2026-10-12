@@ -83,6 +83,22 @@
     #login{position:fixed;inset:0;background:var(--violet);display:grid;place-items:center;z-index:50}
     #login .card{width:min(360px,90vw);text-align:center;padding:2rem}
     .imgrow{display:flex;gap:.6rem;align-items:center}
+    /* Transparência (2.15.0): publicações agrupadas por ano, com anexos */
+    .transp-adm__ano{margin:1.6rem 0 .7rem;font-size:1.15rem;display:flex;align-items:baseline;gap:.6rem}
+    .transp-adm__ano:first-child{margin-top:0}
+    .transp-adm__ano small{font-size:.78rem;font-weight:600;color:var(--muted)}
+    .transp-adm__linha{display:grid;grid-template-columns:8rem 1fr;gap:0 1rem}
+    .anexos{display:grid;gap:.5rem}
+    .anexo{display:grid;grid-template-columns:72px 1fr auto;gap:.8rem;align-items:center;padding:.6rem;border:1px solid var(--line);border-radius:10px;background:#fcfbf8}
+    .anexo__mini{width:72px;height:54px;object-fit:cover;border-radius:7px;border:1px solid var(--line)}
+    .anexo__mini--txt{display:grid;place-items:center;background:#e6f3fc;color:#253282;font-weight:700;font-size:.8rem}
+    .anexo__campos{display:grid;gap:.35rem;min-width:0}
+    .anexo__campos input{padding:.45rem .6rem}
+    .anexo__tipo{font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+    .anexo__acoes{display:flex;gap:.3rem}
+    .anexo__acoes .btn{padding:.3rem .55rem}
+    .anexo__acoes .btn[disabled]{opacity:.35;cursor:default}
+    .anexos__botoes{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.7rem}
     .galeria-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1rem}
     .gal-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column}
     .gal-card img{width:100%;height:150px;object-fit:cover;background:#f0eee9;display:block}
@@ -387,10 +403,10 @@
 
     <section class="panel" id="p-transparencia">
       <div class="topbar"><h1>Transparência</h1><button class="btn btn-navy" onclick="saveTexts('transparencia')">Salvar textos</button></div>
-      <p class="hint mb">Textos da página e os documentos com link. Cada documento é um card.</p>
+      <p class="hint mb">Cada <b>publicação</b> pertence a um <b>ano</b> e, se quiser, a um <b>mês</b> — no site, cada ano vira uma aba e as publicações se ordenam sozinhas, do mês mais recente para o mais antigo. Numa publicação cabem vários anexos: PDF, link do Drive, fotos e vídeos.</p>
       <div class="topbar" style="margin-bottom:.8rem">
-        <h3 style="margin:0">Documentos publicados</h3>
-        <button class="btn btn-ghost btn-sm" onclick="addRow('documentos')">+ Novo documento</button>
+        <h3 style="margin:0">Publicações</h3>
+        <button class="btn btn-ghost btn-sm" onclick="addRow('documentos')">+ Nova publicação</button>
       </div>
       <div id="documentos-list" class="mb"></div>
       <div id="transparencia-form"></div>
@@ -477,9 +493,9 @@ async function api(url, method = "GET", body) {
   return j;
 }
 let toastT;
-function toast(msg, err = false) {
+function toast(msg, err = false, ms = 3000) {
   const t = $("#toast"); t.textContent = msg; t.classList.toggle("err", err); t.classList.add("on");
-  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 3000);
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), ms);
 }
 const escA = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 
@@ -746,7 +762,8 @@ document.querySelectorAll(".navbtn[data-p]").forEach((b) =>
     /* Antes de trocar de tela, a que está saindo se despede: o cadastro que
        ficou em branco vai embora agora, e não na próxima visita. */
     const saindo = document.querySelector(".navbtn[data-p].on");
-    if (saindo && saindo !== b) { try { await descartarVazios(saindo.dataset.p); } catch {} }
+    /* a tela "transparencia" guarda a lista "documentos" (2.15.0) */
+    if (saindo && saindo !== b) { try { await descartarVazios(saindo.dataset.p === "transparencia" ? "documentos" : saindo.dataset.p); } catch {} }
 
     document.querySelectorAll(".navbtn[data-p]").forEach((x) => x.classList.remove("on"));
     document.querySelectorAll(".panel").forEach((x) => x.classList.remove("on"));
@@ -1040,6 +1057,7 @@ function renderProjetosReadonly() {
 }
 
 function renderTable(t) {
+  if (t === "documentos") return renderDocumentos();   // (2.15.0) agrupada por ano, com anexos
   $("#" + t + "-list").innerHTML = DATA[t].map((r) => `
     <div class="card">
       ${TDEFS[t].map(([f, lab, kind]) => {
@@ -1207,7 +1225,7 @@ async function addRow(t) {
     services: { title: "Novo serviço", categoria: "", text: "", content: "", slug: "" },
     team: { name: "Nova pessoa", role: "", bio: "", photo: "", whatsapp: "", especialidades: "", na_home: 0 },
     projetos: { title: "Novo projeto", sigla: "", status: "Em planejamento institucional", resumo: "", publico: "", content: "" },
-    documentos: { title: "Novo documento", ano: "", tipo: "", url: "" },
+    documentos: { title: "", ano: String(new Date().getFullYear()), mes: new Date().getMonth() + 1, tipo: "", anexos: "[]" },
     /* Memória e Blog nascem SEM título. O rótulo "Nova memória" vinha escrito
        dentro do campo: quem começava a digitar tinha primeiro de apagar, e
        quem não reparasse publicava uma matéria chamada "Nova memória". O nome
@@ -1226,7 +1244,10 @@ async function addRow(t) {
   /* Leva o cadastro novo para a vista e põe o cursor no primeiro campo: numa
      lista longa ele nasceria fora da tela, e a sensação é de que nada
      aconteceu. */
-  const novo = document.querySelector(`#${t}-list .card`);
+  /* (2.15.0) a Transparência se ordena por ano e mês: o card novo pode não
+     ser o primeiro da lista, então ele é achado pelo id */
+  const novo = t === "documentos" && r && r.item ? document.getElementById("doc-adm-" + r.item.id)
+    : document.querySelector(`#${t}-list .card`);
   if (novo) {
     novo.scrollIntoView({ behavior: "smooth", block: "center" });
     novo.querySelector("input")?.focus();
@@ -1249,7 +1270,7 @@ async function addRow(t) {
    `slug` e `date` ficam de fora da conta: os dois são preenchidos sozinhos no
    nascimento e estariam sempre "cheios", o que nunca deixaria nada ser
    descartado. */
-const AREAS_DE_RASCUNHO = ["posts", "feed"];
+const AREAS_DE_RASCUNHO = ["posts", "feed", "documentos"];
 async function descartarVazios(t) {
   if (!AREAS_DE_RASCUNHO.includes(t) || !Array.isArray(DATA[t]) || !DATA[t].length) return;
   const semNada = (v) => !String(v ?? "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
@@ -1257,10 +1278,14 @@ async function descartarVazios(t) {
     const el = document.querySelector(`#${t}-list [data-t="${t}"][data-id="${id}"][data-f="${f}"]`);
     return el ? el.value : "";
   };
-  const campos = TDEFS[t].map(([f]) => f).filter((f) => f !== "slug" && f !== "date");
+  /* Na Transparência, o ano (e o mês) nascem preenchidos; o que diz se a
+     publicação tem conteúdo é o enunciado, a descrição e os anexos. */
+  const campos = t === "documentos" ? ["title", "tipo"]
+    : TDEFS[t].map(([f]) => f).filter((f) => f !== "slug" && f !== "date");
   const apagados = [];
   for (const r of DATA[t]) {
     if (!campos.every((f) => semNada(r[f]) && semNada(naTela(r.id, f)))) continue;
+    if (t === "documentos" && (anexosDoDoc(r).length || (ANEXOS[r.id] || []).length)) continue;
     try { await api(`/api/${t}/${r.id}`, "DELETE"); apagados.push(r.id); } catch { /* fica para a próxima */ }
   }
   if (!apagados.length) return;
@@ -1274,6 +1299,252 @@ async function delRow(t, id) {
   DATA = await api("/api/content");
   renderTable(t);
   toast("Excluído. Lembre de publicar!");
+}
+
+/* ==========================================================================
+   TRANSPARÊNCIA POR ANO, COM ANEXOS (2.15.0)
+
+   Cada card é uma PUBLICAÇÃO ("Mês de Agosto") de um ANO, com quantos anexos
+   precisar: PDF enviado, link do Drive, fotos e vídeos. No site, o ano vira
+   uma aba e as publicações dele se ordenam pelo mês — quem cadastra não
+   precisa mais pensar em ordem.
+
+   O painel agrupa do mesmo jeito que o site, para o que se vê aqui ser o que
+   vai ao ar. Os ENVIOS (PDF, foto, vídeo) e o tirar/mover de anexos se salvam
+   na hora: arquivo enviado e não salvo é arquivo perdido no servidor, e o
+   "esqueci de salvar" era o erro mais provável. Textos (enunciado,
+   descrição, nome do anexo, endereço do link) vão no botão Salvar.
+   ========================================================================== */
+const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho",
+  "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+const ANEXOS = {};   // id da publicação → lista de anexos em edição
+const anoDoDoc = (d) => (/\d{4}/.exec(String(d.ano || "")) || [""])[0];
+function anexosDoDoc(d) {
+  if (d.anexos != null && d.anexos !== "") { try { const l = JSON.parse(d.anexos); return Array.isArray(l) ? l : []; } catch { return []; } }
+  const u = String(d.url || "").trim();
+  return u ? [{ tipo: /^\/assets\/docs\/[^/]+\.pdf$/i.test(u) ? "pdf" : "link", url: u, titulo: "" }] : [];
+}
+const ROTULO_ANEXO = { pdf: "PDF", link: "Link", foto: "Foto", video: "Vídeo" };
+/* O que vai para o banco: link ainda sem endereço fica de fora (é uma linha
+   que a pessoa acabou de abrir e não preencheu). */
+const anexosParaSalvar = (id) => (ANEXOS[id] || []).filter((a) => a.tipo !== "link" || String(a.url || "").trim())
+  .map((a) => ({ tipo: a.tipo, url: String(a.url || "").trim(), titulo: String(a.titulo || "").trim() }));
+
+function renderDocumentos() {
+  const lista = [...(DATA.documentos || [])].sort((a, b) =>
+    (anoDoDoc(b) || "0").localeCompare(anoDoDoc(a) || "0") || ((b.mes || 13) - (a.mes || 13)) || (b.id - a.id));
+  for (const d of lista) if (!ANEXOS[d.id]) ANEXOS[d.id] = anexosDoDoc(d);
+  let anoAtual = null, html = "";
+  for (const d of lista) {
+    const ano = anoDoDoc(d) || "Sem ano";
+    if (ano !== anoAtual) {
+      anoAtual = ano;
+      const n = lista.filter((x) => (anoDoDoc(x) || "Sem ano") === ano).length;
+      html += `<h3 class="transp-adm__ano">${escA(ano)} <small>${n} ${n === 1 ? "publicação" : "publicações"}</small></h3>`;
+    }
+    const dados = (f) => `data-t="documentos" data-id="${d.id}" data-f="${f}"`;
+    html += `<div class="card transp-adm" id="doc-adm-${d.id}">
+      <div class="transp-adm__linha">
+        <div><label>Ano</label><input ${dados("ano")} value="${escA(anoDoDoc(d) || d.ano || "")}" inputmode="numeric" maxlength="4" placeholder="2026"></div>
+        <div><label>Mês</label><select ${dados("mes")}>
+          <option value="">Ano todo (sem mês)</option>
+          ${MESES.map((m, i) => `<option value="${i + 1}"${Number(d.mes) === i + 1 ? " selected" : ""}>${m}</option>`).join("")}
+        </select></div>
+      </div>
+      <label>Enunciado</label>
+      <input ${dados("title")} value="${escA(d.title)}" placeholder="Ex.: Mês de Outubro — Relatório de atividades">
+      <label>Descrição (opcional)</label>
+      <textarea ${dados("tipo")} placeholder="Texto curto que aparece ao abrir a publicação">${escA(d.tipo)}</textarea>
+      <label>Anexos</label>
+      <div class="anexos" id="anexos-${d.id}">${linhasAnexos(d.id)}</div>
+      <div class="anexos__botoes">
+        <button class="btn btn-ghost btn-sm" onclick="anexarPdf(${d.id}, this)">+ PDF</button>
+        <button class="btn btn-ghost btn-sm" onclick="anexarLink(${d.id})">+ Link (Drive)</button>
+        <button class="btn btn-ghost btn-sm" onclick="anexarFotos(${d.id}, this)">+ Fotos</button>
+        <button class="btn btn-ghost btn-sm" onclick="anexarVideo(${d.id}, this)">+ Vídeo</button>
+      </div>
+      <p class="hint">PDF de até 30 MB, fotos (várias de uma vez) e vídeo de até 120 MB. Arquivo maior? Suba no Google Drive e use <b>+ Link</b>.</p>
+      <div class="right mt">
+        <a class="btn btn-ghost btn-sm" href="/transparencia/#doc-${d.id}" target="_blank" style="text-decoration:none">Ver no site</a>
+        <button class="btn btn-danger btn-sm" onclick="delRow('documentos',${d.id})">Excluir</button>
+        <button class="btn btn-navy btn-sm" onclick="salvarDoc(${d.id})">Salvar</button>
+      </div>
+    </div>`;
+  }
+  $("#documentos-list").innerHTML = html || '<p class="hint">Nenhuma publicação ainda. Clique em <b>+ Nova publicação</b>.</p>';
+}
+
+function linhasAnexos(id) {
+  const lista = ANEXOS[id] || [];
+  if (!lista.length) return '<p class="hint anexos__vazio">Sem anexos. Use os botões abaixo.</p>';
+  return lista.map((a, i) => {
+    const mini = a.tipo === "foto" ? `<img class="anexo__mini" src="${escA(a.url)}" alt="">`
+      : a.tipo === "video" ? `<img class="anexo__mini" src="${escA(capaDe(a.url))}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'anexo__mini anexo__mini--txt',textContent:'▶'}))">`
+      : `<span class="anexo__mini anexo__mini--txt">${a.tipo === "pdf" ? "PDF" : "🔗"}</span>`;
+    return `<div class="anexo">
+      ${mini}
+      <div class="anexo__campos">
+        <span class="anexo__tipo">${ROTULO_ANEXO[a.tipo] || a.tipo}${a.tipo !== "link" ? ` · <a href="${escA(a.url)}" target="_blank">abrir</a>` : ""}</span>
+        <input value="${escA(a.titulo)}" placeholder="${a.tipo === "foto" ? "Legenda da foto (opcional)" : "Nome que aparece no site (opcional)"}" oninput="ANEXOS[${id}][${i}].titulo=this.value">
+        ${a.tipo === "link" ? `<input class="anexo__url" value="${escA(a.url)}" placeholder="https://drive.google.com/…" oninput="ANEXOS[${id}][${i}].url=this.value.trim()">` : ""}
+      </div>
+      <div class="anexo__acoes">
+        <button class="btn btn-ghost btn-sm" title="Subir" aria-label="Subir" onclick="moverAnexo(${id},${i},-1)"${i === 0 ? " disabled" : ""}>↑</button>
+        <button class="btn btn-ghost btn-sm" title="Descer" aria-label="Descer" onclick="moverAnexo(${id},${i},1)"${i === lista.length - 1 ? " disabled" : ""}>↓</button>
+        <button class="btn btn-danger btn-sm" title="Tirar" aria-label="Tirar anexo" onclick="tirarAnexo(${id},${i})">×</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+const redesenharAnexos = (id) => { const c = document.getElementById("anexos-" + id); if (c) c.innerHTML = linhasAnexos(id); };
+
+/* Grava SÓ os anexos (os textos esperam o Salvar). */
+async function salvarAnexos(id) {
+  const anexos = JSON.stringify(anexosParaSalvar(id));
+  await api(`/api/documentos/${id}`, "PUT", { anexos });
+  const d = (DATA.documentos || []).find((x) => x.id === id);
+  if (d) d.anexos = anexos;
+}
+async function salvarDoc(id) {
+  const body = {};
+  document.querySelectorAll(`[data-t="documentos"][data-id="${id}"]`).forEach((el) => body[el.dataset.f] = el.value);
+  /* link aberto e não preenchido: avisa em vez de sumir com ele calado */
+  if ((ANEXOS[id] || []).some((a) => a.tipo === "link" && !String(a.url || "").trim()))
+    return toast("Há um link sem endereço. Cole o endereço ou tire a linha com ×.", true);
+  body.anexos = JSON.stringify(anexosParaSalvar(id));
+  try { await api(`/api/documentos/${id}`, "PUT", body); }
+  catch (e) { return toast(e.message, true); }
+  const d = (DATA.documentos || []).find((x) => x.id === id);
+  if (d) Object.assign(d, body, { mes: body.mes ? Number(body.mes) : null });
+  renderDocumentos();   // o ano ou o mês podem ter mudado: reagrupa e reordena
+  const card = document.getElementById("doc-adm-" + id);
+  if (card) card.scrollIntoView({ block: "nearest" });
+  toast("Salvo! Lembre de publicar.");
+}
+async function moverAnexo(id, i, passo) {
+  const l = ANEXOS[id], j = i + passo;
+  if (!l || j < 0 || j >= l.length) return;
+  [l[i], l[j]] = [l[j], l[i]];
+  redesenharAnexos(id);
+  try { await salvarAnexos(id); } catch (e) { toast(e.message, true); }
+}
+async function tirarAnexo(id, i) {
+  const a = ANEXOS[id][i];
+  if (!confirm(`Tirar este anexo (${ROTULO_ANEXO[a.tipo]}${a.titulo ? ": " + a.titulo : ""}) da publicação?`)) return;
+  ANEXOS[id].splice(i, 1);
+  redesenharAnexos(id);
+  try { await salvarAnexos(id); toast("Anexo tirado. Lembre de publicar."); } catch (e) { toast(e.message, true); }
+}
+function anexarLink(id) {
+  ANEXOS[id].push({ tipo: "link", url: "", titulo: "" });
+  redesenharAnexos(id);
+  const campos = document.querySelectorAll(`#anexos-${id} .anexo__url`);
+  if (campos.length) campos[campos.length - 1].focus();
+  toast("Cole o endereço do Drive e clique em Salvar.");
+}
+
+/* Escolhe arquivos e devolve a lista (vazia se a pessoa desistir). */
+function escolherArquivos(aceita, varios) {
+  return new Promise((ok) => {
+    const fi = document.createElement("input");
+    fi.type = "file"; fi.accept = aceita; fi.multiple = !!varios;
+    fi.onchange = () => ok([...fi.files]);
+    fi.click();
+  });
+}
+/* Envio em binário com progresso — o mesmo contrato do /api/upload-video. */
+function enviarBinario(rota, file, tipo, aoAndar) {
+  return new Promise((ok, falha) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", rota);
+    xhr.setRequestHeader("Content-Type", tipo);
+    xhr.setRequestHeader("X-Nome-Arquivo", encodeURIComponent(file.name));
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable && aoAndar) aoAndar(Math.round((e.loaded / e.total) * 100)); };
+    xhr.onload = () => {
+      let r = {}; try { r = JSON.parse(xhr.responseText); } catch {}
+      if (xhr.status === 200 && r.path) ok(r.path); else falha(new Error(r.error || "Não consegui enviar o arquivo."));
+    };
+    xhr.onerror = () => falha(new Error("A conexão caiu durante o envio."));
+    xhr.send(file);
+  });
+}
+/* Foto de celular chega com 4–8 MB e 4000 px. No site ela aparece numa
+   miniatura e, ampliada, numa tela: 1920 px bastam e o arquivo cai para algo
+   perto de 500 KB — quem abre a Transparência no 4G agradece. GIF fica como
+   está (pode ser animado). */
+function reduzirFoto(file) {
+  return new Promise((ok, falha) => {
+    const fr = new FileReader();
+    fr.onerror = () => falha(new Error("Não consegui ler a foto."));
+    fr.onload = () => {
+      if (/gif$/i.test(file.type)) return ok(fr.result);
+      const img = new Image();
+      img.onerror = () => falha(new Error(`"${file.name}" não é uma foto que o navegador consiga abrir.`));
+      img.onload = () => {
+        const k = Math.min(1, 1920 / Math.max(img.naturalWidth, img.naturalHeight));
+        if (k === 1 && file.size < 1.5 * 1024 * 1024 && /jpe?g$/i.test(file.type)) return ok(fr.result);
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+        const g = c.getContext("2d");
+        g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);   // PNG transparente não vira preto
+        g.drawImage(img, 0, 0, c.width, c.height);
+        ok(c.toDataURL("image/jpeg", 0.85));
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+/* Os três envios seguem o mesmo roteiro: escolhe, sobe um a um mostrando o
+   andamento no próprio botão, acrescenta à lista e salva os anexos. */
+async function anexarEm(id, btn, arquivos, sobeUm) {
+  if (!arquivos.length) return;
+  const rotulo = btn.textContent;
+  btn.disabled = true;
+  let feitos = 0; const erros = [];
+  for (const [n, f] of arquivos.entries()) {
+    const marca = arquivos.length > 1 ? ` ${n + 1}/${arquivos.length}` : "";
+    btn.textContent = "Enviando" + marca + "…";
+    try {
+      const anexo = await sobeUm(f, (pct) => { btn.textContent = `Enviando${marca} ${pct}%`; });
+      ANEXOS[id].push(anexo); feitos++;
+      redesenharAnexos(id);
+    } catch (e) { erros.push(`${f.name}: ${e.message}`); }
+  }
+  btn.disabled = false; btn.textContent = rotulo;
+  if (feitos) {
+    try { await salvarAnexos(id); toast(`${feitos} anexo(s) enviado(s) e salvo(s). Lembre de publicar.`); }
+    catch (e) { toast(e.message, true); }
+  }
+  if (erros.length) toast(erros.join(" · "), true, 7000);
+}
+const semExtensao = (nome) => String(nome || "").replace(/\.[^.]+$/, "");
+async function anexarPdf(id, btn) {
+  const arquivos = await escolherArquivos("application/pdf,.pdf", true);
+  await anexarEm(id, btn, arquivos, async (f, andar) => {
+    if (f.size > 30 * 1024 * 1024) throw new Error(`tem ${Math.round(f.size / 1048576)} MB; o limite é 30 MB — use o link do Drive`);
+    const url = await enviarBinario("/api/upload-pdf", f, "application/pdf", andar);
+    return { tipo: "pdf", url, titulo: semExtensao(f.name) };
+  });
+}
+async function anexarFotos(id, btn) {
+  const arquivos = await escolherArquivos("image/jpeg,image/png,image/webp,image/gif", true);
+  await anexarEm(id, btn, arquivos, async (f) => {
+    const dataUrl = await reduzirFoto(f);
+    const r = await api("/api/upload", "POST", { name: f.name, dataUrl });
+    return { tipo: "foto", url: r.path, titulo: "" };
+  });
+}
+async function anexarVideo(id, btn) {
+  const arquivos = await escolherArquivos("video/mp4,video/webm,video/ogg,video/quicktime", true);
+  await anexarEm(id, btn, arquivos, async (f, andar) => {
+    if (f.size > 120 * 1024 * 1024) throw new Error(`tem ${Math.round(f.size / 1048576)} MB; o limite é 120 MB — use o link do Drive ou do YouTube`);
+    const url = await enviarBinario("/api/upload-video", f, f.type || "video/mp4", andar);
+    /* A capa sai do próprio vídeo, como no Feed. Se não sair, o vídeo fica
+       com a capa padrão — o anexo entra do mesmo jeito. */
+    try { await gerarCapa(url); } catch {}
+    return { tipo: "video", url, titulo: "" };
+  });
 }
 
 const ehVideo = (u) => /\.(mp4|webm|ogv)(\?|#|$)/i.test(String(u || ""));
