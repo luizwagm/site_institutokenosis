@@ -99,6 +99,14 @@
     .anexo__acoes .btn{padding:.3rem .55rem}
     .anexo__acoes .btn[disabled]{opacity:.35;cursor:default}
     .anexos__botoes{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.7rem}
+    /* Feed (2.16.0): as mídias do carrossel, em miniaturas na ordem em que vão ao ar */
+    .midias{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.6rem}
+    .midia{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fcfbf8}
+    .midia>img,.midia>.midia__mini{display:grid;place-items:center;width:100%;aspect-ratio:4/3;object-fit:cover}
+    .midia__num{position:absolute;top:.35rem;left:.35rem;background:rgba(37,50,130,.85);color:#fff;font-size:.72rem;font-weight:700;padding:.05rem .45rem;border-radius:999px}
+    .midia__acoes{display:flex;justify-content:center;gap:.25rem;padding:.35rem}
+    .midia__acoes .btn{padding:.2rem .5rem}
+    .midia__acoes .btn[disabled]{opacity:.35;cursor:default}
     .galeria-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1rem}
     .gal-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column}
     .gal-card img{width:100%;height:150px;object-fit:cover;background:#f0eee9;display:block}
@@ -403,7 +411,7 @@
 
     <section class="panel" id="p-transparencia">
       <div class="topbar"><h1>Transparência</h1><button class="btn btn-navy" onclick="saveTexts('transparencia')">Salvar textos</button></div>
-      <p class="hint mb">Cada <b>publicação</b> pertence a um <b>ano</b> e, se quiser, a um <b>mês</b> — no site, cada ano vira uma aba e as publicações se ordenam sozinhas, do mês mais recente para o mais antigo. Numa publicação cabem vários anexos: PDF, link do Drive, fotos e vídeos.</p>
+      <p class="hint mb">Cada <b>publicação</b> pertence a um <b>ano</b> e, se quiser, a um <b>mês</b> — no site, cada ano vira uma aba e, dentro dele, as publicações e os anexos se ordenam sozinhos, em ordem alfabética. Numa publicação cabem vários anexos: PDF, link do Drive, fotos e vídeos.</p>
       <div class="topbar" style="margin-bottom:.8rem">
         <h3 style="margin:0">Publicações</h3>
         <button class="btn btn-ghost btn-sm" onclick="addRow('documentos')">+ Nova publicação</button>
@@ -1094,7 +1102,8 @@ function renderTable(t) {
             ${ehVideo(r[f]) ? `<img class="thumb" src="${escA(capaDe(r[f]))}" alt="" title="Capa tirada do vídeo" onerror="this.nextElementSibling.style.display='';this.remove()"><span class="thumb thumb--video" title="Matéria em vídeo — ainda sem capa" style="display:none">▶</span>`
               : r[f] ? `<img class="thumb" src="${escA(r[f])}" alt="">` : ""}
           </div>
-          ${comVideo ? `<p class="hint">Foto <b>ou</b> vídeo (MP4/WEBM). Com vídeo, a capa é uma <b>foto tirada do próprio vídeo</b>, com o selo ▶ vídeo, e o vídeo toca dentro da matéria.</p>` : ""}`;
+          ${comVideo ? `<p class="hint">Foto <b>ou</b> vídeo (MP4/WEBM). Com vídeo, a capa é uma <b>foto tirada do próprio vídeo</b>, com o selo ▶ vídeo, e o vídeo toca dentro da matéria.</p>` : ""}
+          ${t === "feed" ? blocoMidias(r) : ""}`;   // (2.16.0) carrossel
         }
         if (kind === "home") return `<label>${lab}</label>
           <select data-t="${t}" data-id="${r.id}" data-f="${f}">
@@ -1306,8 +1315,8 @@ async function delRow(t, id) {
 
    Cada card é uma PUBLICAÇÃO ("Mês de Agosto") de um ANO, com quantos anexos
    precisar: PDF enviado, link do Drive, fotos e vídeos. No site, o ano vira
-   uma aba e as publicações dele se ordenam pelo mês — quem cadastra não
-   precisa mais pensar em ordem.
+   uma aba; dentro dele, publicações e anexos se ordenam de A a Z (2.16.0) —
+   quem cadastra não precisa pensar em ordem.
 
    O painel agrupa do mesmo jeito que o site, para o que se vê aqui ser o que
    vai ao ar. Os ENVIOS (PDF, foto, vídeo) e o tirar/mover de anexos se salvam
@@ -1324,6 +1333,11 @@ function anexosDoDoc(d) {
   const u = String(d.url || "").trim();
   return u ? [{ tipo: /^\/assets\/docs\/[^/]+\.pdf$/i.test(u) ? "pdf" : "link", url: u, titulo: "" }] : [];
 }
+/* (2.16.0) de A a Z, como no site: a mesma comparação do português (sem
+   diferença de maiúscula e acento, número como número). */
+const ALFA = new Intl.Collator("pt-BR", { sensitivity: "base", numeric: true });
+const nomeDoAnexo = (a) => a.titulo || decodeURIComponent(String(a.url || "").split(/[?#]/)[0].split("/").pop() || "").replace(/^[a-z0-9]{6,9}-/, "");
+const ordenarAnexos = (id) => { if (ANEXOS[id]) ANEXOS[id].sort((a, b) => ALFA.compare(nomeDoAnexo(a).trim(), nomeDoAnexo(b).trim())); };
 const ROTULO_ANEXO = { pdf: "PDF", link: "Link", foto: "Foto", video: "Vídeo" };
 /* O que vai para o banco: link ainda sem endereço fica de fora (é uma linha
    que a pessoa acabou de abrir e não preencheu). */
@@ -1332,8 +1346,8 @@ const anexosParaSalvar = (id) => (ANEXOS[id] || []).filter((a) => a.tipo !== "li
 
 function renderDocumentos() {
   const lista = [...(DATA.documentos || [])].sort((a, b) =>
-    (anoDoDoc(b) || "0").localeCompare(anoDoDoc(a) || "0") || ((b.mes || 13) - (a.mes || 13)) || (b.id - a.id));
-  for (const d of lista) if (!ANEXOS[d.id]) ANEXOS[d.id] = anexosDoDoc(d);
+    (anoDoDoc(b) || "0").localeCompare(anoDoDoc(a) || "0") || ALFA.compare(String(a.title || "").trim(), String(b.title || "").trim()) || (a.id - b.id));
+  for (const d of lista) { if (!ANEXOS[d.id]) ANEXOS[d.id] = anexosDoDoc(d); ordenarAnexos(d.id); }
   let anoAtual = null, html = "";
   for (const d of lista) {
     const ano = anoDoDoc(d) || "Sem ano";
@@ -1389,8 +1403,6 @@ function linhasAnexos(id) {
         ${a.tipo === "link" ? `<input class="anexo__url" value="${escA(a.url)}" placeholder="https://drive.google.com/…" oninput="ANEXOS[${id}][${i}].url=this.value.trim()">` : ""}
       </div>
       <div class="anexo__acoes">
-        <button class="btn btn-ghost btn-sm" title="Subir" aria-label="Subir" onclick="moverAnexo(${id},${i},-1)"${i === 0 ? " disabled" : ""}>↑</button>
-        <button class="btn btn-ghost btn-sm" title="Descer" aria-label="Descer" onclick="moverAnexo(${id},${i},1)"${i === lista.length - 1 ? " disabled" : ""}>↓</button>
         <button class="btn btn-danger btn-sm" title="Tirar" aria-label="Tirar anexo" onclick="tirarAnexo(${id},${i})">×</button>
       </div>
     </div>`;
@@ -1420,13 +1432,6 @@ async function salvarDoc(id) {
   const card = document.getElementById("doc-adm-" + id);
   if (card) card.scrollIntoView({ block: "nearest" });
   toast("Salvo! Lembre de publicar.");
-}
-async function moverAnexo(id, i, passo) {
-  const l = ANEXOS[id], j = i + passo;
-  if (!l || j < 0 || j >= l.length) return;
-  [l[i], l[j]] = [l[j], l[i]];
-  redesenharAnexos(id);
-  try { await salvarAnexos(id); } catch (e) { toast(e.message, true); }
 }
 async function tirarAnexo(id, i) {
   const a = ANEXOS[id][i];
@@ -1508,6 +1513,7 @@ async function anexarEm(id, btn, arquivos, sobeUm) {
     try {
       const anexo = await sobeUm(f, (pct) => { btn.textContent = `Enviando${marca} ${pct}%`; });
       ANEXOS[id].push(anexo); feitos++;
+      ordenarAnexos(id);   // (2.16.0) entra já no lugar dele, de A a Z
       redesenharAnexos(id);
     } catch (e) { erros.push(`${f.name}: ${e.message}`); }
   }
@@ -1545,6 +1551,100 @@ async function anexarVideo(id, btn) {
     try { await gerarCapa(url); } catch {}
     return { tipo: "video", url, titulo: "" };
   });
+}
+
+/* ==========================================================================
+   VÁRIAS MÍDIAS NO FEED (2.16.0)
+
+   A capa continua no campo de sempre e é a PRIMEIRA mídia. Aqui entram as
+   outras fotos e vídeos, sem limite; com pelo menos uma, a matéria abre com
+   um carrossel no site. A ordem aqui é a ordem do carrossel (← →).
+
+   Como na Transparência, enviar, tirar e mover salvam na hora — arquivo
+   enviado e não salvo é arquivo perdido no servidor.
+   ========================================================================== */
+const MIDIAS = {};   // id da matéria do Feed → lista de mídias além da capa
+function midiasDaMateria(r) {
+  try { const l = JSON.parse(r.midias || "[]"); return Array.isArray(l) ? l : []; } catch { return []; }
+}
+function blocoMidias(r) {
+  MIDIAS[r.id] = midiasDaMateria(r);
+  return `<label>Mais fotos e vídeos (carrossel)</label>
+    <input type="hidden" data-t="feed" data-id="${r.id}" data-f="midias" value="${escA(JSON.stringify(MIDIAS[r.id]))}">
+    <div class="midias" id="midias-${r.id}">${linhasMidias(r.id)}</div>
+    <div class="anexos__botoes">
+      <button class="btn btn-ghost btn-sm" onclick="maisMidias(${r.id}, this, 'foto')">+ Fotos</button>
+      <button class="btn btn-ghost btn-sm" onclick="maisMidias(${r.id}, this, 'video')">+ Vídeos</button>
+    </div>
+    <p class="hint">A capa (acima) é a primeira. Com mais fotos ou vídeos aqui, a matéria abre com um <b>carrossel</b> no site. Pode enviar várias de uma vez; as setas mudam a ordem.</p>`;
+}
+function linhasMidias(id) {
+  const lista = MIDIAS[id] || [];
+  if (!lista.length) return '<p class="hint anexos__vazio">Só a capa, por enquanto.</p>';
+  return lista.map((m, i) => `<div class="midia">
+      ${m.tipo === "video"
+        ? `<img src="${escA(capaDe(m.url))}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'midia__mini anexo__mini--txt',textContent:'▶'}))">`
+        : `<img src="${escA(m.url)}" alt="">`}
+      <span class="midia__num">${i + 2}</span>
+      <div class="midia__acoes">
+        <button class="btn btn-ghost btn-sm" aria-label="Mover para a esquerda" onclick="moverMidia(${id},${i},-1)"${i === 0 ? " disabled" : ""}>←</button>
+        <button class="btn btn-ghost btn-sm" aria-label="Mover para a direita" onclick="moverMidia(${id},${i},1)"${i === lista.length - 1 ? " disabled" : ""}>→</button>
+        <button class="btn btn-danger btn-sm" aria-label="Tirar" onclick="tirarMidia(${id},${i})">×</button>
+      </div>
+    </div>`).join("");
+}
+async function salvarMidias(id) {
+  const midias = JSON.stringify(MIDIAS[id] || []);
+  const campo = document.querySelector(`[data-t="feed"][data-id="${id}"][data-f="midias"]`);
+  if (campo) campo.value = midias;
+  const c = document.getElementById("midias-" + id);
+  if (c) c.innerHTML = linhasMidias(id);
+  await api(`/api/feed/${id}`, "PUT", { midias });
+  const r = (DATA.feed || []).find((x) => x.id === id);
+  if (r) r.midias = midias;
+}
+async function moverMidia(id, i, passo) {
+  const l = MIDIAS[id], j = i + passo;
+  if (!l || j < 0 || j >= l.length) return;
+  [l[i], l[j]] = [l[j], l[i]];
+  try { await salvarMidias(id); } catch (e) { toast(e.message, true); }
+}
+async function tirarMidia(id, i) {
+  if (!confirm("Tirar esta mídia da matéria?")) return;
+  MIDIAS[id].splice(i, 1);
+  try { await salvarMidias(id); toast("Mídia tirada. Lembre de publicar."); } catch (e) { toast(e.message, true); }
+}
+async function maisMidias(id, btn, tipo) {
+  const arquivos = await escolherArquivos(tipo === "foto" ? "image/jpeg,image/png,image/webp,image/gif"
+    : "video/mp4,video/webm,video/ogg,video/quicktime", true);
+  if (!arquivos.length) return;
+  const rotulo = btn.textContent;
+  btn.disabled = true;
+  let feitos = 0; const erros = [];
+  for (const [n, f] of arquivos.entries()) {
+    const marca = arquivos.length > 1 ? ` ${n + 1}/${arquivos.length}` : "";
+    btn.textContent = "Enviando" + marca + "…";
+    try {
+      if (tipo === "foto") {
+        const r = await api("/api/upload", "POST", { name: f.name, dataUrl: await reduzirFoto(f) });
+        MIDIAS[id].push({ tipo: "foto", url: r.path });
+      } else {
+        if (f.size > 120 * 1024 * 1024) throw new Error(`tem ${Math.round(f.size / 1048576)} MB; o limite é 120 MB`);
+        const url = await enviarBinario("/api/upload-video", f, f.type || "video/mp4", (pct) => { btn.textContent = `Enviando${marca} ${pct}%`; });
+        try { await gerarCapa(url); } catch {}   // sem capa, vale a padrão
+        MIDIAS[id].push({ tipo: "video", url });
+      }
+      feitos++;
+      const c = document.getElementById("midias-" + id);
+      if (c) c.innerHTML = linhasMidias(id);
+    } catch (e) { erros.push(`${f.name}: ${e.message}`); }
+  }
+  btn.disabled = false; btn.textContent = rotulo;
+  if (feitos) {
+    try { await salvarMidias(id); toast(`${feitos} mídia(s) enviada(s) e salva(s). Lembre de publicar.`); }
+    catch (e) { toast(e.message, true); }
+  }
+  if (erros.length) toast(erros.join(" · "), true, 7000);
 }
 
 const ehVideo = (u) => /\.(mp4|webm|ogv)(\?|#|$)/i.test(String(u || ""));

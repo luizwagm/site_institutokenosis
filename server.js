@@ -94,7 +94,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "2.15.0";
+const APP_VERSION = "2.16.0";
 
 /* ==========================================================================
    CONSULTA DE CEP
@@ -214,6 +214,17 @@ function anexosDe(d) {
   if (!u) return [];
   return [{ tipo: ANEXO_URL.pdf.test(u) ? "pdf" : "link", url: u, titulo: "" }].filter(anexoValido);
 }
+/* ORDEM ALFABÉTICA (2.16.0) — pedido do Instituto: tudo o que se cadastra
+   aparece de A a Z (serviços, projetos, diretoria, parceiros, publicações e
+   anexos da Transparência). Comparação do português de verdade: sem
+   diferença entre maiúscula e minúscula nem entre "Á" e "A", e número lido
+   como número ("Relatório 2" antes de "Relatório 10"). */
+const ALFABETO = new Intl.Collator("pt-BR", { sensitivity: "base", numeric: true });
+const emOrdemAZ = (lista, nome) => [...lista].sort((a, b) =>
+  ALFABETO.compare(String(nome(a) || "").trim(), String(nome(b) || "").trim()) || ((a.id || 0) - (b.id || 0)));
+/* O nome de um anexo para ordenar: o que a pessoa escreveu, ou, sem isso, o
+   nome do arquivo sem o prefixo de data que o envio acrescenta. */
+const nomeDoAnexo = (a) => a.titulo || decodeURIComponent(String(a.url || "").split(/[?#]/)[0].split("/").pop() || "").replace(/^[a-z0-9]{6,9}-/, "");
 const anoDoDoc = (d) => (/\d{4}/.exec(String(d.ano || "")) || [""])[0];
 /* Confere e arruma o que chega do painel numa publicação. Devolve a mensagem
    de erro, ou null. Recusar com motivo é melhor que descartar calado: quem
@@ -238,6 +249,40 @@ function prepararDocumento(b) {
       : "Um dos anexos não é válido. Envie o arquivo de novo.";
     b.anexos = JSON.stringify(lista.map((a) => ({ tipo: a.tipo, url: a.url, titulo: String(a.titulo || "").trim().slice(0, 160) })));
   }
+  return null;
+}
+/* ==========================================================================
+   VÁRIAS MÍDIAS NUMA MATÉRIA DO FEED (2.16.0)
+
+   A capa (`image`) continua sendo a PRIMEIRA mídia — é ela que vai no cartão
+   da lista, no og:image e no Google. As demais fotos e vídeos ficam em
+   `midias` (JSON), sem limite de quantidade. Com mais de uma, a página da
+   matéria abre com um carrossel; com uma só, fica exatamente como antes.
+
+   Separar capa e "as outras" mantém tudo o que já existia funcionando sem
+   migração: matéria antiga é uma matéria com zero mídias extras.
+   ========================================================================== */
+function midiasDe(p) {
+  try {
+    const lista = JSON.parse(p.midias || "[]");
+    return Array.isArray(lista)
+      ? lista.filter((m) => m && (m.tipo === "foto" || m.tipo === "video") && ANEXO_URL[m.tipo].test(String(m.url || "")))
+          .map((m) => ({ tipo: m.tipo, url: m.url }))
+      : [];
+  } catch { return []; }
+}
+/* Todas as mídias da matéria, a capa primeiro. */
+const todasAsMidias = (p) => [...(p.image ? [{ tipo: ehVideo(p.image) ? "video" : "foto", url: p.image }] : []), ...midiasDe(p)];
+/* Confere o que o painel mandou em `midias`. Devolve a mensagem de erro, ou null. */
+function prepararMidias(b) {
+  if (!("midias" in b)) return null;
+  let lista = b.midias;
+  if (typeof lista === "string") { try { lista = lista.trim() ? JSON.parse(lista) : []; } catch { return "Mídias em formato inválido."; } }
+  if (!Array.isArray(lista)) return "Mídias em formato inválido.";
+  if (lista.length > 500) return "São no máximo 500 mídias por matéria.";
+  if (lista.some((m) => !m || !(m.tipo === "foto" || m.tipo === "video") || !ANEXO_URL[m.tipo].test(String(m.url || ""))))
+    return "Uma das mídias não é válida. Envie o arquivo de novo.";
+  b.midias = JSON.stringify(lista.map((m) => ({ tipo: m.tipo, url: m.url })));
   return null;
 }
 
@@ -329,6 +374,8 @@ for (const col of ["whatsapp TEXT DEFAULT ''", "especialidades TEXT DEFAULT ''",
 for (const col of ["mes INTEGER", "anexos TEXT"]) {
   try { db.exec(`ALTER TABLE documentos ADD COLUMN ${col}`); } catch {}
 }
+// (2.16.0) Feed: as fotos e vídeos além da capa, para o carrossel (JSON)
+try { db.exec("ALTER TABLE feed ADD COLUMN midias TEXT"); } catch {}
 
 const sha = (s) => crypto.createHash("sha256").update(String(s)).digest("hex");
 
@@ -1182,11 +1229,12 @@ function tituloSeo(base, limite = 60) {
    Todo mundo que chama publish() precisa aguardar. */
 async function publish() {
   const S = {}; for (const r of db.prepare("SELECT key,value FROM settings").all()) S[r.key] = r.value;
-  const servicos = await listarServicos();   // fonte agora é o sistema de gestão (/restrito)
-  const projetos = await listarProjetos();   // fonte agora é o sistema de gestão (/restrito)
+  /* (2.16.0) de A a Z — ver ALFABETO */
+  const servicos = emOrdemAZ(await listarServicos(), (x) => x.title);   // fonte: o sistema de gestão (/restrito)
+  const projetos = emOrdemAZ(await listarProjetos(), (x) => x.title);   // fonte: o sistema de gestão (/restrito)
   const documentos = db.prepare("SELECT * FROM documentos ORDER BY sort,id").all();
-  const parceiros = db.prepare("SELECT * FROM portfolio ORDER BY sort,id").all();
-  const diretoria = db.prepare("SELECT * FROM team ORDER BY sort,id").all();
+  const parceiros = emOrdemAZ(db.prepare("SELECT * FROM portfolio").all(), (x) => x.title);
+  const diretoria = emOrdemAZ(db.prepare("SELECT * FROM team").all(), (x) => x.name);
   /* Rascunho não vai para o ar. O painel apaga o cadastro em branco quando se
      troca de tela, mas ninguém garante que se troque: dá para clicar em
      "+ Nova publicação" e ir direto em Publicar. Sem esta peneira, o site
@@ -1237,7 +1285,7 @@ async function publish() {
      Não existe texto original por serviço, então não se cria página individual
      (seria inventar conteúdo, que é justamente o que não pode). */
   const CHECK_SERV = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
-  const categorias = [...new Set(servicos.map((s) => s.categoria).filter(Boolean))];
+  const categorias = [...new Set(servicos.map((s) => s.categoria).filter(Boolean))].sort(ALFABETO.compare);
   /* Mostra 5 itens por card; o resto abre no clique. Uma categoria tem 16
      itens — sem cortar, o card estica e desalinha toda a linha da grade. */
   const blocoCategoria = (cat, i) => {
@@ -1275,11 +1323,11 @@ async function publish() {
   const projetosHome = projetos.slice(0, 3).map(cartaoProjeto).join("\n          ");
 
   /* ---------------------------------------------- Transparência (2.15.0)
-     Uma aba por ano; dentro dela, as publicações do mês mais recente para o
-     mais antigo. A publicação do "ano todo" (relatório anual, sem mês) vem
-     primeiro: é o resumo do ano. Cada publicação é um <details> — fechada,
-     ela ocupa uma linha, e é isso que impede a página de crescer sem fim. A
-     mais recente de cada ano já vem aberta. */
+     Uma aba por ano (do mais novo ao mais velho); dentro dela, as publicações
+     em ordem ALFABÉTICA do enunciado (2.16.0, pedido do Instituto — na 2.15.0
+     era pelo mês), e os anexos de cada uma também de A a Z. Cada publicação é
+     um <details> — fechada, ela ocupa uma linha, e é isso que impede a página
+     de crescer sem fim. A primeira de cada ano já vem aberta. */
   const ICONE_DOC = '<svg class="doc__icone" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>';
   const ICONE_LINK = '<svg class="doc__icone" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>';
   const SETA = '<svg class="transp-pub__seta" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
@@ -1294,10 +1342,10 @@ async function publish() {
     docsPorAno.get(ano).push(d);
   }
   const anos = [...docsPorAno.keys()].sort((a, b) => (b === "Outros") - (a === "Outros") || b.localeCompare(a));
-  for (const ano of anos) docsPorAno.get(ano).sort((a, b) => ((b.mes || 13) - (a.mes || 13)) || (b.id - a.id));
+  for (const ano of anos) docsPorAno.set(ano, emOrdemAZ(docsPorAno.get(ano), (d) => d.title));   // (2.16.0) A-Z pelo enunciado
 
   const publicacaoTransp = (d, aberta) => {
-    const anexos = anexosDe(d);
+    const anexos = emOrdemAZ(anexosDe(d), nomeDoAnexo);   // (2.16.0) A-Z pelo nome
     const arquivos = anexos.filter((a) => a.tipo === "pdf" || a.tipo === "link");
     const fotos = anexos.filter((a) => a.tipo === "foto");
     const videos = anexos.filter((a) => a.tipo === "video");
@@ -1381,8 +1429,12 @@ async function publish() {
      O Feed escapou por acaso: passava por um embrulho de dois parâmetros, que
      descarta o terceiro. Agora as duas áreas têm o seu, e sem padrão nenhum
      ninguém volta a chamar esta função direto de um `map` sem perceber. */
+  /* (2.16.0) matéria do Feed com várias mídias ganha um selo com a contagem:
+     o carrossel fica na página da matéria, e o selo avisa antes do clique. */
+  const seloMidias = (p, area) => { const n = area === "feed" ? todasAsMidias(p).length : 0;
+    return n > 1 ? `<span class="materia__qtd" aria-label="${n} fotos e vídeos">${n}</span>` : ""; };
   const cartaoMateria = (p, i, area) => `<article class="materia materia--${area}" data-revela${i % 3 ? ` data-revela-atraso="${i % 3}"` : ""}>
-            ${p.image ? `<a class="materia__foto${ehVideo(p.image) ? " materia__foto--video" : ""}" href="/${area}/${esc(p.slug)}/" tabindex="-1" aria-hidden="true"><img src="${esc(ehVideo(p.image) ? (capaDoVideo(p.image) || CAPA_VIDEO) : p.image)}" alt="${esc(p.title)}" loading="lazy" decoding="async"${ehVideo(p.image) ? (medidasDoImg(capaDoVideo(p.image)) || ' width="900" height="560"') : (medidasDoImg(p.image) || ' width="900" height="560"')}></a>` : ""}
+            ${p.image ? `<a class="materia__foto${ehVideo(p.image) ? " materia__foto--video" : ""}" href="/${area}/${esc(p.slug)}/" tabindex="-1" aria-hidden="true">${seloMidias(p, area)}<img src="${esc(ehVideo(p.image) ? (capaDoVideo(p.image) || CAPA_VIDEO) : p.image)}" alt="${esc(p.title)}" loading="lazy" decoding="async"${ehVideo(p.image) ? (medidasDoImg(capaDoVideo(p.image)) || ' width="900" height="560"') : (medidasDoImg(p.image) || ' width="900" height="560"')}></a>` : ""}
             <div class="materia__corpo">
               <time class="materia__data" datetime="${esc(p.date)}">${dataBR(p.date)}</time>
               <h3 class="materia__titulo"><a href="/${area}/${esc(p.slug)}/">${esc(p.title)}</a></h3>
@@ -1663,6 +1715,21 @@ async function publish() {
     JSONLD: jsonldTag({ "@context": "https://schema.org", "@graph": [migalha("Feed", "/feed/"),
       { "@type": "Blog", name: "Feed do Instituto Kenósis", url: `${SITE}/feed/`, publisher: { "@id": `${SITE}/#org` } }] }),
   }));
+  /* (2.16.0) O CARROSSEL. Sem script ele já funciona: é uma faixa que rola
+     para o lado e para em cada mídia (scroll-snap). O script só acrescenta
+     setas, pontos, contador e teclado (assets/js/main.js, iniCarrossel).
+     Cada mídia aparece INTEIRA, na proporção dela, sobre fundo escuro — foto
+     de celular em pé não perde rosto nem pé para caber numa moldura deitada.
+     Só a primeira foto carrega de cara; vídeo não baixa nada antes do play. */
+  const carrossel = (midias, titulo) => `<figure class="materia-capa carrossel" data-revela data-carrossel aria-roledescription="carrossel" aria-label="${esc(`Fotos e vídeos: ${titulo}`)}">
+          <div class="carrossel__trilho" tabindex="0">
+            ${midias.map((m, i) => `<div class="carrossel__item" role="group" aria-roledescription="slide" aria-label="${i + 1} de ${midias.length}">
+              ${m.tipo === "video"
+                ? `<video src="${esc(m.url)}" controls preload="none" playsinline poster="${esc(capaDoVideo(m.url) || CAPA_VIDEO)}"></video>`
+                : `<img src="${esc(m.url)}" alt="${esc(`${titulo} — foto ${i + 1} de ${midias.length}`)}"${i === 0 ? ' fetchpriority="high"' : ' loading="lazy"'} decoding="async"${medidasDoImg(m.url)}>`}
+            </div>`).join("\n            ")}
+          </div>
+        </figure>`;
   const manterFeed = new Set(feed.map((p) => p.slug));
   fs.mkdirSync(path.join(ROOT, "feed"), { recursive: true });
   for (const d of fs.readdirSync(path.join(ROOT, "feed"), { withFileTypes: true }))
@@ -1674,7 +1741,8 @@ async function publish() {
       /* `preload="metadata"`: baixa só o cabeçalho, para saber duração e
          proporção. Com "auto", abrir a matéria começaria a puxar o vídeo
          inteiro de quem só queria ler o texto. */
-      FIGURA: !p.image ? ""
+      FIGURA: todasAsMidias(p).length > 1 ? carrossel(todasAsMidias(p), p.title)
+        : !p.image ? ""
         : ehVideo(p.image)
         ? `<figure class="materia-capa materia-capa--video" data-revela><video src="${esc(p.image)}" controls preload="metadata" playsinline poster="${esc(capaDoVideo(p.image) || CAPA_VIDEO)}"></video></figure>`
         : `<figure class="materia-capa" data-revela><img src="${esc(p.image)}" alt="${esc(p.title)}" fetchpriority="high" decoding="async"${medidasDoImg(p.image)}></figure>`,
@@ -1765,7 +1833,7 @@ const readBody = (req) => new Promise((ok, bad) => {
   req.on("end", () => { try { ok(d ? JSON.parse(d) : {}); } catch { bad(new Error("JSON inválido")); } });
 });
 const TABLES = {
-  feed:         ["title", "slug", "excerpt", "content", "image", "date", "sort"],
+  feed:         ["title", "slug", "excerpt", "content", "image", "midias", "date", "sort"],
   services:     ["title", "slug", "text", "content", "sort"],
   projetos:     ["title", "slug", "sigla", "status", "resumo", "publico", "content", "sort"],
   documentos:   ["title", "tipo", "ano", "mes", "url", "anexos", "sort"],
@@ -2350,11 +2418,12 @@ Consulte <code>journalctl -u kenosis -n 40</code>.</small></p></div>`);
         return json(res, 200, {
           settings: S,
           campos: CAMPOS,   // o painel monta a tela "Textos do site" a partir daqui
-          services: await listarServicos(),   // somente leitura no painel: cadastro é no /restrito
-          projetos: await listarProjetos(),   // somente leitura no painel: cadastro é no /restrito
+          /* (2.16.0) o painel mostra na mesma ordem A-Z do site */
+          services: emOrdemAZ(await listarServicos(), (x) => x.title),   // somente leitura no painel: cadastro é no /restrito
+          projetos: emOrdemAZ(await listarProjetos(), (x) => x.title),   // somente leitura no painel: cadastro é no /restrito
           documentos: db.prepare("SELECT * FROM documentos ORDER BY sort,id").all(),
-          portfolio: db.prepare("SELECT * FROM portfolio ORDER BY sort,id").all(),
-          team: db.prepare("SELECT * FROM team ORDER BY sort,id").all(),
+          portfolio: emOrdemAZ(db.prepare("SELECT * FROM portfolio").all(), (x) => x.title),
+          team: emOrdemAZ(db.prepare("SELECT * FROM team").all(), (x) => x.name),
           posts: db.prepare("SELECT * FROM posts ORDER BY date DESC, id DESC").all(),
           feed: db.prepare("SELECT * FROM feed ORDER BY date DESC, id DESC").all(),
         });
@@ -2404,6 +2473,7 @@ Consulte <code>journalctl -u kenosis -n 40</code>.</small></p></div>`);
             if (clash) b.slug = `${b.slug}-${Date.now().toString(36)}`;
           }
           if (table === "documentos") { const erro = prepararDocumento(b); if (erro) return json(res, 400, { error: erro }); }
+          if (table === "feed") { const erro = prepararMidias(b); if (erro) return json(res, 400, { error: erro }); }
           limparRicos(table, b);
           const use = cols.filter((c) => c in b);
           const r = db.prepare(`INSERT INTO ${table}(${use.join(",")}) VALUES(${use.map(() => "?").join(",")})`).run(...use.map((c) => b[c]));
@@ -2421,6 +2491,7 @@ Consulte <code>journalctl -u kenosis -n 40</code>.</small></p></div>`);
             if (clash && String(clash.id) !== String(id)) b.slug = `${b.slug}-${Date.now().toString(36)}`;
           }
           if (table === "documentos") { const erro = prepararDocumento(b); if (erro) return json(res, 400, { error: erro }); }
+          if (table === "feed") { const erro = prepararMidias(b); if (erro) return json(res, 400, { error: erro }); }
           limparRicos(table, b);
           const use = cols.filter((c) => c in b);
           if (use.length) db.prepare(`UPDATE ${table} SET ${use.map((c) => c + "=?").join(",")} WHERE id=?`).run(...use.map((c) => b[c]), id);
@@ -2566,6 +2637,14 @@ Consulte <code>journalctl -u kenosis -n 40</code>.</small></p></div>`);
             if (ehVideo(r.image) && /^\/assets\/video\/[A-Za-z0-9._-]+$/.test(r.image)
                 && fs.existsSync(path.join(VIDEO_DIR, path.basename(r.image))) && !capaDoVideo(r.image))
               faltam.push({ tabela, id: r.id, titulo: r.title, video: r.image });
+          }
+        }
+        /* (2.16.0) os vídeos do carrossel do Feed */
+        for (const p of db.prepare("SELECT id, title, midias FROM feed WHERE midias IS NOT NULL AND midias<>''").all()) {
+          for (const m of midiasDe(p)) {
+            if (m.tipo === "video" && fs.existsSync(path.join(VIDEO_DIR, path.basename(m.url))) && !capaDoVideo(m.url)
+                && !faltam.some((f) => f.video === m.url))
+              faltam.push({ tabela: "feed", id: p.id, titulo: p.title, video: m.url });
           }
         }
         /* (2.15.0) e os vídeos anexados às publicações da Transparência */

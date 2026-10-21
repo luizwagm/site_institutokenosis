@@ -32,6 +32,15 @@ sempre HTML pronto, com o SEO já embutido — não há renderização por requi
   capa tirada do vídeo). No site, uma aba por ano e as publicações do mês mais
   recente ao mais antigo, recolhíveis. Documento antigo, só com `url`, vira
   uma publicação com um link — sem migração. Prova: `node testar-transparencia.js`.
+- **Ordem alfabética (2.16.0):** serviços (e as categorias), projetos, diretoria,
+  parceiros, publicações da Transparência (dentro do ano) e os anexos de cada uma
+  saem de A a Z, no site e no painel (`ALFABETO`, Intl.Collator pt-BR, número
+  como número). Os anos continuam do mais novo ao mais velho.
+- **Carrossel no Feed (2.16.0):** a capa é a 1ª mídia; as demais fotos e vídeos
+  ficam na coluna JSON `midias` do `feed`, sem limite. Com mais de uma, a página
+  da matéria abre com um carrossel (scroll-snap, funciona sem script; setas,
+  pontos e teclado pelo `iniCarrossel`); o cartão da lista ganha um selo com a
+  contagem. Prova: `node testar-feed-e-ordem.js`.
 
 Para republicar sem abrir o painel (útil em script):
 

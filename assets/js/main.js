@@ -376,11 +376,63 @@ function iniTransparencia() {
   lupa.addEventListener("close", () => { img.removeAttribute("src"); });
 }
 
+/* ----------------------------- Carrossel (2.16.0) -------------------------
+   A faixa já rola sozinha (scroll-snap). Aqui entram as setas, os pontos, o
+   contador "2 / 5" e as setas do teclado. O slide atual é calculado pela
+   POSIÇÃO da rolagem, e não guardado numa variável: assim dedo, seta, ponto
+   e teclado nunca discordam sobre onde se está. Trocar de slide pausa o
+   vídeo que estava tocando — senão o som seguiria com a imagem fora da tela. */
+function iniCarrossel() {
+  $$("[data-carrossel]").forEach((caixa) => {
+    const trilho = $(".carrossel__trilho", caixa);
+    const itens = $$(".carrossel__item", caixa);
+    if (!trilho || itens.length < 2) return;
+    const ant = document.createElement("button"), prox = document.createElement("button");
+    ant.type = prox.type = "button";
+    ant.className = "carrossel__seta carrossel__seta--ant"; ant.setAttribute("aria-label", "Mídia anterior"); ant.textContent = "‹";
+    prox.className = "carrossel__seta carrossel__seta--prox"; prox.setAttribute("aria-label", "Próxima mídia"); prox.textContent = "›";
+    const contador = document.createElement("span");
+    contador.className = "carrossel__contador"; contador.setAttribute("aria-live", "polite");
+    const pontos = document.createElement("div");
+    pontos.className = "carrossel__pontos";
+    const botoes = itens.map((_, i) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.setAttribute("aria-label", `Ir para a mídia ${i + 1} de ${itens.length}`);
+      b.addEventListener("click", () => ir(i));
+      pontos.appendChild(b);
+      return b;
+    });
+    caixa.append(ant, prox, contador, pontos);
+
+    const atual = () => Math.round(trilho.scrollLeft / Math.max(1, trilho.clientWidth));
+    const ir = (i) => trilho.scrollTo({ left: Math.max(0, Math.min(itens.length - 1, i)) * trilho.clientWidth });
+    let ultimo = -1;
+    const pinta = () => {
+      const i = Math.max(0, Math.min(itens.length - 1, atual()));
+      if (i === ultimo) return;
+      ultimo = i;
+      contador.textContent = `${i + 1} / ${itens.length}`;
+      botoes.forEach((b, k) => b.setAttribute("aria-current", String(k === i)));
+      ant.disabled = i === 0; prox.disabled = i === itens.length - 1;
+      itens.forEach((it, k) => { if (k !== i) $$("video", it).forEach((v) => { if (!v.paused) v.pause(); }); });
+    };
+    ant.addEventListener("click", () => ir(atual() - 1));
+    prox.addEventListener("click", () => ir(atual() + 1));
+    trilho.addEventListener("scroll", () => requestAnimationFrame(pinta), { passive: true });
+    trilho.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") { e.preventDefault(); ir(atual() + 1); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); ir(atual() - 1); }
+    });
+    window.addEventListener("resize", () => { ultimo = -1; pinta(); });
+    pinta();
+  });
+}
+
 /* -------------------------------- Boot ----------------------------------- */
 function iniciar() {
   iniCabecalho(); iniMenu(); iniLupa(); iniRevelacao();
   iniFormulario(); iniBotaoZap(); iniServicos(); iniAno(); iniResultados(); iniConsentimento();
-  iniTransparencia();
+  iniTransparencia(); iniCarrossel();
 }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar);
 else iniciar();

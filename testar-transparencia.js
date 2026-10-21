@@ -141,7 +141,7 @@ const PDF = Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Roo
         { tipo: "pdf", url: pdfOk.j.path, titulo: "Relatório \"oficial\" de agosto" },
         { tipo: "link", url: "https://drive.google.com/file/d/zzqaago/view", titulo: "" },
         { tipo: "foto", url: foto1, titulo: "Oficina de artes" },
-        { tipo: "foto", url: foto2, titulo: "" },
+        { tipo: "foto", url: foto2, titulo: "Abertura do evento" },   // cadastrada depois, mas vem antes (A-Z)
         { tipo: "video", url: "/assets/video/zz-qa-acao.mp4", titulo: "Apresentação" }]) });
     await api("/api/documentos", "POST", { title: "Mês de Outubro", ano: "2026", mes: 10, anexos: "[]" });
     await api("/api/documentos", "POST", { title: "Relatório anual 2026", ano: "2026", anexos: JSON.stringify([{ tipo: "link", url: "https://drive.google.com/x" }]) });
@@ -155,14 +155,16 @@ const PDF = Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Roo
     certo("uma aba por ano, do mais novo ao mais velho, com a contagem", JSON.stringify(abas) === JSON.stringify(["2026:4", "2025:1", "2018:1"]), JSON.stringify(abas));
     const ano26 = html.slice(html.indexOf('id="ano-2026"'), html.indexOf('id="ano-2025"'));
     const ordem = [...ano26.matchAll(/class="transp-pub__quando">([^<]+)</g)].map((m) => m[1]);
-    certo("dentro do ano: o \"ano todo\" e depois Outubro, Setembro, Agosto — mesmo cadastrados fora de ordem",
-      JSON.stringify(ordem) === JSON.stringify(["Ano todo", "Outubro", "Setembro", "Agosto"]), JSON.stringify(ordem));
+    certo("dentro do ano: em ordem ALFABÉTICA do enunciado (2.16.0), mesmo cadastrados fora de ordem",
+      JSON.stringify(ordem) === JSON.stringify(["Agosto", "Outubro", "Setembro", "Ano todo"]), JSON.stringify(ordem));
     const abertas = [...ano26.matchAll(/<details class="transp-pub" id="doc-\d+"( open)?>/g)].map((m) => !!m[1]);
     certo("só a primeira publicação do ano vem aberta (a página não cresce sem fim)", JSON.stringify(abertas) === JSON.stringify([true, false, false, false]), JSON.stringify(abertas));
     certo("o rascunho em branco não vai ao ar", !/Novembro/.test(html));
     const ago = ano26.slice(ano26.indexOf(">Agosto<"));
     certo("a publicação de Agosto leva o PDF, com o nome dado", ago.includes(`href="${pdfOk.j.path}"`) && ago.includes("Relatório &quot;oficial&quot; de agosto") && ago.includes("PDF · abre em nova aba"));
     certo("…o link do Drive, dito como Google Drive", ago.includes('href="https://drive.google.com/file/d/zzqaago/view"') && ago.includes("Link · Google Drive"));
+    const srcFotos = [...ago.matchAll(/class="transp-foto" href="([^"]+)"/g)].map((m) => m[1]);
+    certo("os anexos saem em ordem ALFABÉTICA pelo nome (Abertura antes de Oficina)", JSON.stringify(srcFotos) === JSON.stringify([foto2, foto1]), JSON.stringify(srcFotos));
     certo("…as duas fotos, ampliáveis em grupo", (ago.match(/data-amplia="doc-\d+"/g) || []).length === 2 && ago.includes(`src="${foto1}"`) && ago.includes('alt="Oficina de artes"'));
     certo("…o vídeo, com a capa dele e sem baixar nada antes do play", /<video controls preload="none" playsinline poster="\/assets\/video\/zz-qa-acao\.jpg" src="\/assets\/video\/zz-qa-acao\.mp4"/.test(ago));
     certo("…e o resumo do que tem dentro", ago.includes("2 documentos · 2 fotos · 1 vídeo"));
@@ -212,9 +214,9 @@ const PDF = Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Roo
       && await na(`document.getElementById("doc-${idAgo}").open`));
     await na(`document.querySelector("#doc-${idAgo} [data-amplia]").click()`, true);
     const lupa1 = await na(`(() => { const d = document.querySelector(".transp-lupa"); return { aberta: !!(d && d.open), src: d && d.querySelector("img").getAttribute("src"), leg: d && d.querySelector(".transp-lupa__legenda").textContent }; })()`);
-    certo("a foto amplia, com a legenda e a posição", lupa1.aberta && lupa1.src === foto1 && /Oficina de artes\s+\(1\/2\)/.test(lupa1.leg), JSON.stringify(lupa1));
+    certo("a foto amplia, com a legenda e a posição", lupa1.aberta && lupa1.src === foto2 && /Abertura do evento\s+\(1\/2\)/.test(lupa1.leg), JSON.stringify(lupa1));
     await na(`document.querySelector(".transp-lupa__prox").click()`, true);
-    certo("…a seta leva à próxima da mesma publicação", (await na(`document.querySelector(".transp-lupa img").getAttribute("src")`)) === foto2);
+    certo("…a seta leva à próxima da mesma publicação", (await na(`document.querySelector(".transp-lupa img").getAttribute("src")`)) === foto1);
     await na(`document.querySelector(".transp-lupa__fechar").click()`, true);
     certo("…e fecha", !(await na(`document.querySelector(".transp-lupa").open`)));
 
@@ -231,9 +233,9 @@ const PDF = Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Roo
     const grupos = await na(`[...document.querySelectorAll(".transp-adm__ano")].map((h) => h.firstChild.textContent.trim())`);
     certo("no painel, as publicações vêm agrupadas por ano, do mais novo", JSON.stringify(grupos) === JSON.stringify(["2026", "2025", "2018"]), JSON.stringify(grupos));
     const titulos = await na(`[...document.querySelectorAll('.transp-adm [data-f="title"]')].slice(0, 5).map((i) => i.value)`);
-    certo("…na mesma ordem do site (ano todo, depois o mês mais recente)", titulos[0] === "Relatório anual 2026" && titulos[2] === "Mês de Outubro"
-      && titulos[3] === "Mês de Setembro" && titulos[4] === "Mês de Agosto <script>alert(1)</script>", JSON.stringify(titulos));
-    certo("…e o rascunho de Novembro aparece só no painel, para ser preenchido", titulos[1] === "");
+    certo("…na mesma ordem do site (A-Z pelo enunciado)", titulos[1] === "Mês de Agosto <script>alert(1)</script>" && titulos[2] === "Mês de Outubro"
+      && titulos[3] === "Mês de Setembro" && titulos[4] === "Relatório anual 2026", JSON.stringify(titulos));
+    certo("…e o rascunho em branco aparece só no painel, no topo, para ser preenchido", titulos[0] === "");
 
     /* + PDF pelo botão de verdade, numa publicação sem anexos (Setembro). */
     const idSet = await idDe("Mês de Setembro");
@@ -274,7 +276,7 @@ const PDF = Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Roo
     await na(`[...document.querySelectorAll("#doc-adm-${idSet} button")].find((b) => b.textContent === "Salvar").click()`, true);
     await ate(`[...document.querySelectorAll(".transp-adm__ano")].some((h) => /2025/.test(h.textContent) && /2 publica/.test(h.textContent))`, 6000);
     const ano25 = await na(`(() => { const hs = [...document.querySelectorAll(".transp-adm__ano")]; const h = hs.find((x) => /^2025/.test(x.textContent.trim())); const out = []; let el = h && h.nextElementSibling; while (el && !el.matches(".transp-adm__ano")) { out.push(el.querySelector('[data-f="title"]').value); el = el.nextElementSibling; } return out; })()`);
-    certo("trocar o ano e salvar leva a publicação para o grupo do novo ano, já em ordem", JSON.stringify(ano25) === JSON.stringify(["Mês de Setembro", "Mês de Março"]), JSON.stringify(ano25));
+    certo("trocar o ano e salvar leva a publicação para o grupo do novo ano, já em ordem", JSON.stringify(ano25) === JSON.stringify(["Mês de Março", "Mês de Setembro"]), JSON.stringify(ano25));
     const doBanco = (await conteudo()).find((d) => d.id === idSet);
     certo("…e o banco guardou o ano novo sem perder os anexos", doBanco.ano === "2025" && JSON.parse(doBanco.anexos).length === 2, JSON.stringify(doBanco));
 
