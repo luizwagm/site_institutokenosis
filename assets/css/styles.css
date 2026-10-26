@@ -618,13 +618,9 @@ h1, h2, h3, h4 {
   aspect-ratio: 16 / 9; object-fit: cover;
   transition: transform .6s ease;
 }
-/* Cartão do FEED (home e /feed/): a foto tem 250px de altura fixos.
-   (2.17.0) Era 500px; o Instituto pediu a capa "reduzida pelo meio, para uma
-   melhor visualização" — a METADE da altura, cortando por igual em cima e
-   embaixo (object-position no centro), para o título e o resumo subirem e
-   caberem mais notícias na tela. Só o CARTÃO: dentro da notícia a capa
-   continua inteira, na proporção dela (.materia-capa, mais abaixo).
-   Antes: mais alta que a da Memória, para a notícia ter presença.
+/* Cartão do FEED (home e /feed/): a foto tem 500px de altura fixos, como o
+   cliente pediu — mais alta que a da Memória, para a notícia ter presença.
+   (2.17.1) A 2.17.0 baixou para 250px; o cliente preferiu como era, e voltou.
    `height` fixo com `object-fit: cover` recorta o que sobra e mantém a fileira
    alinhada; por isso o `aspect-ratio` é anulado (senão ele brigaria com a
    altura).
@@ -634,7 +630,7 @@ h1, h2, h3, h4 {
    contrário — o cartão sozinho na largura toda pedia a foto grande, e a lista
    ficava sem peso. Uma altura só para os dois tamanhos. */
 .materia--feed .materia__foto img {
-  height: 250px; aspect-ratio: auto; object-position: center;
+  height: 500px; aspect-ratio: auto;
 }
 .materia:hover .materia__foto img { transform: scale(1.05); }
 .materia__corpo { padding: 1.4rem 1.5rem; display: flex; flex-direction: column; flex: 1; }
@@ -850,7 +846,7 @@ body.tem-cookie-barra .zap-flutua { bottom: calc(var(--cookie-barra-h, 0px) + 1.
    ========================================================================== */
 .materia__foto--video { position: relative; }
 /* (2.14.0) A capa agora é um quadro do próprio vídeo — e vídeo de celular é
-   EM PÉ. O cartão recorta para 16:9 (ou 250px de altura no Feed); cortando
+   EM PÉ. O cartão recorta para 16:9 (ou 500px de altura no Feed); cortando
    pelo centro, o rosto de quem fala fica pela metade. Um pouco acima do meio
    é onde ele costuma estar. */
 .materia__foto--video img { object-position: center 30%; }

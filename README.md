@@ -50,6 +50,8 @@ sempre HTML pronto, com o SEO já embutido — não há renderização por requi
   usa a 1ª mídia do carrossel como miniatura (antes saía sem nenhuma).
 - **2.17.0 — capa do cartão do Feed com metade da altura** (500px → 250px, corte pelo
   centro), no /feed/ e na home. Dentro da notícia nada muda.
+- **2.17.1 — desfeito:** o cliente preferiu a capa como era; o cartão do Feed voltou a
+  500px de altura.
 
 Para republicar sem abrir o painel (útil em script):
 
