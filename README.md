@@ -48,6 +48,8 @@ sempre HTML pronto, com o SEO já embutido — não há renderização por requi
   relê o banco e conta fotos/vídeos, e o servidor recusa (409) apagar como rascunho
   (`DELETE ?rascunho=1`) qualquer linha com conteúdo. Também: publicação sem foto de capa
   usa a 1ª mídia do carrossel como miniatura (antes saía sem nenhuma).
+- **2.17.0 — capa do cartão do Feed com metade da altura** (500px → 250px, corte pelo
+  centro), no /feed/ e na home. Dentro da notícia nada muda.
 
 Para republicar sem abrir o painel (útil em script):
 
