@@ -1227,7 +1227,22 @@ async function saveRow(t, id) {
   const body = {};
   document.querySelectorAll(`[data-t="${t}"][data-id="${id}"]`).forEach((el) => body[el.dataset.f] = el.value);
   await api(`/api/${t}/${id}`, "PUT", body);
+  /* (2.16.1) A MEMÓRIA DA TELA ACOMPANHA O QUE FOI SALVO. Antes o painel
+     gravava no banco e continuava com a cópia antiga (a do cadastro em
+     branco); o próximo "+ Nova publicação" redesenhava a lista com ela, a
+     publicação salva aparecia vazia — e o descarte de rascunho a apagava. */
+  const linha = (DATA[t] || []).find((x) => String(x.id) === String(id));
+  if (linha) Object.assign(linha, body);
   toast("Salvo! Lembre de publicar.");
+}
+/* (2.16.1) Antes de redesenhar uma lista, o que está DIGITADO na tela (salvo
+   ou não) passa para a memória — senão o redesenho apagaria da tela o que a
+   pessoa escreveu e ainda não salvou. */
+function guardarTela(t) {
+  for (const el of document.querySelectorAll(`#${t}-list [data-t="${t}"][data-id][data-f]`)) {
+    const linha = (DATA[t] || []).find((x) => String(x.id) === el.dataset.id);
+    if (linha) linha[el.dataset.f] = el.value;
+  }
 }
 async function addRow(t) {
   const blank = {
@@ -1246,6 +1261,7 @@ async function addRow(t) {
      /api/content inteiro em seguida — o conteúdo do site todo, com os serviços
      e projetos que vêm do PostgreSQL. Eram ~900ms para acrescentar um cadastro
      vazio, e quem clicava ficava olhando para uma tela parada. */
+  guardarTela(t);   // (2.16.1) o redesenho abaixo não pode apagar o que está na tela
   const r = await api("/api/" + t, "POST", blank);
   if (r && r.item) DATA[t] = [r.item, ...(DATA[t] || [])];
   else DATA = await api("/api/content");        // servidor antigo: caminho de antes
@@ -1278,7 +1294,16 @@ async function addRow(t) {
 
    `slug` e `date` ficam de fora da conta: os dois são preenchidos sozinhos no
    nascimento e estariam sempre "cheios", o que nunca deixaria nada ser
-   descartado. */
+   descartado.
+
+   (2.16.1) E O "BANCO" É O BANCO DE VERDADE. Em 23/10/2026 este descarte
+   APAGOU publicações inteiras: ele julgava pela cópia que o painel guardava
+   na memória, que estava velha (a do cadastro em branco). Agora:
+     · relê do servidor antes de decidir;
+     · fotos e vídeos do carrossel (e anexos) contam como conteúdo;
+     · e pede com ?rascunho=1 — o servidor confere de novo e recusa (409)
+       apagar qualquer linha que tenha conteúdo. Três travas, cada uma
+       sozinha bastaria. */
 const AREAS_DE_RASCUNHO = ["posts", "feed", "documentos"];
 async function descartarVazios(t) {
   if (!AREAS_DE_RASCUNHO.includes(t) || !Array.isArray(DATA[t]) || !DATA[t].length) return;
@@ -1291,12 +1316,17 @@ async function descartarVazios(t) {
      publicação tem conteúdo é o enunciado, a descrição e os anexos. */
   const campos = t === "documentos" ? ["title", "tipo"]
     : TDEFS[t].map(([f]) => f).filter((f) => f !== "slug" && f !== "date");
+  let doBanco;
+  try { doBanco = (await api("/api/content"))[t] || []; } catch { return; }   // sem resposta: não arrisca
+  const temMidia = (v) => { try { const l = JSON.parse(v || "[]"); return Array.isArray(l) && l.length > 0; } catch { return !semNada(v); } };
   const apagados = [];
-  for (const r of DATA[t]) {
+  for (const r of doBanco) {
     if (!campos.every((f) => semNada(r[f]) && semNada(naTela(r.id, f)))) continue;
+    if (temMidia(r.midias) || (MIDIAS[r.id] || []).length) continue;
     if (t === "documentos" && (anexosDoDoc(r).length || (ANEXOS[r.id] || []).length)) continue;
-    try { await api(`/api/${t}/${r.id}`, "DELETE"); apagados.push(r.id); } catch { /* fica para a próxima */ }
+    try { await api(`/api/${t}/${r.id}?rascunho=1`, "DELETE"); apagados.push(r.id); } catch { /* o servidor recusou ou falhou: fica */ }
   }
+  DATA[t] = doBanco;
   if (!apagados.length) return;
   DATA[t] = DATA[t].filter((r) => !apagados.includes(r.id));
   renderTable(t);

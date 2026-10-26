@@ -208,14 +208,18 @@ const JPEG = (enchimento = 64) =>
     console.log("\n  3. o site usa a capa, e o painel tira a foto certa");
     const srv = fs.readFileSync(path.join(__dirname, "server.js"), "utf8");
     const adm = fs.readFileSync(path.join(__dirname, "admin", "index.html"), "utf8");
+    /* (2.16.1) o cartão escolhe a imagem por imagemDoCartao: a capa, ou a 1ª
+       mídia do carrossel — vídeo vira o quadro dele, e a genérica só na falta */
     verdade("o cartão da lista usa a capa do vídeo (e a genérica só na falta)",
-      srv.includes("capaDoVideo(p.image) || CAPA_VIDEO) : p.image)}"));
-    ok("o pôster do vídeo dentro da matéria usa a capa (Memória e Feed)",
-      srv.split('poster="${esc(capaDoVideo(p.image) || CAPA_VIDEO)}"').length - 1, 2);
-    ok("o JSON-LD aponta a capa como imagem do artigo (Memória e Feed)",
-      srv.split("SITE + (capaDoVideo(p.image) || CAPA_VIDEO)").length - 1, 2);
+      srv.includes("{ url: capaDoVideo(m.url) || CAPA_VIDEO, video: true }") && srv.includes("(imagemDoCartao(p))}"));
+    verdade("o pôster do vídeo dentro da matéria usa a capa (Memória e Feed)",
+      srv.split('poster="${esc(capaDoVideo(p.image) || CAPA_VIDEO)}"').length - 1 === 1      // Memória
+      && srv.split('poster="${esc(capaDoVideo(m.url) || CAPA_VIDEO)}"').length - 1 >= 2);   // Feed: capa única e carrossel
+    verdade("o JSON-LD aponta a capa como imagem do artigo (Memória e Feed)",
+      srv.split("SITE + (capaDoVideo(p.image) || CAPA_VIDEO)").length - 1 === 1
+      && srv.includes("SITE + c.url) : undefined)(imagemDoCartao(p))"));
     verdade("a capa tem largura e altura medidas (a página não pula quando ela chega)",
-      srv.includes("medidasDoImg(capaDoVideo(p.image))"));
+      srv.includes("medidasDoImg(c.url) || ' width=\"900\" height=\"560\"'"));
     /* Vídeo gravado por MediaRecorder diz Infinity de duração. A primeira
        versão supunha 1 s, e toda tentativa caía no começo preto. */
     verdade("sem duração no cabeçalho, a captura mede pulando ao fim",

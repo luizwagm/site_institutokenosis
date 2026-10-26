@@ -268,6 +268,88 @@ const PNG_1X1 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfF
     const salvo = (await conteudo()).feed.find((f) => f.id === idVarias);
     certo("Salvar a matéria guarda o texto e mantém as mídias", salvo.excerpt === "Resumo novo." && JSON.parse(salvo.midias).length === 3, JSON.stringify({ excerpt: salvo.excerpt, midias: salvo.midias }));
 
+    /* ------------------------------------------------- 4. o caso de 23/10/2026 (2.16.1)
+       O passo a passo de quem reclamou, no painel de verdade: publicação com 2
+       vídeos no carrossel (sem foto de capa), Salvar; "+ Nova publicação" com 10
+       fotos, Salvar; trocar de tela. Antes, a primeira era APAGADA pelo descarte
+       de rascunho (que julgava por uma cópia velha da tela), e o cartão do Feed
+       de uma publicação só com vídeos saía sem miniatura. */
+    await cdp("Page.navigate", { url: BASE + "/admin/" });
+    await ate(`!!document.querySelector('.navbtn[data-p="feed"]')`, 15000);
+    await na(`window.confirm = () => true; document.querySelector('.navbtn[data-p="feed"]').click(); true`, true);
+    await espera(400);
+    const novaPub = async () => {
+      const antes = await na(`[...document.querySelectorAll('#feed-list [data-t="feed"][data-f="title"]')].map((i) => i.dataset.id)`);
+      await na(`[...document.querySelectorAll("button")].find((b) => b.getAttribute("onclick") === "addRow('feed')").click()`, true);
+      await ate(`document.querySelectorAll('#feed-list [data-t="feed"][data-f="title"]').length > ${antes.length}`, 8000);
+      return await na(`[...document.querySelectorAll('#feed-list [data-t="feed"][data-f="title"]')].map((i) => i.dataset.id).find((x) => !${JSON.stringify(antes)}.includes(x))`);
+    };
+    const campoDe = (id, campo) => `document.querySelector('[data-t="feed"][data-id="${id}"][data-f="${campo}"]')`;
+    const setar = (id, campo, valor) => na(`(() => { const el = ${campoDe(id, campo)}; el.value = ${JSON.stringify(valor)}; el.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
+    const salvar = async (id) => { await na(`[...document.querySelectorAll("button")].find((b) => b.getAttribute("onclick") === "saveRow('feed',${id})").click()`, true); await espera(800); };
+    const enviarArquivos = async (id, rotulo, arquivos) => {
+      eventos.length = 0;
+      await na(`[...document.querySelectorAll("#midias-${id} ~ .anexos__botoes button")].find((b) => b.textContent.includes(${JSON.stringify(rotulo)})).click()`, true);
+      let esc = null;
+      for (let t = 0; t < 5000 && !esc; t += 100) { esc = eventos.find((x) => x.method === "Page.fileChooserOpened"); if (!esc) await espera(100); }
+      if (esc) await cdp("DOM.setFileInputFiles", { files: arquivos, backendNodeId: esc.params.backendNodeId });
+      await ate(`document.querySelectorAll("#midias-${id} .midia").length === ${arquivos.length}`, 60000);
+      await espera(800);
+    };
+    const v1 = path.join(TMP, "caso-video-1.webm"), v2 = path.join(TMP, "caso-video-2.webm");
+    fs.writeFileSync(v1, Buffer.from(webm, "base64")); fs.writeFileSync(v2, Buffer.from(webm, "base64"));
+    const fotos10 = [];
+    for (let i = 0; i < 10; i++) {
+      const b64 = await na(`(() => { const c = document.createElement("canvas"); c.width = 400; c.height = 300; const g = c.getContext("2d"); g.fillStyle = "hsl(${i * 36},70%,55%)"; g.fillRect(0, 0, 400, 300); return c.toDataURL("image/png").split(",")[1]; })()`);
+      const p10 = path.join(TMP, `caso-foto-${i}.png`); fs.writeFileSync(p10, Buffer.from(b64, "base64")); fotos10.push(p10);
+    }
+    await cdp("Page.setInterceptFileChooserDialog", { enabled: true });
+    const idVid = await novaPub();
+    await setar(idVid, "title", "Zz Qa Caso Vídeos");
+    await setar(idVid, "excerpt", "Dois vídeos no carrossel, sem foto de capa.");
+    await enviarArquivos(idVid, "Vídeos", [v1, v2]);
+    await salvar(idVid);
+    const idFot = await novaPub();
+    certo("\"+ Nova publicação\" NÃO apaga da tela a publicação salva antes", (await na(`${campoDe(idVid, "title")}.value`)) === "Zz Qa Caso Vídeos", await na(`${campoDe(idVid, "title")}.value`));
+    await setar(idFot, "title", "Zz Qa Caso Fotos");
+    await enviarArquivos(idFot, "Fotos", fotos10);
+    await setar(idFot, "excerpt", "Dez fotos.");
+    /* texto digitado e AINDA NÃO salvo sobrevive a uma nova "+ Nova publicação" */
+    const idTerceira = await novaPub();
+    certo("…nem o que estava digitado e ainda não salvo", (await na(`${campoDe(idFot, "excerpt")}.value`)) === "Dez fotos.", await na(`${campoDe(idFot, "excerpt")}.value`));
+    await salvar(idFot);
+    /* troca de tela: é aqui que o descarte de rascunho age */
+    await na(`document.querySelector('.navbtn[data-p="posts"]').click(); true`, true);
+    await espera(2500);
+    const feedAgora = (await conteudo()).feed;
+    const pv = feedAgora.find((x) => String(x.id) === String(idVid)), pf = feedAgora.find((x) => String(x.id) === String(idFot));
+    certo("depois de trocar de tela, a publicação com os 2 vídeos CONTINUA no banco", pv && pv.title === "Zz Qa Caso Vídeos" && JSON.parse(pv.midias || "[]").length === 2, JSON.stringify(pv && { t: pv.title, m: pv.midias }));
+    certo("…e a das 10 fotos também", pf && pf.title === "Zz Qa Caso Fotos" && JSON.parse(pf.midias || "[]").length === 10, JSON.stringify(pf && { t: pf.title, n: JSON.parse(pf.midias || "[]").length }));
+    certo("…e só o rascunho em branco de verdade foi descartado", !feedAgora.some((x) => String(x.id) === String(idTerceira)));
+    /* a trava do servidor, sozinha */
+    const recusaRasc = await api(`/api/feed/${idVid}?rascunho=1`, "DELETE");
+    certo("o servidor RECUSA apagar como rascunho uma publicação com conteúdo (409)", recusaRasc.status === 409 && (await conteudo()).feed.some((x) => String(x.id) === String(idVid)), String(recusaRasc.status));
+    const soMidias = await api("/api/feed", "POST", { title: "", excerpt: "", content: "", image: "", date: new Date().toISOString().slice(0, 10),
+      midias: JSON.stringify([{ tipo: "foto", url: f2 }]) });
+    const recusaMidia = await api(`/api/feed/${soMidias.j.item.id}?rascunho=1`, "DELETE");
+    certo("…nem uma que só tem fotos no carrossel, sem título", recusaMidia.status === 409, String(recusaMidia.status));
+    await api(`/api/feed/${soMidias.j.item.id}`, "DELETE");
+    const vazia = await api("/api/feed", "POST", { title: "", excerpt: "", content: "", image: "", date: new Date().toISOString().slice(0, 10) });
+    certo("…mas apaga o rascunho realmente vazio", (await api(`/api/feed/${vazia.j.item.id}?rascunho=1`, "DELETE")).status === 200);
+    /* a miniatura da publicação só com vídeos */
+    await api("/api/publish", "POST");
+    const listaCaso = ler("feed/index.html");
+    const slugVid = pv.slug;
+    const cartaoVid = (new RegExp(`<a class="materia__foto([^"]*)" href="/feed/${slugVid}/"[^>]*>(.*?)</a>`, "s").exec(listaCaso) || []);
+    certo("no Feed, a publicação SÓ COM VÍDEOS no carrossel ganha miniatura: o quadro do 1º vídeo", cartaoVid.length && / materia__foto--video/.test(cartaoVid[1])
+      && /<img src="\/assets\/(video\/[^"]+\.jpg|img\/capa-video\.svg)"/.test(cartaoVid[2]) && /materia__qtd/.test(cartaoVid[2]), (cartaoVid[0] || "cartão não achado").slice(0, 200));
+    const umaSo = await api("/api/feed", "POST", { title: "Zz Qa Uma Midia No Carrossel", excerpt: "x", content: "<p>x</p>", image: "", date: new Date().toISOString().slice(0, 10),
+      midias: JSON.stringify([{ tipo: "foto", url: f2 }]) });
+    await api("/api/publish", "POST");
+    const pagUma = ler(`feed/${umaSo.j.item.slug}/index.html`);
+    certo("matéria com UMA foto só no carrossel (sem capa): a página mostra a foto", new RegExp(`<figure class="materia-capa" data-revela><img src="${f2}"`).test(pagUma));
+    certo("…e o cartão também", new RegExp(`href="/feed/${umaSo.j.item.slug}/"[^>]*><img src="${f2}"`).test(ler("feed/index.html")));
+
     ws.close();
   } catch (e) {
     falhas.push("execução: " + e.message);

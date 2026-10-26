@@ -94,7 +94,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "2.16.0";
+const APP_VERSION = "2.16.1";
 
 /* ==========================================================================
    CONSULTA DE CEP
@@ -270,6 +270,15 @@ function midiasDe(p) {
           .map((m) => ({ tipo: m.tipo, url: m.url }))
       : [];
   } catch { return []; }
+}
+/* (2.16.1) A IMAGEM DO CARTÃO quando a matéria não tem foto de capa: a 1ª
+   mídia do carrossel — e, se for vídeo, o quadro tirado dele. Antes o cartão
+   só olhava `image`: uma publicação feita só com vídeos no carrossel ia ao
+   Feed SEM miniatura nenhuma (aconteceu no ar em 23/10/2026). */
+function imagemDoCartao(p) {
+  const m = todasAsMidias(p)[0];
+  if (!m) return null;
+  return m.tipo === "video" ? { url: capaDoVideo(m.url) || CAPA_VIDEO, video: true } : { url: m.url, video: false };
 }
 /* Todas as mídias da matéria, a capa primeiro. */
 const todasAsMidias = (p) => [...(p.image ? [{ tipo: ehVideo(p.image) ? "video" : "foto", url: p.image }] : []), ...midiasDe(p)];
@@ -1434,7 +1443,7 @@ async function publish() {
   const seloMidias = (p, area) => { const n = area === "feed" ? todasAsMidias(p).length : 0;
     return n > 1 ? `<span class="materia__qtd" aria-label="${n} fotos e vídeos">${n}</span>` : ""; };
   const cartaoMateria = (p, i, area) => `<article class="materia materia--${area}" data-revela${i % 3 ? ` data-revela-atraso="${i % 3}"` : ""}>
-            ${p.image ? `<a class="materia__foto${ehVideo(p.image) ? " materia__foto--video" : ""}" href="/${area}/${esc(p.slug)}/" tabindex="-1" aria-hidden="true">${seloMidias(p, area)}<img src="${esc(ehVideo(p.image) ? (capaDoVideo(p.image) || CAPA_VIDEO) : p.image)}" alt="${esc(p.title)}" loading="lazy" decoding="async"${ehVideo(p.image) ? (medidasDoImg(capaDoVideo(p.image)) || ' width="900" height="560"') : (medidasDoImg(p.image) || ' width="900" height="560"')}></a>` : ""}
+            ${((c) => c ? `<a class="materia__foto${c.video ? " materia__foto--video" : ""}" href="/${area}/${esc(p.slug)}/" tabindex="-1" aria-hidden="true">${seloMidias(p, area)}<img src="${esc(c.url)}" alt="${esc(p.title)}" loading="lazy" decoding="async"${medidasDoImg(c.url) || ' width="900" height="560"'}></a>` : "")(imagemDoCartao(p))}
             <div class="materia__corpo">
               <time class="materia__data" datetime="${esc(p.date)}">${dataBR(p.date)}</time>
               <h3 class="materia__titulo"><a href="/${area}/${esc(p.slug)}/">${esc(p.title)}</a></h3>
@@ -1741,13 +1750,15 @@ async function publish() {
       /* `preload="metadata"`: baixa só o cabeçalho, para saber duração e
          proporção. Com "auto", abrir a matéria começaria a puxar o vídeo
          inteiro de quem só queria ler o texto. */
+      /* (2.16.1) a mídia única pode estar no carrossel, e não na capa */
       FIGURA: todasAsMidias(p).length > 1 ? carrossel(todasAsMidias(p), p.title)
-        : !p.image ? ""
-        : ehVideo(p.image)
-        ? `<figure class="materia-capa materia-capa--video" data-revela><video src="${esc(p.image)}" controls preload="metadata" playsinline poster="${esc(capaDoVideo(p.image) || CAPA_VIDEO)}"></video></figure>`
-        : `<figure class="materia-capa" data-revela><img src="${esc(p.image)}" alt="${esc(p.title)}" fetchpriority="high" decoding="async"${medidasDoImg(p.image)}></figure>`,
+        : ((m) => !m ? ""
+        : m.tipo === "video"
+        ? `<figure class="materia-capa materia-capa--video" data-revela><video src="${esc(m.url)}" controls preload="metadata" playsinline poster="${esc(capaDoVideo(m.url) || CAPA_VIDEO)}"></video></figure>`
+        : `<figure class="materia-capa" data-revela><img src="${esc(m.url)}" alt="${esc(p.title)}" fetchpriority="high" decoding="async"${medidasDoImg(m.url)}></figure>`)(todasAsMidias(p)[0]),
       JSONLD: jsonldTag({ "@context": "https://schema.org", "@type": "Article",
-        headline: p.title, description: p.excerpt, image: ehVideo(p.image) ? SITE + (capaDoVideo(p.image) || CAPA_VIDEO) : p.image, datePublished: p.date, inLanguage: "pt-BR",
+        headline: p.title, description: p.excerpt,
+        image: ((c) => c ? (/^https?:/.test(c.url) ? c.url : SITE + c.url) : undefined)(imagemDoCartao(p)), datePublished: p.date, inLanguage: "pt-BR",
         author: { "@id": `${SITE}/#org` }, publisher: { "@id": `${SITE}/#org` },
         mainEntityOfPage: `${SITE}/feed/${p.slug}/` }),
     }));
@@ -2498,6 +2509,21 @@ Consulte <code>journalctl -u kenosis -n 40</code>.</small></p></div>`);
           return json(res, 200, { ok: true });
         }
         if (req.method === "DELETE" && id) {
+          /* (2.16.1) O DESCARTE DE RASCUNHO NUNCA APAGA CONTEÚDO. O painel
+             apaga sozinho o cadastro que ficou em branco (ao trocar de tela),
+             e pede com ?rascunho=1. Em 23/10/2026 ele apagou publicações
+             INTEIRAS — com vídeos, fotos e texto — porque julgava pelo que
+             tinha na memória da tela, que estava velho. Aqui a decisão é do
+             BANCO: se a linha tem qualquer coisa, a resposta é 409 e nada
+             some. O "Excluir" de verdade (sem ?rascunho) continua valendo. */
+          if (new URL(req.url, "http://localhost").searchParams.get("rascunho") === "1") {
+            const linha = db.prepare(`SELECT * FROM ${table} WHERE id=?`).get(id);
+            const vazio = (v) => !String(v ?? "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+            const campos = ["title", "excerpt", "content", "image", "tipo", "url", "name", "role", "bio", "photo", "subtitle"];
+            const temMidia = (v) => { try { const l = JSON.parse(v || "[]"); return Array.isArray(l) && l.length > 0; } catch { return !vazio(v); } };
+            if (linha && (campos.some((c) => c in linha && !vazio(linha[c])) || temMidia(linha.midias) || temMidia(linha.anexos)))
+              return json(res, 409, { error: "Este cadastro tem conteúdo — não é rascunho e não foi apagado." });
+          }
           db.prepare(`DELETE FROM ${table} WHERE id=?`).run(id);
           return json(res, 200, { ok: true });
         }

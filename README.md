@@ -41,6 +41,13 @@ sempre HTML pronto, com o SEO já embutido — não há renderização por requi
   da matéria abre com um carrossel (scroll-snap, funciona sem script; setas,
   pontos e teclado pelo `iniCarrossel`); o cartão da lista ganha um selo com a
   contagem. Prova: `node testar-feed-e-ordem.js`.
+- **2.16.1 — o descarte de rascunho apagava publicações:** o painel julgava pela cópia
+  que guardava da tela (velha depois de Salvar); "+ Nova publicação" redesenhava a lista
+  com ela e, ao trocar de tela, apagava a publicação salva (aconteceu no ar em 23/10/2026).
+  Agora: Salvar atualiza a memória, o redesenho preserva o que está digitado, o descarte
+  relê o banco e conta fotos/vídeos, e o servidor recusa (409) apagar como rascunho
+  (`DELETE ?rascunho=1`) qualquer linha com conteúdo. Também: publicação sem foto de capa
+  usa a 1ª mídia do carrossel como miniatura (antes saía sem nenhuma).
 
 Para republicar sem abrir o painel (útil em script):
 
