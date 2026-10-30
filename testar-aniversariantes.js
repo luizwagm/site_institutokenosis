@@ -158,13 +158,26 @@ verdade("o envio do carrossel/anexos também usa o motivo",
 const vmax = /const VIDEO_MAX = Number\(process\.env\.VIDEO_MAX_MB \|\| (\d+)\)/.exec(fs.readFileSync(path.join(__dirname, "server.js"), "utf8"));
 const vpainel = /const VIDEO_MAX_MB = (\d+);/.exec(ADMIN);
 ok("o limite do painel é o mesmo do servidor", vpainel && vpainel[1], vmax && vmax[1]);
+/* 2.17.3: o cliente tem vídeo de 68 MB e pediu "acima de 100 MB". */
+ok("o limite do vídeo é de 300 MB (o de 120 já não bastava)", Number(vmax && vmax[1]), 300);
+verdade("nenhum teto de 120 MB esquecido no painel", !/120 \* 1024 \* 1024|até 120 MB|limite é 120 MB/.test(ADMIN));
+/* O Node corta pedido que dure mais de 5 min (requestTimeout padrão): um
+   vídeo grande em upload lento seria cortado no meio, depois do nginx liberar. */
+const SERVER = fs.readFileSync(path.join(__dirname, "server.js"), "utf8");
+const rt = /servidor\.requestTimeout = (\d+) \* 60 \* 1000;/.exec(SERVER);
+verdade("o prazo do Node para um pedido passa de 5 min (vídeo grande em upload lento)", rt && Number(rt[1]) >= 20);
 
+const tetoNovo = /^TETO="(\d+)m"$/m.exec(NGINX_NOVO);
+const prazoNovo = /^PRAZO="(\d+)s"$/m.exec(NGINX_NOVO);
 for (const [nome, txt] of [["liberar-envios.sh", NGINX_NOVO], ["criar-site.sh", NGINX_CRIAR]]) {
   const bloco = /location ~ \^\/api\/upload-\(video\|pdf\)\\?\$ \{([\s\S]*?)\n    \}/.exec(txt);
   verdade(`${nome}: tem o location das duas rotas de envio`, bloco);
   const corpo = bloco ? bloco[1] : "";
-  const mb = /client_max_body_size\s+(\d+)m;/.exec(corpo);
+  const mb = /client_max_body_size\s+(\d+)m;/.exec(corpo) || (/__TETO__/.test(corpo) && tetoNovo);
   verdade(`${nome}: o teto do bloco passa do limite do vídeo`, mb && Number(mb[1]) > Number(vmax && vmax[1]));
+  const prazo = /proxy_read_timeout\s+(\d+)s;/.exec(corpo) || (/__PRAZO__/.test(corpo) && prazoNovo);
+  verdade(`${nome}: prazo de pelo menos 20 min no envio`, prazo && Number(prazo[1]) >= 1200);
+  verdade(`${nome}: o bloco termina na marca de fim`, /\n    \}\n    (# kenosis: fim dos envios grandes|__FIM_BLOCO__)\n/.test(txt));
   verdade(`${nome}: corpo em fluxo (proxy_request_buffering off)`, /proxy_request_buffering off;/.test(corpo));
   verdade(`${nome}: repassa X-Forwarded-Proto e X-Forwarded-For`,
     /X-Forwarded-Proto/.test(corpo) && /X-Forwarded-For/.test(corpo));
@@ -172,6 +185,14 @@ for (const [nome, txt] of [["liberar-envios.sh", NGINX_NOVO], ["criar-site.sh", 
 verdade("liberar-envios.sh devolve a cópia quando o nginx -t recusa",
   /if ! nginx -t[\s\S]*?cp "\$COPIA" "\$ARQ"/.test(NGINX_NOVO));
 verdade("liberar-envios.sh usa heredoc entre aspas (nada expandido pelo shell)", /<<'FIM'/.test(NGINX_NOVO));
+/* A 2.17.2 parava em "já está lá" e deixava o teto antigo: rodar de novo
+   tem de TROCAR o bloco, não sair. */
+verdade("liberar-envios.sh troca um bloco anterior em vez de sair", !/nada a fazer/.test(NGINX_NOVO) &&
+  /index\(\$0, ini\) \{ pulando = 1; next \}/.test(NGINX_NOVO));
+verdade("liberar-envios.sh acha o vhost pelo server_name quando o arquivo tem outro nome",
+  /grep -lE "server_name[^"]*\$DOMINIO/.test(NGINX_NOVO));
+const provaMb = /head -c \$\(\((\d+) \* 1024 \* 1024\)\)/.exec(NGINX_NOVO);
+verdade("a prova do script envia mais de 100 MB", provaMb && Number(provaMb[1]) > 100);
 verdade("liberar-envios.sh está com fim de linha LF", !NGINX_NOVO.includes("\r"));
 
 console.log(`\n  ${passou} passaram, ${falhou} falharam\n`);

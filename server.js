@@ -94,7 +94,7 @@ const PORT = Number(process.env.PORT) || 5189;   // PORT permite subir uma cópi
    não do HTML: assim, mesmo com o navegador servindo o admin do cache, o número
    exibido é sempre o da versão que está REALMENTE rodando no servidor.
    Subir ao publicar alterações no painel ou no server.js. */
-const APP_VERSION = "2.17.2";
+const APP_VERSION = "2.17.3";
 
 /* ==========================================================================
    CONSULTA DE CEP
@@ -163,7 +163,10 @@ const UPLOAD_DIR = path.join(ROOT, "assets", "img", "uploads");
    mesmo tempo. O vídeo em si toca DENTRO da matéria.
    ========================================================================== */
 const VIDEO_DIR = path.join(ROOT, "assets", "video");
-const VIDEO_MAX = Number(process.env.VIDEO_MAX_MB || 120) * 1024 * 1024;
+/* 300 MB (2.17.3; era 120). O cliente filma no celular e um vídeo de poucos
+   minutos já passa de 100 MB. Acima disso, YouTube + link. O nginx precisa de
+   teto MAIOR que este (nginx/liberar-envios.sh), senão barra antes. */
+const VIDEO_MAX = Number(process.env.VIDEO_MAX_MB || 300) * 1024 * 1024;
 const CAPA_VIDEO = "/assets/img/capa-video.svg";
 const ehVideo = (u) => /\.(mp4|webm|ogv)(\?|#|$)/i.test(String(u || ""));
 
@@ -2985,6 +2988,13 @@ subindoGestao = (async () => {
    acima nem por `chat.rota()`. Sem esta linha o chat carrega, autentica e
    nunca recebe mensagem em tempo real — sem erro nenhum aparecendo. */
 chat.conectarUpgrade(servidor);
+
+/* O Node corta qualquer pedido que leve mais de 5 min (requestTimeout padrão).
+   Um vídeo de 300 MB num upload de escritório (~8 Mbit/s) leva isso ou mais, e
+   seria cortado no meio sem aviso. 30 min cobre o pior caso razoável; o nginx
+   na frente continua segurando o resto (ele só repassa pedido completo, exceto
+   nas duas rotas de envio). */
+servidor.requestTimeout = 30 * 60 * 1000;
 
 servidor.listen(PORT, process.env.HOST || "127.0.0.1", async () => {
   console.log(`\n  Instituto Kenósis — site + gerenciador v${APP_VERSION}`);

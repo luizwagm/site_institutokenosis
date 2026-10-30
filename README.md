@@ -58,6 +58,12 @@ sempre HTML pronto, com o SEO já embutido — não há renderização por requi
   duas partes: `sudo ./nginx/liberar-envios.sh` (UMA vez no servidor) libera 130 MB só para
   `/api/upload-video` e `/api/upload-pdf`, em fluxo; e o painel agora diz o motivo da
   recusa (tamanho, sessão, servidor reiniciando) e barra antes de enviar o que passa de 120 MB.
+- **2.17.3 — vídeo de até 300 MB** (o cliente tinha um de 68 MB e pediu acima de 100). Em
+  produção, depois da 2.17.2, o nginx ainda barrava tudo acima de 25 MB: o script não tinha
+  valido no servidor. Agora: limite de 300 MB no painel e no servidor; o Node aceita pedido de
+  até 30 min (o padrão de 5 min cortaria um vídeo grande num upload lento); e o
+  `liberar-envios.sh` põe 320 MB e 30 min no nginx, acha o vhost pelo `server_name`, TROCA o
+  bloco de uma versão anterior (antes parava em "já está lá") e prova com 150 MB.
 
 Para republicar sem abrir o painel (útil em script):
 
@@ -203,8 +209,8 @@ O `criar-site.sh` já deixa configurado:
 
 - `client_max_body_size 25m` — o painel envia foto em base64; o padrão de 1 MB
   devolveria 413.
-- um `location` só para `/api/upload-video` e `/api/upload-pdf` com 130 MB e corpo em
-  fluxo — vídeo é de até 120 MB. Servidor instalado antes da 2.17.2: rode uma vez
+- um `location` só para `/api/upload-video` e `/api/upload-pdf` com 320 MB e corpo em
+  fluxo — vídeo é de até 300 MB. Servidor instalado antes da 2.17.2: rode uma vez
   `sudo ./nginx/liberar-envios.sh institutokenosis.com`.
 - `X-Forwarded-For` e `X-Forwarded-Proto` — sem eles o contador vê um único
   visitante e o cookie de sessão perde o `Secure`.

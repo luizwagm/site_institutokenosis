@@ -1407,7 +1407,7 @@ function renderDocumentos() {
         <button class="btn btn-ghost btn-sm" onclick="anexarFotos(${d.id}, this)">+ Fotos</button>
         <button class="btn btn-ghost btn-sm" onclick="anexarVideo(${d.id}, this)">+ Vídeo</button>
       </div>
-      <p class="hint">PDF de até 30 MB, fotos (várias de uma vez) e vídeo de até 120 MB. Arquivo maior? Suba no Google Drive e use <b>+ Link</b>.</p>
+      <p class="hint">PDF de até 30 MB, fotos (várias de uma vez) e vídeo de até 300 MB. Arquivo maior? Suba no Google Drive e use <b>+ Link</b>.</p>
       <div class="right mt">
         <a class="btn btn-ghost btn-sm" href="/transparencia/#doc-${d.id}" target="_blank" style="text-decoration:none">Ver no site</a>
         <button class="btn btn-danger btn-sm" onclick="delRow('documentos',${d.id})">Excluir</button>
@@ -1500,7 +1500,7 @@ function motivoDaRecusa(xhr, r, padrao) {
   if (xhr.status === 502 || xhr.status === 503 || xhr.status === 504) return "O servidor demorou ou estava reiniciando. Tente de novo em instantes.";
   return `${padrao} (código ${xhr.status || "sem resposta"}).`;
 }
-const VIDEO_MAX_MB = 120;   // o mesmo VIDEO_MAX do server.js
+const VIDEO_MAX_MB = 300;   // o mesmo VIDEO_MAX do server.js
 /* Envio em binário com progresso — o mesmo contrato do /api/upload-video. */
 function enviarBinario(rota, file, tipo, aoAndar) {
   return new Promise((ok, falha) => {
@@ -1588,7 +1588,7 @@ async function anexarFotos(id, btn) {
 async function anexarVideo(id, btn) {
   const arquivos = await escolherArquivos("video/mp4,video/webm,video/ogg,video/quicktime", true);
   await anexarEm(id, btn, arquivos, async (f, andar) => {
-    if (f.size > 120 * 1024 * 1024) throw new Error(`tem ${Math.round(f.size / 1048576)} MB; o limite é 120 MB — use o link do Drive ou do YouTube`);
+    if (f.size > VIDEO_MAX_MB * 1048576) throw new Error(`tem ${Math.round(f.size / 1048576)} MB; o limite é ${VIDEO_MAX_MB} MB — use o link do Drive ou do YouTube`);
     const url = await enviarBinario("/api/upload-video", f, f.type || "video/mp4", andar);
     /* A capa sai do próprio vídeo, como no Feed. Se não sair, o vídeo fica
        com a capa padrão — o anexo entra do mesmo jeito. */
@@ -1673,7 +1673,7 @@ async function maisMidias(id, btn, tipo) {
         const r = await api("/api/upload", "POST", { name: f.name, dataUrl: await reduzirFoto(f) });
         MIDIAS[id].push({ tipo: "foto", url: r.path });
       } else {
-        if (f.size > 120 * 1024 * 1024) throw new Error(`tem ${Math.round(f.size / 1048576)} MB; o limite é 120 MB`);
+        if (f.size > VIDEO_MAX_MB * 1048576) throw new Error(`tem ${Math.round(f.size / 1048576)} MB; o limite é ${VIDEO_MAX_MB} MB`);
         const url = await enviarBinario("/api/upload-video", f, f.type || "video/mp4", (pct) => { btn.textContent = `Enviando${marca} ${pct}%`; });
         try { await gerarCapa(url); } catch {}   // sem capa, vale a padrão
         MIDIAS[id].push({ tipo: "video", url });
