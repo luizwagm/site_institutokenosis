@@ -170,6 +170,25 @@ server {
         add_header Cache-Control "no-store" always;
     }
 
+    # kenosis: envios grandes (liberar-envios.sh)
+    # Vídeo (até 120 MB) e PDF (até 30 MB) do painel. Só estas duas rotas
+    # passam de 25 MB; o corpo segue em fluxo e a aplicação corta no limite.
+    # Sem isto o nginx devolve 413 em HTML e o painel não sabe dizer por quê.
+    location ~ ^/api/upload-(video|pdf)\$ {
+        client_max_body_size    130m;
+        proxy_request_buffering off;
+        client_body_timeout     300s;
+        proxy_send_timeout      300s;
+        proxy_read_timeout      300s;
+
+        proxy_pass http://127.0.0.1:$PORTA;
+        proxy_http_version 1.1;
+        proxy_set_header Host              \$host;
+        proxy_set_header X-Real-IP         \$remote_addr;
+        proxy_set_header X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:$PORTA;
         proxy_http_version 1.1;

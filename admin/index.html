@@ -1487,6 +1487,20 @@ function escolherArquivos(aceita, varios) {
     fi.click();
   });
 }
+/* Por que o envio foi recusado, em português.
+
+   A aplicação responde em JSON, mas quem barra primeiro é o nginx — e ele
+   responde em HTML. Foi o que aconteceu em produção (2.17.2): todo vídeo acima
+   de 25 MB voltava 413 do nginx, o JSON não abria e a tela dizia só "não
+   consegui enviar", sem pista nenhuma. Agora o código do erro vira motivo. */
+function motivoDaRecusa(xhr, r, padrao) {
+  if (r && r.error) return r.error;
+  if (xhr.status === 413) return "O arquivo é maior do que o servidor aceita. Para vídeos grandes, suba no YouTube e cole o link.";
+  if (xhr.status === 401) return "Sua sessão terminou. Entre de novo no painel e repita o envio.";
+  if (xhr.status === 502 || xhr.status === 503 || xhr.status === 504) return "O servidor demorou ou estava reiniciando. Tente de novo em instantes.";
+  return `${padrao} (código ${xhr.status || "sem resposta"}).`;
+}
+const VIDEO_MAX_MB = 120;   // o mesmo VIDEO_MAX do server.js
 /* Envio em binário com progresso — o mesmo contrato do /api/upload-video. */
 function enviarBinario(rota, file, tipo, aoAndar) {
   return new Promise((ok, falha) => {
@@ -1497,7 +1511,7 @@ function enviarBinario(rota, file, tipo, aoAndar) {
     xhr.upload.onprogress = (e) => { if (e.lengthComputable && aoAndar) aoAndar(Math.round((e.loaded / e.total) * 100)); };
     xhr.onload = () => {
       let r = {}; try { r = JSON.parse(xhr.responseText); } catch {}
-      if (xhr.status === 200 && r.path) ok(r.path); else falha(new Error(r.error || "Não consegui enviar o arquivo."));
+      if (xhr.status === 200 && r.path) ok(r.path); else falha(new Error(motivoDaRecusa(xhr, r, "Não consegui enviar o arquivo")));
     };
     xhr.onerror = () => falha(new Error("A conexão caiu durante o envio."));
     xhr.send(file);
@@ -1797,6 +1811,8 @@ function pickVideo(btn) {
   fi.type = "file"; fi.accept = "video/mp4,video/webm,video/ogg,video/quicktime";
   fi.onchange = () => {
     const file = fi.files[0]; if (!file) return;
+    if (file.size > VIDEO_MAX_MB * 1048576)
+      return toast(`O vídeo tem ${Math.round(file.size / 1048576)} MB e o limite é ${VIDEO_MAX_MB} MB. Para vídeos maiores, suba no YouTube e cole o link.`, true);
     const rotulo = btn.textContent;
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/upload-video");
@@ -1823,7 +1839,7 @@ function pickVideo(btn) {
           if (mini) mini.replaceWith(img); else btn.parentElement.appendChild(img);
           toast("Vídeo enviado, com capa tirada do próprio vídeo. Salve o item.");
         }).catch((e) => toast(`Vídeo enviado. A capa não saiu (${e.message}) — ele fica com a capa padrão. Salve o item.`, true));
-      } else toast(r.error || "Não consegui enviar o vídeo.", true);
+      } else toast(motivoDaRecusa(xhr, r, "Não consegui enviar o vídeo"), true);
     };
     xhr.onerror = () => { btn.disabled = false; btn.textContent = rotulo; toast("Falha de rede ao enviar o vídeo.", true); };
     xhr.send(file);

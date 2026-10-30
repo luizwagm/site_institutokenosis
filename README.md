@@ -52,6 +52,12 @@ sempre HTML pronto, com o SEO já embutido — não há renderização por requi
   centro), no /feed/ e na home. Dentro da notícia nada muda.
 - **2.17.1 — desfeito:** o cliente preferiu a capa como era; o cartão do Feed voltou a
   500px de altura.
+- **2.17.2 — vídeo acima de 25 MB não subia:** o nginx do servidor aceita 25 MB por pedido
+  (`client_max_body_size 25m`) e o painel promete 120 MB. O nginx recusava com 413 em HTML,
+  antes de chegar à aplicação, e o painel dizia só "Não consegui enviar o vídeo". Conserto em
+  duas partes: `sudo ./nginx/liberar-envios.sh` (UMA vez no servidor) libera 130 MB só para
+  `/api/upload-video` e `/api/upload-pdf`, em fluxo; e o painel agora diz o motivo da
+  recusa (tamanho, sessão, servidor reiniciando) e barra antes de enviar o que passa de 120 MB.
 
 Para republicar sem abrir o painel (útil em script):
 
@@ -197,6 +203,9 @@ O `criar-site.sh` já deixa configurado:
 
 - `client_max_body_size 25m` — o painel envia foto em base64; o padrão de 1 MB
   devolveria 413.
+- um `location` só para `/api/upload-video` e `/api/upload-pdf` com 130 MB e corpo em
+  fluxo — vídeo é de até 120 MB. Servidor instalado antes da 2.17.2: rode uma vez
+  `sudo ./nginx/liberar-envios.sh institutokenosis.com`.
 - `X-Forwarded-For` e `X-Forwarded-Proto` — sem eles o contador vê um único
   visitante e o cookie de sessão perde o `Secure`.
 - `error_page 502 503 504 /manutencao.html` — a tela de manutenção aparece

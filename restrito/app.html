@@ -397,6 +397,8 @@
     .paginacao:empty{display:none}
     .pglbl{font-size:.82rem;font-weight:600;color:var(--muted)}
     .pgsel{width:auto;margin:0;padding:.3rem .5rem;font-size:.85rem}
+    /* aniversariante de hoje: a linha que a secretaria liga primeiro */
+    tr.aniv-hoje td{background:#fff8e1}
     .pginfo{color:var(--dim);font-size:.82rem}
     .pgnav{display:flex;align-items:center;gap:.25rem;margin-left:auto;flex-wrap:wrap}
     .pgbtn{min-width:32px;padding:.28rem .5rem;border:1px solid var(--line2);background:#fff;
@@ -876,6 +878,7 @@
         <h1 id="mod-titulo"></h1>
         <div style="display:flex;gap:.5rem">
           <button class="btn btn-ghost btn-sm" id="mod-imprimir" onclick="imprimirAgenda()" hidden>🖨 Imprimir</button>
+          <button class="btn btn-ghost btn-sm" id="mod-aniv" onclick="abrirAniversariantes()" hidden>🎂 Aniversariantes</button>
           <button class="btn btn-ghost btn-sm" id="mod-relacao" onclick="imprimirRelacaoUsuarios()" hidden>🖨 Imprimir relação</button>
           <button class="btn btn-ghost btn-sm" onclick="exportarCSV()">Exportar CSV</button>
           <button class="btn btn-navy" id="mod-novo" onclick="abrirForm()">+ Novo</button>
@@ -938,6 +941,21 @@
       <div class="stat-grid" id="relpac-stats"></div>
       <div class="card" id="relpac-tabela" style="padding:0;overflow:auto"></div>
       <div id="relpac-paginacao" class="paginacao"></div>
+    </section>
+
+    <!-- Aniversariantes do mês (1.39.0) — sai da tela de Usuários pelo botão 🎂.
+         É a lista do telefonema e do bolo da turma: dia, nome, idade e telefone. -->
+    <section class="panel" id="pane-aniv">
+      <div class="topbar">
+        <h1 id="aniv-titulo">Aniversariantes do mês</h1>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="voltarDosAniversariantes()">← Usuários</button>
+          <button class="btn btn-ghost btn-sm" onclick="imprimirAniversariantes()">🖨 Imprimir relação</button>
+        </div>
+      </div>
+      <div class="filtro-data" id="aniv-filtro"></div>
+      <div class="stat-grid" id="aniv-stats"></div>
+      <div class="card" id="aniv-tabela" style="padding:0;overflow:auto"></div>
     </section>
 
     <!-- ====================================================================
@@ -1378,6 +1396,8 @@ async function recarregarCache(){
   try { CACHE.servicos = await api("servicos"); } catch {}
 }
 const rotuloRef = (r) => r.nome ?? r.title ?? ("#"+r.id);
+/* Ordem alfabética do português: "Álvaro" junto de "Alberto", "ana" junto de "Ana". */
+const ALFA = new Intl.Collator("pt-BR", { sensitivity:"base", numeric:true }).compare;
 const nomePac = (id) => { const r=CACHE.pacientes.find((p)=>String(p.id)===String(id)); return r?r.nome:"—"; };
 const nomeProf = (id) => { const r=CACHE.profissionais.find((p)=>String(p.id)===String(id)); return r?r.nome:"—"; };
 
@@ -2566,6 +2586,7 @@ function mostrarModulo(){
   reiniciarPagina(MOD);
   montarFiltroSituacao();
   $("#mod-relacao").hidden = MOD !== "pacientes";
+  $("#mod-aniv").hidden = MOD !== "pacientes";
   $("#mod-periodo").innerHTML = COM_PERIODO.has(MOD) ? periodoHTML(MOD) : "";
   if(COM_PERIODO.has(MOD)) renderPeriodoInfo();
   /* A última coluna leva a MESMA classe do <td>: é por ela que o celular
@@ -2612,6 +2633,11 @@ async function carregarLista(){
   try {
     const q=m.busca?$("#mod-busca").value.trim():"";
     LISTA=await api(MOD+(q?"?q="+encodeURIComponent(q):""));
+    /* Usuários em ORDEM ALFABÉTICA (1.39.0). O servidor devolve do mais novo
+       para o mais antigo, e o nome não dá para ordenar no SQL com segurança:
+       a colação do banco põe "Álvaro" depois de "Zeca" e minúscula depois de
+       maiúscula. Aqui é pt-BR de verdade — acento e caixa não mudam a ordem. */
+    if(MOD==="pacientes") LISTA.sort((a,b)=>ALFA(a.nome,b.nome) || a.id-b.id);
   } catch(e){ $("#mod-tbody").innerHTML=`<tr><td colspan="${m.colunas.length+1}" class="vazio">${escA(e.message)}</td></tr>`; return; }
   if(MOD==="atendimentos") pintarAtendimentos();
   else renderTabela();
@@ -4995,6 +5021,106 @@ function imprimirRelacaoUsuarios(){
   const btn=document.querySelector('.navbtn[data-nav="relatorios_pacientes"]');
   if(btn && btn.style.display!=="none") btn.click();
   else toast("Seu perfil não tem acesso aos relatórios.",true);
+}
+
+/* ==========================================================================
+   ANIVERSARIANTES DO MÊS (1.39.0)
+
+   Tela própria, aberta pelo botão 🎂 da lista de Usuários. Lê a MESMA lista
+   de usuários (o nascimento é cifrado no banco: não há como filtrar o mês no
+   SQL — a lista volta decifrada e o recorte é aqui, como a busca por CPF).
+
+   Começa no mês corrente e em ATIVOS (quem saiu do Instituto não entra na
+   ligação de parabéns), com Todos a um clique. Ordem: dia, depois nome.
+   ========================================================================== */
+const MESES_NOME = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+let ANIV = { lista: [], mes: 0, situacao: "1" };
+
+/* PURA: quem nasceu no mês `mes` (1–12), com o dia e a idade que completa no
+   ano `ano`. Fica sem relógio de propósito — a suíte prova 29/02, a pessoa
+   nascida neste ano e a data torta sem depender do dia em que roda. */
+function aniversariantesDoMes(lista, mes, ano){
+  return (lista||[]).map((p)=>{
+    const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(p.nascimento||""));
+    if(!m || Number(m[2])!==Number(mes)) return null;
+    const dia=Number(m[3]); if(dia<1||dia>31) return null;
+    return { ...p, dia, completa: Number(ano)-Number(m[1]) };
+  }).filter(Boolean).sort((a,b)=> a.dia-b.dia || ALFA(String(a.nome||""),String(b.nome||"")));
+}
+const anivIdade = (x) => x.completa>0 ? `${x.completa} ano${x.completa>1?"s":""}` : "—";
+const anivDia = (x, mes) => `${String(x.dia).padStart(2,"0")}/${String(mes).padStart(2,"0")}`;
+
+async function abrirAniversariantes(){
+  document.querySelectorAll(".panel").forEach((x)=>x.classList.remove("on"));
+  $("#pane-aniv").classList.add("on");
+  window.scrollTo({ top:0 });
+  if(!ANIV.mes) ANIV.mes = new Date().getMonth()+1;
+  $("#aniv-tabela").innerHTML='<p class="vazio">Carregando…</p>';
+  try{ ANIV.lista = await api("pacientes"); }
+  catch(e){ $("#aniv-tabela").innerHTML='<p class="vazio">'+escA(e.message)+'</p>'; return; }
+  pintarAniversariantes();
+}
+function voltarDosAniversariantes(){
+  const btn=document.querySelector('.navbtn[data-nav="pacientes"]');
+  if(btn) btn.click();
+}
+function trocarMesAniv(v){ ANIV.mes = ((Number(v)-1+12)%12)+1; pintarAniversariantes(); }
+function trocarSituacaoAniv(v){ ANIV.situacao = v; pintarAniversariantes(); }
+/* O que entra na relação: o mês escolhido E a situação escolhida. A tela e a
+   impressão perguntam aqui — as duas nunca mostram listas diferentes. */
+function anivVisiveis(){
+  const base = ANIV.situacao==="1" ? ANIV.lista.filter(estaAtivo) : ANIV.lista;
+  return aniversariantesDoMes(base, ANIV.mes, new Date().getFullYear());
+}
+function pintarAniversariantes(){
+  const mes=ANIV.mes, hoje=new Date(), ehEsteMes = mes===hoje.getMonth()+1;
+  const bt=(v,r)=>`<button class="vbtn${ANIV.situacao===v?" on":""}" onclick="trocarSituacaoAniv('${v}')">${r}</button>`;
+  $("#aniv-titulo").textContent = `Aniversariantes de ${MESES_NOME[mes-1]}`;
+  $("#aniv-filtro").innerHTML=`<span class="pglbl">Mês:</span>
+    <button class="btn btn-ghost btn-sm" onclick="trocarMesAniv(${mes-1})" title="Mês anterior" aria-label="Mês anterior">‹</button>
+    <select class="pgsel" id="aniv-mes" onchange="trocarMesAniv(this.value)" aria-label="Mês">${
+      MESES_NOME.map((n,i)=>`<option value="${i+1}"${i+1===mes?" selected":""}>${n}</option>`).join("")}</select>
+    <button class="btn btn-ghost btn-sm" onclick="trocarMesAniv(${mes+1})" title="Próximo mês" aria-label="Próximo mês">›</button>
+    <span class="pglbl" style="margin-left:.6rem">Mostrar:</span>
+    <span class="vista-toggle" style="margin:0">${bt("1","Ativos")}${bt("","Todos")}</span>`;
+  const d=anivVisiveis();
+  const deHoje = ehEsteMes ? d.filter((x)=>x.dia===hoje.getDate()).length : 0;
+  $("#aniv-stats").innerHTML=[["No mês",d.length],...(ehEsteMes?[["Hoje",deHoje]]:[])]
+    .map(([r,num])=>`<div class="stat"><b>${num}</b><span>${r}</span></div>`).join("");
+  if(!d.length){
+    $("#aniv-tabela").innerHTML=`<p class="vazio">Nenhum aniversariante em ${MESES_NOME[mes-1]}${ANIV.situacao==="1"?" entre os usuários ativos":""}.</p>`;
+    return;
+  }
+  $("#aniv-tabela").innerHTML=`<table>
+    <thead><tr><th style="width:90px">Dia</th><th class="col-nome">Usuário</th><th style="width:110px">Completa</th>
+      <th style="width:150px">Telefone</th><th style="width:96px">Situação</th></tr></thead>
+    <tbody>${d.map((x)=>{
+      const ehHoje = ehEsteMes && x.dia===hoje.getDate();
+      return `<tr${ehHoje?' class="aniv-hoje"':""}>
+      <td class="c-inteiro"><b>${anivDia(x,mes)}</b>${ehHoje?' <span class="tag tag-Ativo">hoje</span>':""}</td>
+      <td><b>${escA(x.nome)}</b></td>
+      <td class="c-inteiro">${anivIdade(x)}</td>
+      <td class="c-inteiro">${escA(x.telefone||"—")}</td>
+      <td>${estaAtivo(x)?'<span class="tag tag-Ativo">Ativo</span>':'<span class="tag tag-Inativo">Inativo</span>'}</td>
+    </tr>`;}).join("")}</tbody></table>`;
+}
+/* Impressão com o timbre de todas as outras: cabeçalho da tabela no <thead>
+   (repete em cada folha) e larguras somando 100 (table-layout fixo). Retrato:
+   são cinco colunas curtas. */
+function imprimirAniversariantes(){
+  const d=anivVisiveis(), mes=ANIV.mes;
+  if(!d.length) return toast("Nenhum aniversariante para imprimir neste mês.",true);
+  const nomeMes=MESES_NOME[mes-1];
+  const corpo=`<table class="m"><thead><tr><th style="width:11%">Dia</th><th style="width:45%">Usuário</th>
+      <th style="width:12%">Completa</th><th style="width:20%">Telefone</th><th style="width:12%">Situação</th></tr></thead><tbody>`+
+    d.map((x)=>`<tr>
+      <td>${anivDia(x,mes)}</td>
+      <td>${escA(x.nome)}</td>
+      <td>${anivIdade(x)}</td>
+      <td>${escA(x.telefone||"—")}</td>
+      <td>${estaAtivo(x)?"Ativo":"Inativo"}</td></tr>`).join("")+`</tbody></table>`;
+  abrirImpressao(`Aniversariantes de ${nomeMes}`, corpo, {
+    subtitulo:`${d.length} usuário(s)${ANIV.situacao==="1"?" ativos":""} · emitida em ${new Date().toLocaleDateString("pt-BR")}` });
 }
 
 /* ==========================================================================

@@ -24,7 +24,7 @@ const ROOT = __dirname;
 const APP_DIR = path.join(ROOT, "restrito");
 // Versão única do sistema de gestão (/restrito) e do portal do associado
 // (/externo). Mudou um dos dois → sobe aqui; os dois exibem o mesmo número.
-const SISTEMA_VERSION = "1.38.0";
+const SISTEMA_VERSION = "1.39.0";
 // CSP das telas do sistema de gestão e do portal — bloqueia script/objeto
 // externos; só libera as fontes do Google. 'unsafe-inline' é preciso porque as
 // telas usam script/estilo inline. A janela de impressão (about:blank via
@@ -198,6 +198,13 @@ function proteger(tabela, obj) {
    que as entregou.
    ========================================================================== */
 const HISTORICO_VERSOES = [
+  { versao: "1.39.0", data: "2026-10-30", titulo: "Usuários em ordem alfabética e aniversariantes do mês", mudancas: [
+    "A lista de Usuários passou a sair em ordem alfabética, sem que acento ou letra maiúscula mudem a posição",
+    "Novo botão Aniversariantes na tela de Usuários: abre a relação de quem faz aniversário no mês",
+    "Escolha o mês pelas setas ou pela lista; começa no mês atual e mostra os ativos, com Todos a um clique",
+    "Cada linha traz o dia, o nome, a idade que a pessoa completa e o telefone; os de hoje aparecem destacados",
+    "Imprimir relação sai com o timbre do Instituto e o cabeçalho das colunas em todas as páginas",
+  ] },
   { versao: "1.38.0", data: "2026-10-07", titulo: "Frequência: pôr e tirar colunas de data", mudancas: [
     "A folha de frequência deixou de ter dez colunas fixas: o botão + no fim dos dias acrescenta uma coluna",
     "O × no alto de cada coluna de data a retira; com dia ou cor digitados, pergunta antes",
